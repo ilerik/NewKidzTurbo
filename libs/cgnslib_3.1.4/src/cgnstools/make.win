@@ -1,0 +1,61 @@
+# makefile include for WIN32
+
+#-------------------------------------------------------
+# CGNS setup
+#-------------------------------------------------------
+
+CGNSDIR  = ..\..
+!include $(CGNSDIR)\make.defs
+CGNSLIB  = $(CGNSDIR)\$(LIBCGNS)
+
+SHAREDIR = $(INSTALLDIR)\share
+
+#-------------------------------------------------------
+# linker options
+#-------------------------------------------------------
+
+LINK   = link
+LFLAGS = /nologo /release
+
+#-------------------------------------------------------
+# path to the standard Tcl/Tk includes and libraries
+# the include path needs to include tcl.h, tk.h,
+# tkWinInt.h and the X11 include subdirectory
+#-------------------------------------------------------
+
+TCLINC = 
+TCLLIB = 
+TKLIB  = 
+
+#-------------------------------------------------------
+# TKOGLINCS give the include directories
+# TKOGLLIB is the library relative to cgnsplot directory
+#-------------------------------------------------------
+
+TKOGLINCS = $(TCLINC)
+TKOGLLIB  = ..\tkogl\tkogl.lib
+
+#----------------------------------------------------------
+# compile options for cgnsplot
+#    -DNO_MESH_BOUNDARIES - no structured mesh boundaries
+#    -DNO_CUTTING_PLANE   - no cutting plane
+#----------------------------------------------------------
+
+PLOTOPTS = 
+
+#-------------------------------------------------------
+# set to trap math errors in calculator
+#-------------------------------------------------------
+
+MATHERR = /DUSE_MATHERR
+
+#-------------------------------------------------------
+# windows libraries
+#-------------------------------------------------------
+
+dlllibs = gdi32.lib comdlg32.lib
+
+guilibs	= libcmt.lib oldnames.lib kernel32.lib advapi32.lib \
+	user32.lib gdi32.lib comdlg32.lib winspool.lib
+
+ogllibs = opengl32.lib glu32.lib
