@@ -13,5 +13,114 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\TurbulenceModels">
+      <UniqueIdentifier>{32ba5afc-9e16-4675-8d62-7b6bb8346558}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Utility">
+      <UniqueIdentifier>{254123d7-02e9-4660-8dbb-8f49379aee41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\GridLoading">
+      <UniqueIdentifier>{f08894cb-2a71-47ad-b437-6ca84e06d1fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\GridGeneration">
+      <UniqueIdentifier>{f7761cfe-4d78-4ed9-b8d6-cdcb1ac1baf6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\RiemannSolvers">
+      <UniqueIdentifier>{2fadc18e-377d-4313-b0ef-18035a04d68e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Alglib">
+      <UniqueIdentifier>{01bc6e70-fc46-42a5-8361-e7dfcad034f6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
+      <Filter>Header Files\TurbulenceModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\turbulentmodels\garbarukmodel.h">
+      <Filter>Header Files\TurbulenceModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\turbulentmodels\SAmodel.h">
+      <Filter>Header Files\TurbulenceModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\basetypes.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\datatypes.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridloading\cgnsload.h">
+      <Filter>Header Files\GridLoading</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridgeneration\gengrid1D.h">
+      <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridgeneration\gengrid2D.h">
+      <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridgeneration\gridgeneration.h">
+      <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridgeneration\geomfunctions.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h">
+      <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\riemannsolvers\riemannsolvers.h">
+      <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\grid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\patch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibmisc.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\ap.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\dataanalysis.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\diffequations.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\fasttransforms.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\integration.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\interpolation.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\linalg.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\optimization.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\solvers.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\specialfunctions.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp">
+      <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
