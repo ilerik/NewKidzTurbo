@@ -108,6 +108,25 @@ public:
 		};
 	};
 
+	class ConstantVelocityBoundaryCondition : public BoundaryCondition {
+	public:
+		Vector V;
+		ConstantVelocityBoundaryCondition(Model& _model, Vector _V) : BoundaryCondition(_model), V(_V) {};
+
+		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {
+			ConservativeVariables res = inV;
+			Vector V_in(inV.rou, inV.rov, inV.row);
+			V_in = (1.0/inV.ro)*V_in;
+
+			Vector V_dummy = 2.0*V - V_in;
+			res.rou = inV.ro*V_dummy.x;
+			res.rov = inV.ro*V_dummy.y;
+			res.row = inV.ro*V_dummy.z;
+			res.roE = inV.roE - 0.5*inV.ro*V_in.mod()*V_in.mod() + 0.5*res.ro*V_dummy.mod()*V_dummy.mod();
+			return res;
+		};
+	};
+
 	class SymmetryBoundaryCondition : public BoundaryCondition {
 	public:
 		SymmetryBoundaryCondition(Model& _model) : BoundaryCondition(_model) {};
@@ -1564,35 +1583,46 @@ public:
 		ofs.close();
 	};
 
-	//Save solution in a file
-	void SaveSolution(std::string fname = "SavedSolution.txt")
+	//Save solution in a file //TO DO not portable
+	void SaveSolution(std::string fname = "SavedSolution.sol")
 	{
-		std::ofstream ofs(fname);
-		ofs << std::scientific;
-		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
-		ofs << totalTime << "\n";			
+		std::ofstream ofs;		
+		ofs.open(fname, std::ios::binary | std::ios::out);		
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();				
+		ofs.write( reinterpret_cast<char*>( &totalTime ), sizeof totalTime );
 		for(int i=0; i<cells.size(); i++)
 		{
 			int Index = cells[i]->GlobalIndex;	//Global Index of cell
-			ofs << Index << " " << U[Index].ro << " " << U[Index].roE << " " << U[Index].rou << " ";
-			ofs << U[Index].rov << " " << U[Index].row << "\n";
+			ofs.write( reinterpret_cast<char*>( &Index ), sizeof Index );
+			ofs.write( reinterpret_cast<char*>( &U[Index].ro ), sizeof U[Index].ro );
+			ofs.write( reinterpret_cast<char*>( &U[Index].roE ), sizeof U[Index].roE );
+			ofs.write( reinterpret_cast<char*>( &U[Index].rou ), sizeof U[Index].rou );
+			ofs.write( reinterpret_cast<char*>( &U[Index].rov ), sizeof U[Index].rov );
+			ofs.write( reinterpret_cast<char*>( &U[Index].row ), sizeof U[Index].row );			
 		};
 		ofs.close();
 	};
 	
-	//Load a solution file
+	//Load a solution file //TO DO not portable
 	void LoadSolution(std::string fname = "SavedSolution.txt")
 	{
-		std::ifstream ifs(fname);
-		ifs >> totalTime;				
+		std::ifstream ifs;
+		ifs.open(fname, std::ios::binary | std::ios::in);
+		ifs.read( reinterpret_cast<char*>( &totalTime ), sizeof totalTime );
 		while(!ifs.eof())
 		{
-			int GlobalInd;
-			ifs >> GlobalInd;
-			ifs >> U[GlobalInd].ro >> U[GlobalInd].roE >> U[GlobalInd].rou >> U[GlobalInd].rov >> U[GlobalInd].row;
+			int Index;			
+			ifs.read( reinterpret_cast<char*>( &Index ), sizeof Index );
+			ifs.read( reinterpret_cast<char*>( &U[Index].ro ), sizeof U[Index].ro );
+			ifs.read( reinterpret_cast<char*>( &U[Index].roE ), sizeof U[Index].roE );
+			ifs.read( reinterpret_cast<char*>( &U[Index].rou ), sizeof U[Index].rou );
+			ifs.read( reinterpret_cast<char*>( &U[Index].rov ), sizeof U[Index].rov );
+			ifs.read( reinterpret_cast<char*>( &U[Index].row ), sizeof U[Index].row );			
 		};
 		ifs.close();
 	};
+
+
 	void ReadSolutionFromCGNS(std::string fname) {
 		// TO DO process errors
 		int fn;
