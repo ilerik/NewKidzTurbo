@@ -275,10 +275,6 @@ bool RunPoiseuilleTest() {
 	model.SetBoundaryCondition("top", NoSlipBC);
 	model.SetBoundaryCondition("bottom", NoSlipBC);	
 
-	model.LoadSolution("Poiseuille.txt" );
-	model.ComputeGradients();
-	model.SaveToTechPlot("PoiseuilleInit.dat");
-
 	//Total time
 	double maxTime = 0.2;
 	for (int i = 0; i < 200000000; i++) {
@@ -504,7 +500,7 @@ void RunBiffFlatPlate() {
 	model.ComputeWallVariables();
 	
 
-	std::string outputSolutionFile = "solution2";	
+	std::string outputSolutionFile = "solution2";		
 
 	//Run simulation
 	bool isSave = true;	
@@ -515,7 +511,7 @@ void RunBiffFlatPlate() {
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
-		};
+		};		
 		if ((i % 100 == 0) && (isSave)) {
 			model.SaveSolution(outputSolutionFile+".txt");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
@@ -540,8 +536,8 @@ int main(int argc, char *argv[]) {
 	//RunGAWCalculation();
 	//RunPoiseuilleTest();
 	//RunSODTest();
-	RunBiffFlatPlate();
-	return 0;
+	//RunBiffFlatPlate();
+	//return 0;
 
 	//Load cgns grid			
 	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
@@ -578,24 +574,13 @@ int main(int argc, char *argv[]) {
 	double pressure = 101579;
 	double temperature = 300.214;
 
-	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);	
-	//initValues.rov = initValues.ro * 1.110223e-15;
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);		
 	model.SetInitialConditions(initValues);	
 	//Determine plate start coordinate
-	const double xPlateStart = 0.2;
-	//model.SetInitialConditionsBlasius(xPlateStart, velocity.x ,initValues.ro, initValues.roE);
-	//model.SetInitialConditionsLinear(initValues);
-	//model.SetInitialParabola();
-	//model.ComputeParabolaGradients();	
+	const double xPlateStart = 0.2;	
 
 	//Read solution from CGNS
-	model.ReadSolutionFromCGNS(solutionFile);	
-	//model.SaveSliceToTechPlot("uVisc.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-	//model.ReadSolutionFromCGNS("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\solutionNoVisc.cgns");
-	//model.SaveSliceToTechPlot("uNoVisc.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-	//model.ReadSolutionFromCGNS("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\solutionInit.cgns");
-	//model.Init();	
-	//return 0;
+	model.ReadSolutionFromCGNS(solutionFile);		
 
 	//Boundary conditions
 	//Inlet boundary
@@ -612,21 +597,25 @@ int main(int argc, char *argv[]) {
 	//No slip boundary
 	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
 
+	//Fixed velocity boundary condition
+	Model<Roe3DSolverPerfectGas>::ConstantVelocityBoundaryCondition FixedVelocityBC(model, velocity);
+
 	//Set boundary conditions
 	model.SetBoundaryCondition("inlet", InletBC);
 	model.SetBoundaryCondition("outlet", OutletBC);
-	model.SetBoundaryCondition("plate", NoSlipBC);
-	//model.SetBoundaryCondition("plate", SymmetryBC);
+	model.SetBoundaryCondition("plate", NoSlipBC);	
 	model.SetBoundaryCondition("symmetry", SymmetryBC);
-	model.SetBoundaryCondition("top_left", SymmetryBC);
-	model.SetBoundaryCondition("top_right", SymmetryBC);
+	//model.SetBoundaryCondition("top_left", SymmetryBC);
+	//model.SetBoundaryCondition("top_right", SymmetryBC);
+	model.SetBoundaryCondition("top_left", FixedVelocityBC);
+	model.SetBoundaryCondition("top_right", FixedVelocityBC);
 
 	//Set wall boundaries		
 	model.SetWallBoundary("plate", true);
 	model.ComputeWallDistances();
 	model.DistanceSorting();
-	//model.EnableViscous();
-	model.DisableViscous();
+	model.EnableViscous();
+	//model.DisableViscous();
 
 	 
 	//Init model
@@ -638,27 +627,19 @@ int main(int argc, char *argv[]) {
 
 	//Load solution
 	std::string outputSolutionFile = "solution";
-	//model.LoadSolution("solOutletInviscid.txt");
-	//model.LoadSolution(solutionFile+".txt");
-	//model.LoadSolution("sol.txt");
-	//model.LoadSolution("solInviscid.txt");
-	//model.LoadSolution("solViscousBase.txt");
-	//model.LoadSolution("solViscousTest2.txt");
-	//model.SaveSliceToTechPlot("u.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-	//return 0;
 
 	//Run simulation
 	bool isSave = true;	
 	for (int i = 0; i < 1000000; i++) {
 		model.Step();	
-		if (i % 10 == 0) {
+		if (i % 10 == 0)  {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
 		};
 		if ((i % 100 == 0) && (isSave)) {
-			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveSolution(outputSolutionFile+".sol");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
 			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
 			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
@@ -668,7 +649,7 @@ int main(int argc, char *argv[]) {
 
 	//Save result to techplot
 	if (isSave) {
-		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveSolution(outputSolutionFile+".sol");
 		model.SaveToTechPlot(outputSolutionFile+".dat");
 		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
 		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
