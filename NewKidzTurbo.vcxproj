@@ -88,6 +88,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>cgns.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Debug</AdditionalLibraryDirectories>
+      <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -120,6 +121,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>cgns.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -131,6 +133,7 @@
     <ClInclude Include="src\gridloading\cgnsload.h" />
     <ClInclude Include="src\model.h" />
     <ClInclude Include="src\patch.h" />
+    <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />

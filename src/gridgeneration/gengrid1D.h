@@ -83,6 +83,12 @@ Grid GenGrid1D(int N, double lBegin, double lEnd, Vector direction)
 		};		
 		new_face.CGNSType = NODE;
 		g.ComputeGeometricProperties(new_face);
+
+		//Adjust first cell facenormal
+		if (i == 0) {
+			//Left border			
+			new_face.FaceNormal *= -1;
+		};
 		g.faces.add(new_face);		
 	};
 

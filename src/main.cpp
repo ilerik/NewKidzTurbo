@@ -114,7 +114,8 @@ ConservativeVariables SODTestInitDistribution(Vector r, void *par) {
 };
 
 bool RunSODTest() {
-	Model<Roe3DSolverPerfectGas> model;
+	//Model<Roe3DSolverPerfectGas> model;
+	Model<Godunov3DSolverPerfectGas> model;
 	Grid grid;
 
 	//Shock tube problem setting
@@ -142,7 +143,7 @@ bool RunSODTest() {
 
 	//Boundary conditions
 	//No slip boundary
-	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+	Model<Godunov3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
 	model.SetBoundaryCondition("left", NoSlipBC);
 	model.SetBoundaryCondition("right", NoSlipBC);
 
@@ -154,7 +155,7 @@ bool RunSODTest() {
 
 	//Total time
 	double maxTime = 0.2;
-	for (int i = 0; i < 200000000; i++) {
+	for (int i = 0; i < 2000000000; i++) {
 		model.Step();	
 		if (i % 1 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
@@ -530,14 +531,121 @@ void RunBiffFlatPlate() {
 	};
 };
 
+void GodunovTests() {
+	Godunov3DSolverPerfectGas solver;
+	Face f;
+	f.FaceNormal = Vector(1,0,0);
+	ConservativeVariables UL;
+	ConservativeVariables UR;
+
+	////Numerical tests for exact solution of riemann proble
+	// See Toro p. 129
+	Godunov3DSolverPerfectGas::StarVariables starValues;
+	//Test 1 (SOD shock tube problem)
+	std::cout<<"Test 1 run (SOD shock tube)\n";
+	solver.SetGamma(1.4);
+	//Left state
+	double roL = 1.0;
+	double pL = 1.0;
+	double uL = 0;
+
+	//Right state
+	double roR = 0.125;
+	double pR = 0.1;
+	double uR = 0;
+	starValues = solver.ComputeStarVariables(roL, uL, pL, roR, uR, pR);
+
+	//Output results	
+	std::cout<<"pStar = "<<starValues.pStar<<"; pStarRight = "<<0.30313<<"\n";
+	std::cout<<"uStar = "<<starValues.uStar<<"; uStarRight = "<<0.92745<<"\n";
+	std::cout<<"roStarL = "<<starValues.roStarL<<"; roStarLRight = "<<0.42632<<"\n";
+	std::cout<<"roStarR = "<<starValues.roStarR<<"; roStarRRight = "<<0.26557<<"\n";
+	if (starValues.leftWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Left wave is shock.\n";
+	} else {
+		std::cout<<"Left wave is rarefaction.\n";
+	};
+	if (starValues.rightWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Right wave is shock.\n";
+	} else {
+		std::cout<<"Right wave is rarefaction.\n";
+	};
+	std::cout<<std::endl;
+	 
+	//Test 2 (123 problem)
+	std::cout<<"Test 2 run (123 problem)\n";
+	solver.SetGamma(1.4);
+	//Left state
+	roL = 1.0;
+	pL = 0.4;
+	uL = -2.0;
+
+	//Right state
+	roR = 1.0;
+	pR = 0.4;
+	uR = 2.0;
+	starValues = solver.ComputeStarVariables(roL, uL, pL, roR, uR, pR);
+
+	//Output results	
+	std::cout<<"pStar = "<<starValues.pStar<<"; pStarRight = "<<0.00189<<"\n";
+	std::cout<<"uStar = "<<starValues.uStar<<"; uStarRight = "<<0.00000<<"\n";
+	std::cout<<"roStarL = "<<starValues.roStarL<<"; roStarLRight = "<<0.02185<<"\n";
+	std::cout<<"roStarR = "<<starValues.roStarR<<"; roStarRRight = "<<0.02185<<"\n";	 
+	if (starValues.leftWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Left wave is shock.\n";
+	} else {
+		std::cout<<"Left wave is rarefaction.\n";
+	};
+	if (starValues.rightWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Right wave is shock.\n";
+	} else {
+		std::cout<<"Right wave is rarefaction.\n";
+	};
+	std::cout<<std::endl;
+
+	//Test 3
+	std::cout<<"Test 3 run\n";
+	solver.SetGamma(1.4);
+	//Left state
+	roL = 1.0;
+	pL = 1000.0;
+	uL = 0.0;
+
+	//Right state
+	roR = 1.0;
+	pR = 0.01;
+	uR = 0.0;
+	starValues = solver.ComputeStarVariables(roL, uL, pL, roR, uR, pR);
+
+	//Output results	
+	std::cout<<"pStar = "<<starValues.pStar<<"; pStarRight = "<<460.894 <<"\n";
+	std::cout<<"uStar = "<<starValues.uStar<<"; uStarRight = "<<19.5975 <<"\n";
+	std::cout<<"roStarL = "<<starValues.roStarL<<"; roStarLRight = "<<0.57506<<"\n";
+	std::cout<<"roStarR = "<<starValues.roStarR<<"; roStarRRight = "<<5.99924<<"\n";	 
+	if (starValues.leftWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Left wave is shock.\n";
+	} else {
+		std::cout<<"Left wave is rarefaction.\n";
+	};
+	if (starValues.rightWave == Godunov3DSolverPerfectGas::Shock) {
+		std::cout<<"Right wave is shock.\n";
+	} else {
+		std::cout<<"Right wave is rarefaction.\n";
+	};
+	std::cout<<std::endl;	     
+
+	return;
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {	
+	//GodunovTests();
 	//RunSAFlatPlate();
 	//RunGAWCalculation();
 	//RunPoiseuilleTest();
-	//RunSODTest();
+	RunSODTest();
 	//RunBiffFlatPlate();
-	//return 0;
+	return 0;
 
 	//Load cgns grid			
 	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
@@ -605,10 +713,9 @@ int main(int argc, char *argv[]) {
 	model.SetBoundaryCondition("outlet", OutletBC);
 	model.SetBoundaryCondition("plate", NoSlipBC);	
 	model.SetBoundaryCondition("symmetry", SymmetryBC);
-	//model.SetBoundaryCondition("top_left", SymmetryBC);
-	//model.SetBoundaryCondition("top_right", SymmetryBC);
-	model.SetBoundaryCondition("top_left", FixedVelocityBC);
-	model.SetBoundaryCondition("top_right", FixedVelocityBC);
+	model.SetBoundaryCondition("top_left", SymmetryBC);
+	model.SetBoundaryCondition("top_right", SymmetryBC);
+	
 
 	//Set wall boundaries		
 	model.SetWallBoundary("plate", true);

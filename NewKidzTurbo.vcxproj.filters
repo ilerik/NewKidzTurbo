@@ -78,6 +78,9 @@
     <ClInclude Include="src\patch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h">
+      <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
