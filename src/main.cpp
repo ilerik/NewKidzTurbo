@@ -10,6 +10,8 @@
 #include "garbarukmodel.h"
 #include "SAmodel.h"
 #include "biffplatemodel.h"
+#include "bicgstab.h"
+
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -132,7 +134,7 @@ bool RunSODTest() {
 	model.DisableViscous();
 
 	//Set computational settings
-	model.SetCFLNumber(0.35);
+	model.SetCFLNumber(2.0);
 	model.SetHartenEps(0.005);
 
 	//Bind computational grid
@@ -156,7 +158,8 @@ bool RunSODTest() {
 	//Total time
 	double maxTime = 0.2;
 	for (int i = 0; i < 2000000000; i++) {
-		model.Step();	
+		model.ExplicitTimeStep();	
+		//model.Step();
 		if (i % 1 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
@@ -637,20 +640,50 @@ void GodunovTests() {
 	return;
 };
 
+void LinearSolverTests() {
+	const int N = 2;
+	double* x = new double[N];
+	double* b = new double[N];
+	x[0] = 0.0;
+	x[1] = -0.1;
+	b[0] = 1;
+	b[1] = 4;	
+	SparseRowMatrix A(N);
+	A.setValue(0,0, 1.0);
+	A.setValue(0,1, 2.0);
+	A.setValue(1,0, 3.0);
+	A.setValue(1,1, 4.0);
+	bicgstab<SparseRowMatrix>(N, A, b, x, 1e-10, true);	
+	std::cout<<x[0]<<" "<<x[1]<<std::endl;
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {	
+	LinearSolverTests(); return 0;
 	//GodunovTests();
 	//RunSAFlatPlate();
 	//RunGAWCalculation();
 	//RunPoiseuilleTest();
-	RunSODTest();
+	//RunSODTest();
 	//RunBiffFlatPlate();
-	return 0;
+	//return 0;
 
 	//Load cgns grid			
-	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
+	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\MeshUniform\\solution.cgns";
+	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
 	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineSA.cgns";	
 	Grid grid = LoadCGNSGrid(solutionFile);
+
+	/*std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for (int i = 0; i<faces.size(); i++) {
+		Face* f = faces[i];
+		if (abs(f->FaceNormal.x) < 0.5) f->FaceNormal.x = 0;
+		if (f->FaceNormal.x > 0.5) f->FaceNormal.x = 1.0;
+		if (f->FaceNormal.x < -0.5) f->FaceNormal.x = -1.0;
+		if (abs(f->FaceNormal.y) < 0.5) f->FaceNormal.y = 0;
+		if (f->FaceNormal.y > 0.5) f->FaceNormal.y = 1.0;
+		if (f->FaceNormal.y < -0.5) f->FaceNormal.y = -1.0;
+	};*/
 
 	// Initialize medium model and place boundary conditions
 	Model<Roe3DSolverPerfectGas> model;
@@ -668,8 +701,8 @@ int main(int argc, char *argv[]) {
 
 
 	//Set computational settings
-	model.SetCFLNumber(0.35);
-	model.SetHartenEps(0.000);
+	model.SetCFLNumber(0.9);
+	model.SetHartenEps(0.00);
 
 	////Bind computational grid
 	model.BindGrid(grid);	
@@ -697,6 +730,7 @@ int main(int argc, char *argv[]) {
 
 	//Outlet boundary
 	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	//OutletBC.setParams(101604);
 	OutletBC.setParams(pressure);
 
 	//Symmetry boundary
@@ -713,8 +747,8 @@ int main(int argc, char *argv[]) {
 	model.SetBoundaryCondition("outlet", OutletBC);
 	model.SetBoundaryCondition("plate", NoSlipBC);	
 	model.SetBoundaryCondition("symmetry", SymmetryBC);
-	model.SetBoundaryCondition("top_left", SymmetryBC);
-	model.SetBoundaryCondition("top_right", SymmetryBC);
+	model.SetBoundaryCondition("top_left", OutletBC);
+	model.SetBoundaryCondition("top_right", OutletBC);
 	
 
 	//Set wall boundaries		
@@ -731,14 +765,35 @@ int main(int argc, char *argv[]) {
 	//Save initial solution
 	model.ComputeGradients();
 	model.SaveToTechPlot("init.dat");
+	model.SaveSolution("init.sol");	
+
+	//Debug Output
+	/*std::cout<<"ro = "<<model.GetDensity(1680)<<";\n";
+	std::cout<<"u = "<<model.GetVelocityX(1680)<<";\n";
+	std::cout<<"v = "<<model.GetVelocityY(1680)<<";\n";
+
+	std::cout<<"roL = "<<model.GetDensity(1600)<<";\n";
+	std::cout<<"uL = "<<model.GetVelocityX(1600)<<";\n";
+	std::cout<<"vL = "<<model.GetVelocityY(1600)<<";\n";
+
+	std::cout<<"roT = "<<model.GetDensity(1679)<<";\n";
+	std::cout<<"uT = "<<model.GetVelocityX(1679)<<";\n";
+	std::cout<<"vT = "<<model.GetVelocityY(1679)<<";\n";
+
+	std::cout<<"roR = "<<model.GetDensity(1760)<<";\n";
+	std::cout<<"uR = "<<model.GetVelocityX(1760)<<";\n";
+	std::cout<<"vR = "<<model.GetVelocityY(1760)<<";\n";*/
 
 	//Load solution
 	std::string outputSolutionFile = "solution";
 
-	//Run simulation
+
+
+	////Run simulation
 	bool isSave = true;	
+	//model.ImplicitTimeStep();
 	for (int i = 0; i < 1000000; i++) {
-		model.Step();	
+		model.ExplicitTimeStep();	
 		if (i % 10 == 0)  {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
@@ -748,8 +803,9 @@ int main(int argc, char *argv[]) {
 		if ((i % 100 == 0) && (isSave)) {
 			model.SaveSolution(outputSolutionFile+".sol");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
-			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+			/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
+			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);			
 		};
 		if (model.totalTime > 10000) break;
 	};
@@ -758,7 +814,8 @@ int main(int argc, char *argv[]) {
 	if (isSave) {
 		model.SaveSolution(outputSolutionFile+".sol");
 		model.SaveToTechPlot(outputSolutionFile+".dat");
-		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+		/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
+		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);		
 	};
 }
