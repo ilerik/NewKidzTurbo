@@ -92,9 +92,13 @@ public:
 		return nodes;
 	};
 
+	std::map<int, DataNode>& getLocalNodesWithIndex() {		
+		return localNodes;
+	};
+
 	int size() {
 		return node_idx.size();
-	};
+	};	
 
 	std::set<int> getAllIndexes() {
 		return node_idx;

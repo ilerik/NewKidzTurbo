@@ -657,9 +657,73 @@ void LinearSolverTests() {
 	std::cout<<x[0]<<" "<<x[1]<<std::endl;
 };
 
+void ImplicitSolverTest() {
+	Model<Godunov3DSolverPerfectGas> model;
+	Grid grid;
+
+	//Shock tube problem setting
+	double lBegin = 0;
+	double lEnd = 1.0;
+	Vector direction = Vector(1,0,0);
+	grid = GenGrid1D(1000, lBegin, lEnd, direction);
+	//grid = GenGrid1D(2, lBegin, lEnd, direction);
+	
+	//Set fluid properties	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	model.DisableViscous();
+
+	//Set computational settings
+	model.SetCFLNumber(2.0);
+	model.SetHartenEps(0.005);
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Set initial conditions
+	model.SetInitialConditions(SODTestInitDistribution);
+	/*Vector velocity(0,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;
+
+	ConservativeVariables initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);		
+	model.SetInitialConditions(initValues);	*/
+
+	//Boundary conditions
+	//No slip boundary
+	Model<Godunov3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+	model.SetBoundaryCondition("left", NoSlipBC);
+	model.SetBoundaryCondition("right", NoSlipBC);
+
+	model.SaveToTechPlot("SODInit.dat");
+
+	//Total time
+	//double maxTime = 0.2;
+	//for (int i = 0; i < 2000000000; i++) {
+	//	model.ExplicitTimeStep();	
+	//	//model.Step();
+	//	if (i % 1 == 0) {
+	//		std::cout<<"Interation = "<<i<<"\n";
+	//		std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+	//		for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+	//		std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+	//	};
+	//	model.SaveToTechPlot("SOD.dat");
+	//	if (model.totalTime > 0.2) break;
+	//};
+	model.ImplicitSteadyState(0.2, 10000);
+
+	//Save result to techplot
+	model.SaveToTechPlot("SOD.dat");
+	return ;
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {	
-	LinearSolverTests(); return 0;
+	//ImplicitSolverTest(); return 0;
+
+	//LinearSolverTests(); return 0;
 	//GodunovTests();
 	//RunSAFlatPlate();
 	//RunGAWCalculation();
@@ -701,7 +765,7 @@ int main(int argc, char *argv[]) {
 
 
 	//Set computational settings
-	model.SetCFLNumber(0.9);
+	model.SetCFLNumber(0.9e100);
 	model.SetHartenEps(0.00);
 
 	////Bind computational grid
@@ -787,28 +851,29 @@ int main(int argc, char *argv[]) {
 	//Load solution
 	std::string outputSolutionFile = "solution";
 
-
-
 	////Run simulation
-	bool isSave = true;	
-	//model.ImplicitTimeStep();
-	for (int i = 0; i < 1000000; i++) {
-		model.ExplicitTimeStep();	
-		if (i % 10 == 0)  {
-			std::cout<<"Interation = "<<i<<"\n";
-			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
-			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
-			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
-		};
-		if ((i % 100 == 0) && (isSave)) {
-			model.SaveSolution(outputSolutionFile+".sol");
-			model.SaveToTechPlot(outputSolutionFile+".dat");
-			/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
-			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);			
-		};
-		if (model.totalTime > 10000) break;
-	};
+	bool isSave = true;		
+	//for (int i = 0; i < 1000000; i++) {
+	//	//model.ExplicitTimeStep();	
+	//	model.ImplicitTimeStep();
+	//	if (i % 10 == 0)  {
+	//		std::cout<<"Interation = "<<i<<"\n";
+	//		std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+	//		for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+	//		std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+	//	};
+	//	if ((i % 100 == 0) && (isSave)) {
+	//		model.SaveSolution(outputSolutionFile+".sol");
+	//		model.SaveToTechPlot(outputSolutionFile+".dat");
+	//		/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+	//		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
+	//		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);			
+	//	};
+	//	if (model.totalTime > 10000) break;
+	//};
+
+	//model.LoadSolution(outputSolutionFile + ".sol");
+	model.ImplicitSteadyState(10, 100, 1e-10, 1.0);
 
 	//Save result to techplot
 	if (isSave) {
@@ -818,4 +883,4 @@ int main(int argc, char *argv[]) {
 		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
 		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);		
 	};
-}
+};

@@ -62,7 +62,7 @@ bicgstab( unsigned N, const MATRIX &A, const PC_MATRIX &C,
 
 template< class MATRIX > inline
 int
-bicgstab( unsigned NN, const MATRIX &A,
+bicgstab( unsigned NN, MATRIX &A,
 	  const double *b, double *x, double eps, bool detailed ) {
 	int N = NN;	
   double *rT  = new double[N];
