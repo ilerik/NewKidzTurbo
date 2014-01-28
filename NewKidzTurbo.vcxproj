@@ -132,6 +132,8 @@
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
     <ClInclude Include="src\linearsolvers\bicgstab.h" />
+    <ClInclude Include="src\linearsolvers\cgCUDA.h" />
+    <ClInclude Include="src\linearsolvers\gmres.h" />
     <ClInclude Include="src\model.h" />
     <ClInclude Include="src\patch.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />

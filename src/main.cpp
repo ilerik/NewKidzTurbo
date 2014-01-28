@@ -721,7 +721,7 @@ void ImplicitSolverTest() {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//ImplicitSolverTest(); return 0;
+	ImplicitSolverTest(); return 0;
 
 	//LinearSolverTests(); return 0;
 	//GodunovTests();

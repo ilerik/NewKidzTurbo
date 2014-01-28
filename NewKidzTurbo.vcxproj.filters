@@ -90,6 +90,12 @@
     <ClInclude Include="src\linearsolvers\bicgstab.h">
       <Filter>Header Files\LinearSolvers</Filter>
     </ClInclude>
+    <ClInclude Include="src\linearsolvers\cgCUDA.h">
+      <Filter>Header Files\LinearSolvers\CUDA</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linearsolvers\gmres.h">
+      <Filter>Header Files\LinearSolvers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

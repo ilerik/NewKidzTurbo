@@ -13,6 +13,8 @@
 #include "interpolation.h"
 #include "geomfunctions.h"
 #include "cmath"
+#include "gmres.h"
+
 
 //Step info
 class StepInfo {
@@ -873,7 +875,8 @@ public:
 			};
 
 			//Solve for new solution update
-			int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-15, true);
+			//int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-15, true);
+			int iterationsMade = gmres<Model<RiemannSolver>>(N*M, N*M, *this, b, x, 1e-15, true);
 
 			//Update solution
 			totalTime += stepInfo.TimeStep;
