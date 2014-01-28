@@ -82,7 +82,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -113,7 +113,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -131,6 +131,7 @@
     <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
+    <ClInclude Include="src\gridloading\triangleload.h" />
     <ClInclude Include="src\linearsolvers\bicgstab.h" />
     <ClInclude Include="src\linearsolvers\cgCUDA.h" />
     <ClInclude Include="src\linearsolvers\gmres.h" />

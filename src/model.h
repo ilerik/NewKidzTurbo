@@ -559,7 +559,7 @@ public:
 		ComputeConvectiveFluxes(fluxConvective, maxWaveSpeed, cellValues);
 
 		//Compute gradients
-		ComputeGradients();
+		if (IsGradientRequired) ComputeGradients();
 
 		//Compute viscous fluxes
 		ComputeViscousFluxes();
@@ -707,7 +707,7 @@ public:
 			globalIndexToNumber[cellIndex] = counter;
 			numberToGlobalIndex[counter] = cellIndex;
 			counter++;
-		};
+		};	
 	};
 
 	//Accessor function
@@ -817,8 +817,7 @@ public:
 		delete[] b;
 	};
 
-	//Implementation of general implicit solver
-	
+	//Implementation of general implicit solver	
 	void ImplicitSteadyState(double maxTime, int MaxIterations, double eps = 1e-10, double SERCoef = 0.0) {
 		//Numerate cells		
 		NumerateCells();	
@@ -875,8 +874,8 @@ public:
 			};
 
 			//Solve for new solution update
-			//int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-15, true);
-			int iterationsMade = gmres<Model<RiemannSolver>>(N*M, N*M, *this, b, x, 1e-15, true);
+			int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-7, true);
+			//int iterationsMade = gmres<Model<RiemannSolver>>(N*M, N*M, *this, b, x, 1e-15, true);
 
 			//Update solution
 			totalTime += stepInfo.TimeStep;
@@ -1318,7 +1317,6 @@ public:
 	};	
 
 	//Function to compute gradients at every cell	
-
 	void ComputeGradients() {									
 		//Compute required gradients in cells
 		ComputeFunctionGradient(gradCellsU, U, &Model<RiemannSolver>::GetVelocityX);
@@ -1883,22 +1881,39 @@ public:
 		if (_grid.gridInfo.GridDimensions == 2) {
 			//TO DO unify		
 			//Header
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
 			ofs<<"VARIABLES= \"X\", \"Y\", \"Rho\", \"u\", \"v\", \"w\", \"E\", \"T\", \"P\"";
 			ofs<<", \"PStagnation\"";
 			ofs<<", \"distance\"";
-			ofs<<", \"roResidual\"";
 			ofs<<", \"rouResidual\"";
 			ofs<<", \"rovResidual\"";
 			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
 			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
 			ofs<<", \"dU_dx\"";
 			ofs<<", \"dU_dy\"";
 			ofs<<"\n";
 			
 			ofs<<"ZONE T=\"D\"\n";
-			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ET=QUADRILATERAL\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
 
 			ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
@@ -1914,14 +1929,7 @@ public:
 			std::map<int,int> toNaturalIndex;
 			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
 			int counter = 1;
-			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;
-
-
-			//Access local nodes, faces, cells and flow data
-			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
-			std::vector<Face*> faces = _grid.faces.getLocalNodes();
-			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
-			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
 
 			//Nodes coordinates
 			//X
@@ -2006,12 +2014,6 @@ public:
 				};
 			};
 
-			//roResidual
-			for (int i = 0; i<cells.size(); i++) {
-				int idx = cells[i]->GlobalIndex;
-				ofs<<roResidual[idx]<<"\n";			
-			};
-
 			//rouResidual
 			for (int i = 0; i<cells.size(); i++) {
 				int idx = cells[i]->GlobalIndex;
@@ -2030,10 +2032,28 @@ public:
 				ofs<<rowResidual[idx]<<"\n";			
 			};
 
-			//rowResidual
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
 			for (int i = 0; i<cells.size(); i++) {
 				int idx = cells[i]->GlobalIndex;
 				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
 			};
 
 			//dU_dx
@@ -2048,12 +2068,19 @@ public:
 				ofs<<gradCellsU[idx].y<<"\n";			
 			};
 
-			//Connectivity list for each cell
+			//Connectivity list for each cell			
 			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
 				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
 			};
 		};
 

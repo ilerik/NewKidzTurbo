@@ -251,6 +251,16 @@ void Grid::ComputeGeometricProperties(Cell& cell) {
 		cell.CellVolume += (a & b).mod() / 2.0;
 	};
 
+	if (cell.CGNSType == TRI_3) {
+		isTypeCheckPassed = true;
+
+		//Compute cell volume
+		cell.CellVolume = 0;
+		Vector a = nodes[cell.Nodes[1]].P - nodes[cell.Nodes[0]].P; 
+		Vector b = nodes[cell.Nodes[2]].P - nodes[cell.Nodes[0]].P; 
+		cell.CellVolume += (a & b).mod() / 2.0;		
+	};
+
 	if (cell.CGNSType == BAR_2) {
 		isTypeCheckPassed = true;
 
@@ -397,6 +407,26 @@ std::vector<Face> Grid::ObtainFaces(Cell& cell) {
 		nodes.push_back(cell.Nodes[0]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
+	}
+
+	if (cell.CGNSType == TRI_3) {
+		isTypeCheckPassed = true;
+		std::vector<int> nodes;
+		//Add faces one by one
+		nodes.push_back(cell.Nodes[0]);
+		nodes.push_back(cell.Nodes[1]);
+		res.push_back(Face(BAR_2, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell.Nodes[1]);
+		nodes.push_back(cell.Nodes[2]);
+		res.push_back(Face(BAR_2, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell.Nodes[2]);
+		nodes.push_back(cell.Nodes[0]);
+		res.push_back(Face(BAR_2, nodes));
+		nodes.clear();		
 	}
 
 	if (cell.CGNSType == BAR_2) {

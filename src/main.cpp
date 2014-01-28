@@ -11,6 +11,11 @@
 #include "SAmodel.h"
 #include "biffplatemodel.h"
 #include "bicgstab.h"
+#include "gridloading\triangleload.h"
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/cuthill_mckee_ordering.hpp>
+#include <boost/graph/properties.hpp>
+#include <boost/graph/bandwidth.hpp>
 
 
 template< typename T >
@@ -719,10 +724,131 @@ void ImplicitSolverTest() {
 	return ;
 };
 
+int BumpFlowTest() {
+	Grid grid = Load2DTriangleGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\BumpFlow\\bump.grid");
+
+	//fill in BC Markers
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for(int i=0; i<grid.faces.size(); i++){
+		Face& f = *faces[i];
+		if(f.isExternal!=1) continue;
+		//top border
+		if(f.FaceCenter.y==2.0){
+			f.BCMarker = 4;
+			continue;
+		};
+		//left border
+		if(f.FaceCenter.x==-2.0){
+			f.BCMarker = 1;
+			continue;
+		};
+		//right border
+		if(f.FaceCenter.x>2.999){
+			f.BCMarker = 2;
+			continue;
+		};
+		//bottom border
+		f.BCMarker = 3;
+	};
+	//Add Patches
+	grid.addPatch("left", 1);
+	grid.addPatch("right", 2);
+	grid.addPatch("bottom", 3);
+	grid.addPatch("top", 4);
+	grid.ConstructAndCheckPatches();
+
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+	model.BindGrid(grid);
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	double Mach_inf = 0.3;
+	double temperature = 300.214;
+	double pressure = 101579;
+	double sound_speed = sqrt(model.medium.Gamma*(model.medium.Gamma - 1.0)*model.medium.Cv*temperature);
+	double u_inf = Mach_inf*sound_speed;
+	Vector velocity(u_inf,0,0);
+
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
+	model.SetInitialConditions(initValues);	
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", NoSlipBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Set wall boundaries		
+	model.SetWallBoundary("bottom", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.DisableViscous();
+
+	//Save initial solution
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "bump";
+
+	//Run simulation
+	bool isSave = true;	
+	/*for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+	};*/
+	model.ImplicitSteadyState(10, 100, 1e-15, 1.0);
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	return 0;
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {	
-	ImplicitSolverTest(); return 0;
-
+	BumpFlowTest(); return 0;
+	//ImplicitSolverTest(); return 0;
 	//LinearSolverTests(); return 0;
 	//GodunovTests();
 	//RunSAFlatPlate();
@@ -765,7 +891,7 @@ int main(int argc, char *argv[]) {
 
 
 	//Set computational settings
-	model.SetCFLNumber(0.9e100);
+	model.SetCFLNumber(0.9);
 	model.SetHartenEps(0.00);
 
 	////Bind computational grid

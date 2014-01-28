@@ -96,6 +96,9 @@
     <ClInclude Include="src\linearsolvers\gmres.h">
       <Filter>Header Files\LinearSolvers</Filter>
     </ClInclude>
+    <ClInclude Include="src\gridloading\triangleload.h">
+      <Filter>Header Files\GridLoading</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
