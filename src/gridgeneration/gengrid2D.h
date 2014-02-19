@@ -158,6 +158,7 @@ Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_
 	g.addPatch("right", 2);
 	g.addPatch("bottom", 3);
 	g.addPatch("top", 4);
+	g.addPatch("bottom_left", 5);
 	g.ConstructAndCheckPatches();
 	
 	return g;

@@ -18,6 +18,11 @@ class StepInfo {
 public:
 	double TimeStep;
 	std::vector<double> Residual;
+	//maps from faces
+	std::map<int, double> LyambdaC;
+	std::map<int, double> LyambdaV;
+	//maps from cells
+	std::map<int, double> LyambdaSum;
 };
 
 
@@ -90,7 +95,11 @@ public:
 			parameters.setValue(name, value);
 		};	
 
-		BoundaryCondition(Model& _model) : model(_model) {}; 
+		BoundaryCondition(Model& _model) : model(_model) {};
+		virtual std::vector<double> ComputeConvectiveFlux(Face& f)
+		{
+			return model.ComputeConvectiveFlux(f);
+		};
 
 		virtual ConservativeVariables getDummyValues(ConservativeVariables UL, const Face& face) = 0;		
 	};
@@ -99,6 +108,16 @@ public:
 	class NoSlipBoundaryCondition : public BoundaryCondition {
 	public:
 		NoSlipBoundaryCondition(Model& _model) : BoundaryCondition(_model) {};
+		std::vector<double> ComputeConvectiveFlux(Face& f)	{
+			ConservativeVariables UL = model.U[f.FaceCell_1];
+			std::vector<double> res(5,0);
+			double PL = (model.medium.Gamma - 1.0)*(UL.roE - 0.5*(UL.rou*UL.rou + UL.rov*UL.rov + UL.row*UL.row)/UL.ro);
+			res[1] = PL*f.FaceNormal.x;
+			res[2] = PL*f.FaceNormal.y;
+			res[3] = PL*f.FaceNormal.z;
+
+			return res;
+		};
 
 		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {
 			inV.rou *= -1;
@@ -108,13 +127,32 @@ public:
 		};
 	};
 
+	class ConstantVelocityBoundaryCondition : public BoundaryCondition {
+	public:
+		Vector V;
+		ConstantVelocityBoundaryCondition(Model& _model, Vector _V) : BoundaryCondition(_model), V(_V) {};
+
+		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {
+			ConservativeVariables res = inV;
+			Vector V_in(inV.rou, inV.rov, inV.row);
+			V_in = (1.0/inV.ro)*V_in;
+
+			Vector V_dummy = 2.0*V - V_in;
+			res.rou = inV.ro*V_dummy.x;
+			res.rov = inV.ro*V_dummy.y;
+			res.row = inV.ro*V_dummy.z;
+			res.roE = inV.roE - 0.5*inV.ro*V_in.mod()*V_in.mod() + 0.5*res.ro*V_dummy.mod()*V_dummy.mod();
+			return res;
+		};
+	};
+
 	class SymmetryBoundaryCondition : public BoundaryCondition {
 	public:
 		SymmetryBoundaryCondition(Model& _model) : BoundaryCondition(_model) {};
 
 		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {
 			Vector roU(inV.rou, inV.rov, inV.row);			
-			Vector newRoU = roU - 2*(roU * face.FaceNormal)*face.FaceNormal/face.FaceNormal.mod();
+			Vector newRoU = roU - 2*(roU * face.FaceNormal)*face.FaceNormal/(face.FaceNormal.mod()*face.FaceNormal.mod());
 			inV.rou = newRoU.x;
 			inV.rov = newRoU.y;
 			inV.row = newRoU.z;
@@ -155,6 +193,11 @@ public:
 			_velocityDistributionParams = params;
 		};
 
+		//std::vector<double> ComputeConvectiveFlux(Face& f) {
+		//	std::vector<double> res(5,0);
+
+		//};
+
 		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {			
 			//Compute outgoing riemann invariant
 			//Obtain speed of sound			
@@ -187,10 +230,7 @@ public:
 			};
 			double P0 = _pressure;
 			double Pb = P0;	
-			double cb = (vb * face.FaceNormal / face.FaceNormal.mod() - Rminus);
-			cb = cb * 0.5 * (medium.Gamma - 1.0);
-			double eb = cb*cb / ((medium.Gamma - 1.0) * medium.Gamma);
-			double Tb = eb / medium.Cv;
+			double Tb = _temperature;
 			return model.PrimitiveToConservativeVariables(vb, Pb, Tb, medium);
 		};
 	};
@@ -278,7 +318,7 @@ public:
 		};
 	};
 
-protected:
+//protected:
 	//Internal variables
 	Grid _grid;	//Grid
 	std::map<int, BoundaryCondition*> _boundaryConditions; //Boundary conditions	
@@ -327,6 +367,8 @@ protected:
 	std::map<int, double> rouResidual;
 	std::map<int, double> rovResidual;
 	std::map<int, double> rowResidual;
+	std::map<int, double> roResidual;
+	std::map<int, double> roEResidual;
 
 public:	
 	//Medium properties
@@ -492,12 +534,18 @@ public:
 			for (int k = 0; k<5; k++) vfluxes[faces[i]->GlobalIndex][k] = 0;	//WID
 		};
 
+		//Time step parameters initialisation
+		stepInfo.Residual.resize(5,0);
+		//stepInfo.LyambdaC.clear();
+		//stepInfo.LyambdaV.clear();
+		//stepInfo.LyambdaSum.clear();
+
 		//Compute gradients of conservative variables for each face
 		if (IsGradientRequired) 
-			ComputeGradients();			
+			ComputeGradients();	
+			//ComputeGradientsUniformStruct();
 
 		//Compute convective fluxes
-		//info.TimeStep = 5e-8;
 		ComputeConvectiveFluxes();
 
 		//Compute viscous fluxes		
@@ -507,9 +555,8 @@ public:
 		};
 
 		//Apply CFL condition
+		stepInfo.TimeStep = ComputeMaxTimeStep();	//Blaizek algorithm
 		stepInfo.TimeStep *= CFL;
-		stepInfo.Residual.resize(5,0);
-		for (int i = 0; i<5; i++) stepInfo.Residual[i] = 0;					//WID
 
 		//Distribute fluxes to cells		
 		std::vector<double> sumFlux(5,0);
@@ -521,18 +568,20 @@ public:
 		for (int i = 0; i<cells.size(); i++) {
 			Cell c = *cells[i];
 			//std::vector<double> sumFluxV = sumFluxCell[c.GlobalIndex];
+			bool ExtCell = false;	//TO DO DELETE
 
 			//For each face			
-			for (int k = 0; k<5; k++) sumFlux[k] = 0;
+ 			for (int k = 0; k<5; k++) sumFlux[k] = 0;
 			for (int k = 0; k<5; k++) sumFluxC[k] = 0;
 			for (int k = 0; k<5; k++) sumFluxV[k] = 0;
 
-			double P = GetPressure(U[c.GlobalIndex]);
+			double P = GetPressure(U[c.GlobalIndex]);	//WID
 			
 			for (int j = 0; j<c.Faces.size(); j++) {
 				Face& f = _grid.faces[c.Faces[j]];
 				std::vector<double> flux = fluxes[f.GlobalIndex];// * f.FaceSquare;					
-				std::vector<double> vflux = vfluxes[f.GlobalIndex];// * f.FaceSquare;													
+				std::vector<double> vflux = vfluxes[f.GlobalIndex];// * f.FaceSquare;		
+				if(f.isExternal) ExtCell = true;
 				
 				//Consider direction
 				//sumFlux += (flux - vflux) * f.FaceSquare;
@@ -547,16 +596,19 @@ public:
 					sumFluxV -= vflux * f.FaceSquare;
 					sumFlux += (flux - vflux) * f.FaceSquare;
 				};
-
 			};
 
+			//if(ExtCell==true) for(int i=0; i<5; i++) sumFlux[i] = 0;
+			
 			//Add residual
 			for (int i = 0; i<5; i++) stepInfo.Residual[i] += sumFlux[i] * sumFlux[i];	
 			rouResidual[c.GlobalIndex] = sumFlux[1];
 			rovResidual[c.GlobalIndex] = sumFlux[2];
 			rowResidual[c.GlobalIndex] = sumFlux[3];
+			roResidual[c.GlobalIndex] = sumFlux[0];
+			roEResidual[c.GlobalIndex] = sumFlux[4];
 
-			//Add sum flux to cell values						
+			//Add sum flux to cell values
 			sumFlux = stepInfo.TimeStep * sumFlux / c.CellVolume;			
 
 			U[c.GlobalIndex].ro += sumFlux[0];
@@ -564,6 +616,7 @@ public:
 			U[c.GlobalIndex].rov += sumFlux[2];
 			U[c.GlobalIndex].row += sumFlux[3];
 			U[c.GlobalIndex].roE += sumFlux[4];
+
 		};
 		
 		for (int i = 0; i<5; i++) stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);	
@@ -612,19 +665,9 @@ public:
 		#pragma omp for
 		for (int i = 0; i<faces.size(); i++) {
 			Face& f = *faces[i];
-			ConservativeVariables UL = U[f.FaceCell_1];
-			ConservativeVariables UR;
-			if (f.isExternal) {
-				UR = GetDummyCellValues(UL, f);
-			} else {
-				UR = U[f.FaceCell_2];
-			};
-			std::vector<double> flux = rSolver.ComputeFlux( UL,  UR, f);
-
-			//Store fluxes
-			//fluxes[f.GlobalIndex] = f.FaceSquare*flux;						
-			fluxes[f.GlobalIndex] = flux;						
-
+			if(f.isExternal) fluxes[f.GlobalIndex] = _boundaryConditions[f.BCMarker]->ComputeConvectiveFlux(f);
+			else fluxes[f.GlobalIndex] = ComputeConvectiveFlux(f);		
+			
 			//Additional stability requirement
 			double C = 4;
 			double lambdaVisc = 0;
@@ -646,7 +689,41 @@ public:
 				ts = _grid.cells[f.FaceCell_2].CellVolume/((rSolver.MaxEigenvalue + C * lambdaVisc) * f.FaceSquare);
 				if (stepInfo.TimeStep > ts) stepInfo.TimeStep = ts;
 			};
+
+			//Blaizek time step algorithm
+			stepInfo.LyambdaC[f.GlobalIndex] = rSolver.MaxEigenvalue*f.FaceSquare;
 		};	
+	};
+	std::vector<double> ComputeConvectiveFlux(Face& f)
+	{
+		ConservativeVariables UL = U[f.FaceCell_1];
+		ConservativeVariables UR;
+		if (f.isExternal) {
+			UR = GetDummyCellValues(UL, f);
+		} else {
+			UR = U[f.FaceCell_2];
+		};
+		return rSolver.ComputeFlux( UL,  UR, f);
+	};
+	double ComputeMaxTimeStep() {
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+		double res = std::numeric_limits<double>::max();
+
+		#pragma omp for
+		for (int i = 0; i<cells.size(); i++) {
+			Cell c = *cells[i];
+			double LyambdaSum = 0;
+			//special factor
+			double C = 4.0/c.CellVolume;
+			
+			for (int j = 0; j<c.Faces.size(); j++) {
+				Face& f = _grid.faces[c.Faces[j]];
+				LyambdaSum += stepInfo.LyambdaC[f.GlobalIndex] + C*stepInfo.LyambdaV[f.GlobalIndex];
+			};	
+			double TS = c.CellVolume/LyambdaSum;
+			if(TS<res) res = TS;
+		};
+		return res;
 	};
 
 	//diffusive term functions: turbulent viscosity, heat conductivity and stress tensor
@@ -670,9 +747,6 @@ public:
 	//Compute viscous flux for each cell face
 	void ComputeViscousFluxes() 
 	{
-		//return;
-		double max_Du_Dy = 0;	//WID
-
 		//Obtain all local faces
 		std::vector<Face*> faces = _grid.faces.getLocalNodes();				
 		std::vector<double> sumFlux(5,0);
@@ -705,13 +779,14 @@ public:
 			Matrix Stresses = GetAdditionalStresses(f.GlobalIndex);
 			//TO DO remove runtime check WID
 			//if (Stresses.table.size() != 3) throw Exception("");
-			if (Stresses[0].size() != 3) throw Exception("");
+			if (Stresses[0].size() != 3) throw Exception("");	//WID
 			if (Stresses[1].size() != 3) throw Exception("");
 			if (Stresses[2].size() != 3) throw Exception("");
 
 
-			double viscosity = (medium.Viscosity + viscosityTurb);	
+			double viscosity = (medium.Viscosity + viscosityTurb);
 			double s_viscosity = -2.0/3.0 * viscosity;		//second viscosity
+	
 
 			//required variables on face	
 			ConservativeVariables UAvg;
@@ -763,6 +838,9 @@ public:
 
 			//TO DO remove			
 			vfluxes[f.GlobalIndex] = vflux;
+
+			//Blaizek time step algorithm
+			stepInfo.LyambdaV[f.GlobalIndex] = max(4.0/3.0, medium.Gamma)*(medium.ThermalConductivity/(medium.Cv*medium.Gamma*rho))*f.FaceSquare*f.FaceSquare;
 		};
 		
 	};	
@@ -846,6 +924,151 @@ public:
 			gV = gV - (t * gV - (dVelocity.y)/(dl)) * t;			
 			gW = gW - (t * gW - (dVelocity.z)/(dl)) * t;	
 			gT = gT - (t * gT - (dT)/(dl)) * t;	
+
+			//Eventually
+			gradFacesU[face.GlobalIndex] = gU;
+			gradFacesV[face.GlobalIndex] = gV;
+			gradFacesW[face.GlobalIndex] = gW;
+			gradFacesT[face.GlobalIndex] = gT;
+		};
+		
+	};
+	//Function to compute gradients at every cell
+	void ComputeGradientsUniformStruct() {	
+		//Clear all previous data
+		gradCellsU.clear();
+		gradCellsV.clear();
+		gradCellsW.clear();
+		gradCellsT.clear();
+		gradFacesU.clear();
+		gradFacesV.clear();
+		gradFacesW.clear();
+		gradFacesT.clear();
+
+		//compute gradients over all cells
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+		for(int i=0; i<cells.size(); i++)
+		{
+			Cell c = *cells[i];
+			ConservativeVariables U_bottom, U_top, U_left, U_right;
+			Vector R_bottom, R_top, R_left, R_right;
+			for(int j=0; j<c.Faces.size();j++)
+			{
+				ConservativeVariables Ub;
+				Face f = _grid.faces[c.Faces[j]];
+				if(f.isExternal) Ub = GetDummyCellValues(U[c.GlobalIndex], f);
+				else {
+					if(c.GlobalIndex==f.FaceCell_1) Ub = U[f.FaceCell_2];
+					else Ub = U[f.FaceCell_1];
+				};
+				//define relative position
+				if(abs(f.FaceNormal.x)>abs(f.FaceNormal.y)) {
+					if(c.CellCenter.x>f.FaceCenter.x) {
+						//left
+						U_left = Ub;
+						R_left = f.FaceCenter;
+					}else{
+						//right
+						U_right = Ub;
+						R_right = f.FaceCenter;
+					};
+				}else {
+					if(c.CellCenter.y>f.FaceCenter.y) {
+						//bottom
+						U_bottom = Ub;
+						R_bottom = f.FaceCenter;
+					}else{
+						//top
+						U_top = Ub;
+						R_top = f.FaceCenter;
+					};
+				};
+			};
+			//compute gradients in cell c
+			//X velocity
+			gradCellsU[c.GlobalIndex].z = 0;
+			gradCellsU[c.GlobalIndex].x = 0.5*(GetVelocityX(U_right) - GetVelocityX(U_left))/(R_right - R_left).x;
+			gradCellsU[c.GlobalIndex].y = 0.5*(GetVelocityX(U_top) - GetVelocityX(U_bottom))/(R_top - R_bottom).y;
+			//Y velocity
+			gradCellsV[c.GlobalIndex].z = 0;
+			gradCellsV[c.GlobalIndex].x = 0.5*(GetVelocityY(U_right) - GetVelocityY(U_left))/(R_right - R_left).x;
+			gradCellsV[c.GlobalIndex].y = 0.5*(GetVelocityY(U_top) - GetVelocityY(U_bottom))/(R_top - R_bottom).y;
+			//Z velocity
+			gradCellsW[c.GlobalIndex].z = 0;
+			gradCellsW[c.GlobalIndex].x = 0;
+			gradCellsW[c.GlobalIndex].y = 0;
+			//Temperature
+			gradCellsT[c.GlobalIndex].z = 0;
+			gradCellsT[c.GlobalIndex].x = 0.5*(GetTemperature(U_right) - GetTemperature(U_left))/(R_right - R_left).x;
+			gradCellsT[c.GlobalIndex].y = 0.5*(GetTemperature(U_top) - GetTemperature(U_bottom))/(R_top - R_bottom).y;
+		};
+		
+		//Compute gradients at face centers
+		//Obtain all local faces
+		std::vector<Face*> faces = _grid.faces.getLocalNodes();		
+		#pragma omp for
+		for (int i = 0; i<faces.size(); i++) {
+			Face& face = *faces[i];
+			
+			//Preparation
+			Vector gU;
+			Vector gV;
+			Vector gW;
+			Vector gT;
+			ConservativeVariables UL = U[face.FaceCell_1];
+			Vector CL = _grid.cells[face.FaceCell_1].CellCenter;
+            ConservativeVariables UR;
+			Vector CR;
+            if (face.isExternal) { 
+                UR = GetDummyCellValues(UL, face);
+				CR = 2*(face.FaceCenter - CL) + CL;
+			} else { 
+                UR = U[face.FaceCell_2];
+				CR = _grid.cells[face.FaceCell_2].CellCenter;
+            };
+			//compute gradient at faces
+			if(abs(face.FaceNormal.x)>abs(face.FaceNormal.y))	//vertical face
+			{
+				gU.x = (GetVelocityX(UR) - GetVelocityX(UL))/(CR - CL).x;
+				gV.x = (GetVelocityY(UR) - GetVelocityY(UL))/(CR - CL).x;
+				gW.x = 0;
+				gT.x = (GetTemperature(UR) - GetTemperature(UL))/(CR - CL).x;
+
+				if(face.isExternal) {
+					gU.y = gradCellsU[face.FaceCell_1].y;
+					gV.y = gradCellsV[face.FaceCell_1].y;
+					gW.y = 0;
+					gT.y = gradCellsT[face.FaceCell_1].y;
+				}else {
+					gU.y = 0.5*(gradCellsU[face.FaceCell_1].y + gradCellsU[face.FaceCell_2].y);
+					gV.y = 0.5*(gradCellsV[face.FaceCell_1].y + gradCellsV[face.FaceCell_2].y);
+					gW.y = 0;
+					gT.y = 0.5*(gradCellsT[face.FaceCell_1].y + gradCellsT[face.FaceCell_2].y);
+				};
+			} else //horizontal face
+			{	
+				gU.y = (GetVelocityX(UR) - GetVelocityX(UL))/(CR - CL).y;
+				gV.y = (GetVelocityY(UR) - GetVelocityY(UL))/(CR - CL).y;
+				gW.y = 0;
+				gT.y = (GetTemperature(UR) - GetTemperature(UL))/(CR - CL).y;
+
+				if(face.isExternal) {
+					gU.x = gradCellsU[face.FaceCell_1].y;
+					gV.x = gradCellsV[face.FaceCell_1].y;
+					gW.x = 0;
+					gT.x = gradCellsT[face.FaceCell_1].y;
+				} else {
+					gU.x = 0.5*(gradCellsU[face.FaceCell_1].x + gradCellsU[face.FaceCell_2].x);
+					gV.x = 0.5*(gradCellsV[face.FaceCell_1].x + gradCellsV[face.FaceCell_2].x);
+					gW.x = 0;
+					gT.x = 0.5*(gradCellsT[face.FaceCell_1].x + gradCellsT[face.FaceCell_2].x);
+				};
+			};
+			//Z components
+			gU.z = 0;
+			gV.z = 0;
+			gW.z = 0;
+			gT.z = 0;
 
 			//Eventually
 			gradFacesU[face.GlobalIndex] = gU;
@@ -1306,20 +1529,41 @@ public:
 		if (_grid.gridInfo.GridDimensions == 2) {
 			//TO DO unify		
 			//Header
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
 			ofs<<"VARIABLES= \"X\", \"Y\", \"Rho\", \"u\", \"v\", \"w\", \"E\", \"T\", \"P\"";
 			ofs<<", \"PStagnation\"";
 			ofs<<", \"distance\"";
 			ofs<<", \"rouResidual\"";
 			ofs<<", \"rovResidual\"";
 			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
 			ofs<<", \"dU_dx\"";
 			ofs<<", \"dU_dy\"";
 			ofs<<"\n";
 			
 			ofs<<"ZONE T=\"D\"\n";
-			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ET=QUADRILATERAL\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
 
 			ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
 			ofs<<", CELLCENTERED";
@@ -1333,14 +1577,7 @@ public:
 			std::map<int,int> toNaturalIndex;
 			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
 			int counter = 1;
-			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;
-
-
-			//Access local nodes, faces, cells and flow data
-			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
-			std::vector<Face*> faces = _grid.faces.getLocalNodes();
-			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
-			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
 
 			//Nodes coordinates
 			//X
@@ -1443,6 +1680,30 @@ public:
 				ofs<<rowResidual[idx]<<"\n";			
 			};
 
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
+			};
+
 			//dU_dx
 			for (int i = 0; i<cells.size(); i++) {
 				int idx = cells[i]->GlobalIndex;
@@ -1455,12 +1716,252 @@ public:
 				ofs<<gradCellsU[idx].y<<"\n";			
 			};
 
-			//Connectivity list for each cell
+			//Connectivity list for each cell			
 			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
 				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+			};
+		};
+
+		ofs.close();
+		return;
+
+	};
+	virtual void SaveToTechPlotUndim(std::string fname, ConservativeVariables& var) {
+		std::ofstream ofs(fname);
+		ofs<<std::scientific;
+		if (_grid.gridInfo.GridDimensions == 1) {
+			//Header
+			ofs<<"VARIABLES= \"x\"\n";
+			ofs<<"\"ro\"\n";
+			ofs<<"\"u\"\n";
+			ofs<<"\"P\"\n";
+			ofs<<"\"T\"\n";
+			ofs<<"ZONE\n";
+
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			for (int i = 0; i<cells.size(); i++) {			
+				Cell& c = *cells[i];								
+				ofs<<c.CellCenter.x<<"\n";
+				ofs<<U[c.GlobalIndex].ro/var.ro<<"\n";
+				ofs<<GetVelocity(U[c.GlobalIndex]).x/GetVelocity(var).x<<"\n";
+				ofs<<GetPressure(U[c.GlobalIndex])/GetPressure(var)<<"\n";
+				ofs<<GetTemperature(U[c.GlobalIndex])/GetTemperature(var)<<"\n";
+				ofs<<"\n";
+			};		
+		};
+		if (_grid.gridInfo.GridDimensions == 2) {
+			//TO DO unify		
+			//Header
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+			ofs<<"VARIABLES= \"X\", \"Y\", \"Rho\", \"u\", \"v\", \"w\", \"E\", \"T\", \"P\"";
+			ofs<<", \"PStagnation\"";
+			ofs<<", \"distance\"";
+			ofs<<", \"rouResidual\"";
+			ofs<<", \"rovResidual\"";
+			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
+			ofs<<", \"dU_dx\"";
+			ofs<<", \"dU_dy\"";
+			ofs<<"\n";
+			
+			ofs<<"ZONE T=\"D\"\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
+
+			ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<")\n";
+
+			//Map all node global indexes to natural numbers
+			std::map<int,int> toNaturalIndex;
+			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+			int counter = 1;
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+			//Nodes coordinates
+			//X
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.x<<"\n";
+			};
+
+			//Y
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.y<<"\n";
+			};
+
+			////Solution data
+			////Rho
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].ro/var.ro<<"\n";
+			};
+				
+			//u
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou*var.ro/(U[idx].ro*var.rou)<<"\n";
+			};
+			//v
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov*var.ro/(U[idx].ro*var.rov)<<"\n";		
+			};
+			//w
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].row*var.ro/(U[idx].ro*var.row)<<"\n";
+			};
+			//E
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].roE*var.ro/(U[idx].ro*var.roE)<<"\n";
+			};
+			//T
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
+				double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+				ofs<<T<<"\n";
+			};
+			//P
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
+				double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
+				ofs<<P<<"\n";
+			};	
+
+			//PStagnation
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
+				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
+				ofs<<PStagnation<<"\n";
+			};	
+
+			//distance
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				if (_wallInfo.size() != 0) {
+					ofs<<_wallInfo[idx].distance<<"\n";
+				} else {
+					ofs<<0<<"\n";
+				};
+			};
+
+			//rouResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rouResidual[idx]<<"\n";			
+			};
+
+			//rovResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rovResidual[idx]<<"\n";			
+			};
+
+			//rowResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rowResidual[idx]<<"\n";			
+			};
+
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
+			};
+
+			//dU_dx
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].x<<"\n";			
+			};
+
+			//dU_dy
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].y<<"\n";			
+			};
+
+			//Connectivity list for each cell			
+			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
 			};
 		};
 
@@ -1565,33 +2066,42 @@ public:
 	};
 
 	//Save solution in a file
-	void SaveSolution(std::string fname = "SavedSolution.txt")
+	void SaveSolution(std::string fname = "SavedSolution.sol")
 	{
-		std::ofstream ofs(fname);
-		ofs << std::scientific;
-		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
-		ofs << totalTime << "\n";			
-		for(int i=0; i<cells.size(); i++)
-		{
-			int Index = cells[i]->GlobalIndex;	//Global Index of cell
-			ofs << Index << " " << U[Index].ro << " " << U[Index].roE << " " << U[Index].rou << " ";
-			ofs << U[Index].rov << " " << U[Index].row << "\n";
-		};
-		ofs.close();
+	 std::ofstream ofs;  
+	 ofs.open(fname, std::ios::binary | std::ios::out);  
+	 std::vector<Cell*> cells = _grid.cells.getLocalNodes();    
+	 ofs.write( reinterpret_cast<char*>( &totalTime ), sizeof totalTime );
+	 for(int i=0; i<cells.size(); i++)
+		 {
+		  int Index = cells[i]->GlobalIndex; //Global Index of cell
+		  ofs.write( reinterpret_cast<char*>( &Index ), sizeof Index );
+		  ofs.write( reinterpret_cast<char*>( &U[Index].ro ), sizeof U[Index].ro );
+		  ofs.write( reinterpret_cast<char*>( &U[Index].roE ), sizeof U[Index].roE );
+		  ofs.write( reinterpret_cast<char*>( &U[Index].rou ), sizeof U[Index].rou );
+		  ofs.write( reinterpret_cast<char*>( &U[Index].rov ), sizeof U[Index].rov );
+		  ofs.write( reinterpret_cast<char*>( &U[Index].row ), sizeof U[Index].row );   
+		 };
+	 ofs.close();
 	};
 	
 	//Load a solution file
 	void LoadSolution(std::string fname = "SavedSolution.txt")
 	{
-		std::ifstream ifs(fname);
-		ifs >> totalTime;				
-		while(!ifs.eof())
-		{
-			int GlobalInd;
-			ifs >> GlobalInd;
-			ifs >> U[GlobalInd].ro >> U[GlobalInd].roE >> U[GlobalInd].rou >> U[GlobalInd].rov >> U[GlobalInd].row;
-		};
-		ifs.close();
+	 std::ifstream ifs;
+	 ifs.open(fname, std::ios::binary | std::ios::in);
+	 ifs.read( reinterpret_cast<char*>( &totalTime ), sizeof totalTime );
+	 while(!ifs.eof())
+	 {
+		int Index;   
+		ifs.read( reinterpret_cast<char*>( &Index ), sizeof Index );
+		ifs.read( reinterpret_cast<char*>( &U[Index].ro ), sizeof U[Index].ro );
+		ifs.read( reinterpret_cast<char*>( &U[Index].roE ), sizeof U[Index].roE );
+		ifs.read( reinterpret_cast<char*>( &U[Index].rou ), sizeof U[Index].rou );
+		ifs.read( reinterpret_cast<char*>( &U[Index].rov ), sizeof U[Index].rov );
+		ifs.read( reinterpret_cast<char*>( &U[Index].row ), sizeof U[Index].row );   
+	 };
+	 ifs.close();
 	};
 	void ReadSolutionFromCGNS(std::string fname) {
 		// TO DO process errors

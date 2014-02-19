@@ -2,7 +2,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include "GridLoading\cgnsload.h"
+#include "cgnsload.h"
 #include "grid.h"
 #include "gridgeneration.h"
 #include "model.h"
@@ -10,6 +10,8 @@
 #include "garbarukmodel.h"
 #include "SAmodel.h"
 #include "biffplatemodel.h"
+#include "incompress2D_Flow.h"
+#include "triangleload.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -155,7 +157,7 @@ bool RunSODTest() {
 	//Total time
 	double maxTime = 0.2;
 	for (int i = 0; i < 200000000; i++) {
-		model.Step();	
+		model.Step();
 		if (i % 1 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
@@ -194,7 +196,8 @@ Vector PoiseuilleVelocityDistribution(Vector position, void *params) {
 	double R = (info.YMax - info.YMin) / 2.0;
 	double YMid = (info.YMax + info.YMin) / 2.0;
 	double r = abs(position.y - YMid);
-	velocity.x = deltaP * ( R*R - r*r)/ ( 4 * info.Viscosity * L);
+	//velocity.x = deltaP * ( R*R - r*r)/ ( 4 * info.Viscosity * L);	//for tube
+	velocity.x = deltaP * ( R*R - r*r)/ ( 2.0 * info.Viscosity * L);	//for channel
 
 	return velocity;
 };
@@ -218,6 +221,45 @@ ConservativeVariables PoiseuilleTestInitDistribution(Vector r, void *params) {
 	return U;	
 };
 
+struct ShearFlowSettingStruct {
+	double P;
+	double U_inf;
+	double YMin;
+	double YMax;
+	double XMin;
+	double XMax;
+	double Temperature;
+	double Density;
+	double e;
+};
+
+Vector ShearFlowVelocityDistribution(Vector position, void *params) {
+	Vector velocity(0,0,0);
+	ShearFlowSettingStruct info = *(ShearFlowSettingStruct *)params;
+
+	double Ly = info.YMax - info.YMin;
+	//Velocity profile	
+	velocity.x = info.U_inf*position.y/Ly;	//for channel
+
+	return velocity;
+};
+
+ConservativeVariables ShearFlowInitDistribution(Vector r, void *params) {	
+	ShearFlowSettingStruct info = *(ShearFlowSettingStruct *)params;
+	
+	//Compute conservative variables
+	Vector v = ShearFlowVelocityDistribution(r, params);
+
+	ConservativeVariables U;
+	U.ro = info.Density;
+	U.rou = info.Density * v.x;
+	U.rov = info.Density * v.y;
+	U.row = info.Density * v.z;
+	U.roE = info.Density*info.e + info.Density * v.mod() * v.mod() / 2.0;
+	
+	return U;	
+};
+
 bool RunPoiseuilleTest() {
 	Model<Roe3DSolverPerfectGas> model;
 	Grid grid;
@@ -230,7 +272,7 @@ bool RunPoiseuilleTest() {
 	info.POut = 100000;
 	info.YMin = 0.0;
 	info.YMax = 1.0;
-	info.Viscosity = 1.0;
+	info.Viscosity = 0.5;
 	info.XMin = 0.0;
 	info.XMax = 1.0;		
 	info.Temperature = 300.0;
@@ -275,7 +317,7 @@ bool RunPoiseuilleTest() {
 	model.SetBoundaryCondition("top", NoSlipBC);
 	model.SetBoundaryCondition("bottom", NoSlipBC);	
 
-	model.LoadSolution("Poiseuille.txt" );
+	//model.LoadSolution("Poiseuille.txt" );
 	model.ComputeGradients();
 	model.SaveToTechPlot("PoiseuilleInit.dat");
 
@@ -283,21 +325,106 @@ bool RunPoiseuilleTest() {
 	double maxTime = 0.2;
 	for (int i = 0; i < 200000000; i++) {
 		model.Step();	
-		if (i % 1 == 0) {
+		if (i % 10 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";			
 		};		
-		if ((i % 10 == 0) && (i != 0)) {
+		if ((i % 100 == 0) && (i != 0)) {
 			model.SaveToTechPlot("Poiseuille.dat");
 			model.SaveSolution("Poiseuille.txt" );
 		};
-		if (model.totalTime > 0.2) break;
+		if (model.totalTime > 0.9) break;
 	};
 
 	//Save result to techplot
 	model.SaveToTechPlot("Poiseuille.dat");
+	return true;
+};
+
+bool RunShearFlowTest() {
+	Model<Roe3DSolverPerfectGas> model;
+	Grid grid;
+
+	//Problem setting
+	ShearFlowSettingStruct info;
+	double lBegin = 0;
+	double lEnd = 1.0;
+	info.P = 100000;
+	info.YMin = 0.0;
+	info.YMax = 1.0;
+	info.XMin = 0.0;
+	info.XMax = 1.0;		
+	info.Temperature = 300.0;
+	info.U_inf = 2.0;
+
+	grid = GenGrid2D(50, 20, info.XMax, info.YMax, 1.0, 0.95);
+	
+	//Set fluid properties	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / model.medium.Gamma);
+	model.SetMolecularWeight(28.966);
+	model.SetViscosity(0.5);
+	model.SetThermalConductivity(0.0);
+	model.EnableViscous();
+
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.00);
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Set initial conditions
+	info.e = model.medium.Cv * info.Temperature;
+	info.Density = info.P/(info.e*(model.medium.Gamma - 1.0));		
+	model.SetInitialConditions(ShearFlowInitDistribution, &info);
+
+	//Boundary conditions
+
+	//Inlet	
+	Model<Roe3DSolverPerfectGas>::SubsonicInletBoundaryCondition InletBC(model);	
+	InletBC.setParams(info.P, info.Temperature, Vector(0,0,0));
+	InletBC.setVelocityDistribution( ShearFlowVelocityDistribution, &info);
+	model.SetBoundaryCondition("left", InletBC);
+
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);	
+	OutletBC.setParams(info.P);
+	model.SetBoundaryCondition("right", OutletBC);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+	model.SetBoundaryCondition("bottom", NoSlipBC);	
+
+	//top boundary condition
+	Vector Velocity(info.U_inf, 0, 0);
+	Model<Roe3DSolverPerfectGas>::ConstantVelocityBoundaryCondition TopBC(model, Velocity);
+	model.SetBoundaryCondition("top", TopBC);
+	
+	//model.LoadSolution("Poiseuille.txt" );
+	model.ComputeGradients();
+	model.SaveToTechPlot("ShearFlowInit.dat");
+
+	//Total time
+	double maxTime = 0.2;
+	for (int i = 0; i < 200000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Interation = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";			
+		};		
+		if (i % 100 == 0) {
+			model.SaveToTechPlot("ShearFlow.dat");
+			model.SaveSolution("ShearFlow.txt" );
+		};
+		if (model.totalTime > 0.821) break;
+	};
+
+	//Save result to techplot
+	model.SaveToTechPlot("ShearFlow.dat");
 	return true;
 };
 
@@ -534,19 +661,10 @@ void RunBiffFlatPlate() {
 	};
 };
 
-//Main program ))
-int main(int argc, char *argv[]) {	
-	//RunSAFlatPlate();
-	//RunGAWCalculation();
-	//RunPoiseuilleTest();
-	//RunSODTest();
-	RunBiffFlatPlate();
-	return 0;
+void RunBlaiusTest(){	
 
 	//Load cgns grid			
-	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
-	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineSA.cgns";	
-	Grid grid = LoadCGNSGrid(solutionFile);
+	Grid grid = GenGrid2D(30, 40, 1.2, 0.5, 1.0, 1.0);
 
 	// Initialize medium model and place boundary conditions
 	Model<Roe3DSolverPerfectGas> model;
@@ -567,19 +685,314 @@ int main(int argc, char *argv[]) {
 	model.SetCFLNumber(0.35);
 	model.SetHartenEps(0.000);
 
+	const double xPlateStart = 0.2;
+
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for (int i = 0; i<faces.size(); i++) {
+			Face& f = *faces[i];
+			if((f.BCMarker==3)&&(f.FaceCenter.x < xPlateStart)){
+				f.BCMarker = 5;
+			};
+	};
+
 	////Bind computational grid
 	model.BindGrid(grid);	
 
 	////Initial conditions
 	ConservativeVariables initValues(0);
 
-	//Vector velocity(0.1,0,0);
-	Vector velocity(10,0,0);
+	Vector velocity(10.0,0,0);
 	double pressure = 101579;
 	double temperature = 300.214;
 
-	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);	
-	//initValues.rov = initValues.ro * 1.110223e-15;
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
+	model.SetInitialConditions(initValues);	
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", NoSlipBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+	model.SetBoundaryCondition("bottom_left", SymmetryBC);
+
+	//Set wall boundaries		
+	model.SetWallBoundary("bottom", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.EnableViscous();
+	//model.DisableViscous();
+
+	//Save initial solution
+	model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "solution";
+	//model.LoadSolution(outputSolutionFile+".txt");
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 1 == 0) {
+			std::cout<<"Interation = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 1 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+		};
+		if (model.totalTime > 10000) break;
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+	};
+}
+
+void RunIncompressibleBlasius()
+{
+	Flow2D model;
+	int Nx = 30;
+	int My = 40;
+	double Lx = 1.2;
+	double Ly = 0.5;
+	//Grid grid = GenGrid2D(Nx, My, Lx, Ly, 1.02, 1.05);
+	Grid grid = GenGrid2D(Nx, My, Lx, Ly, 1.0, 1.0);
+	model.BindGrid(grid);
+	model.SetGridParameters(Nx, My, Lx, Ly);
+
+	//set medium and flow properties
+	model.medium.Set_Cv(1006.43 / 1.4);
+	model.medium.Set_density(1.17);
+	model.medium.Set_Gamma(1.4);
+	model.medium.Set_Temperature(300.0);
+	model.medium.Set_Uinf(10.0);
+	model.medium.Set_viscosity(1.78e-3);
+
+	//set initial conditions
+	model.ComputeKineticViscosity();
+	model.SetInitialCondition(0);
+	model.SaveToTechPlot("2dFlowInit.dat");
+	model.CreateConvectivityList();
+
+	//model.LoadSolution("Flow2D.txt");
+
+	//model.ComputeVfromU();
+	//model.ComputeUfromV();
+	model.ComputeBlasius();
+	model.SaveSolution("Flow2D.txt");
+	Flow2DResWrite("Flow2Dres.dat");
+	model.SaveToTechPlot("2dFlow.dat");
+	std::getchar();
+};
+
+void RunBumpFlow(){
+
+	Grid grid = Load2DTriangleGrid("D:\\Projects\\NewKidzTurbo\\Grids\\Bump Triangles\\bump.grid");
+	//Grid grid = Load2DTriangleGrid("D:\\Projects\\NewKidzTurbo\\Grids\\Bump Triangles\\Test.grid");
+	//check_grid(grid);
+
+	//fill in BC Markers
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for(int i=0; i<grid.faces.size(); i++){
+		Face& f = *faces[i];
+		if(f.isExternal!=1) continue;
+		//top border
+		if(f.FaceCenter.y==2.0){
+			f.BCMarker = 4;
+			continue;
+		};
+		//left border
+		if(f.FaceCenter.x==-2.0){
+			f.BCMarker = 1;
+			continue;
+		};
+		//right border
+		if(f.FaceCenter.x>2.999){
+			f.BCMarker = 2;
+			continue;
+		};
+		//bottom border
+		f.BCMarker = 3;
+	};
+	//Add Patches
+	grid.addPatch("left", 1);
+	grid.addPatch("right", 2);
+	grid.addPatch("bottom", 3);
+	grid.addPatch("top", 4);
+	grid.ConstructAndCheckPatches();
+
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+	model.BindGrid(grid);
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	//compute flow prarameters and dimensional values
+	double Mach_inf = 0.3;
+	double temperature = 300.214;
+	double pressure = 101579;
+	double sound_speed = sqrt(model.medium.Gamma*(model.medium.Gamma - 1.0)*model.medium.Cv*temperature);
+	double u_inf = Mach_inf*sound_speed;
+	double ro_inf = model.medium.Gamma*pressure/(sound_speed*sound_speed);
+	double pressure_gamma = pressure*model.medium.Gamma;
+	Vector velocity(u_inf,0,0);
+	ConservativeVariables DimVal(0);
+	DimVal.ro = ro_inf;
+	DimVal.rou = ro_inf*sound_speed;
+	DimVal.rov = ro_inf*sound_speed;
+	DimVal.row = ro_inf*sound_speed;
+	DimVal.roE = ro_inf*sound_speed*sound_speed;
+
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
+	model.SetInitialConditions(initValues);	
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	/*model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);*/
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Set wall boundaries		
+	model.SetWallBoundary("bottom", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.DisableViscous();
+
+	//Load solution
+	model.LoadSolution("solution.txt");
+	std::string outputSolutionFile = "solution";
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlotUndim(outputSolutionFile+".dat", DimVal);
+		};
+		if (model.totalTime > 10000) break;
+	};
+	std::getchar();
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlotUndim(outputSolutionFile+".dat", DimVal);
+	};
+
+	return;
+};
+
+//Main program ))
+int main(int argc, char *argv[]) {
+	//RunSAFlatPlate();
+	//RunGAWCalculation();
+	//RunPoiseuilleTest();
+	//RunSODTest();
+	//RunShearFlowTest();
+	//RunBlaiusTest();
+	//RunIncompressibleBlasius();
+	RunBumpFlow();
+	return 0;
+
+	//Load cgns grid			
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\Laminar_70ms_Air.cgns";
+	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solutionUG.cgns";	
+	Grid grid = LoadCGNSGrid(solutionFile);
+	check_grid(grid);
+
+	// Initialize medium model and place boundary conditions
+	Model<Roe3DSolverPerfectGas> model;
+
+	//Set fluid properties
+	//Air
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+
+	//model.SetViscosity(1.7894e-05);
+	model.SetViscosity(1.7894e-03);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+
+	////Bind computational grid
+	model.BindGrid(grid);	
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	Vector velocity(10.0,0,0);
+	//Vector velocity(70,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;
+
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
 	model.SetInitialConditions(initValues);	
 	//Determine plate start coordinate
 	const double xPlateStart = 0.2;
@@ -625,20 +1038,45 @@ int main(int argc, char *argv[]) {
 	model.SetWallBoundary("plate", true);
 	model.ComputeWallDistances();
 	model.DistanceSorting();
-	//model.EnableViscous();
-	model.DisableViscous();
-
-	 
+	model.EnableViscous();
+	//model.DisableViscous();
+	
 	//Init model
 	//model.Init();		
 
 	//Save initial solution
 	model.ComputeGradients();
 	model.SaveToTechPlot("init.dat");
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	int Lb = 0;
+	for(int i=0; i<cells.size(); i++)
+	{
+		Cell c_b = *cells[i];
+		for(int j=0; j<4; j++)
+		{
+			if((c_b.Faces[j]==31)&&(c_b.GlobalIndex!=77))  Lb = c_b.GlobalIndex;
+		};
+	};
+	Cell c = grid.cells[77];
+	Face f_up = grid.faces[c.Faces[0]];
+	Face f_left = grid.faces[c.Faces[1]];
+	Face f_down = grid.faces[c.Faces[2]];
+	Face f_right = grid.faces[c.Faces[3]];
+
+	Cell cb = grid.cells[10];
+	Face fb_right = grid.faces[cb.Faces[0]];
+	Face fb_up = grid.faces[cb.Faces[1]];
+	Face fb_left = grid.faces[cb.Faces[2]];
+	Face fb_down = grid.faces[cb.Faces[3]];
+
+	//model.SaveSliceToTechPlot("u0_8.dat", 0.2, 72.0, 0.76, 0.8, 0, 0.06);
+	//model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+	//model.ComputeBoundaryLayerHeight(0.0001);
+	//model.SaveBoundaryLayerHeightToTechPlot("BL_height.dat");
 
 	//Load solution
 	std::string outputSolutionFile = "solution";
-	//model.LoadSolution("solOutletInviscid.txt");
+	//model.LoadSolution("solution.txt");
 	//model.LoadSolution(solutionFile+".txt");
 	//model.LoadSolution("sol.txt");
 	//model.LoadSolution("solInviscid.txt");
@@ -652,7 +1090,7 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < 1000000; i++) {
 		model.Step();	
 		if (i % 10 == 0) {
-			std::cout<<"Interation = "<<i<<"\n";
+			std::cout<<"Iteration = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";

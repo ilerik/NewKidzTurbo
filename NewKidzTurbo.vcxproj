@@ -129,6 +129,8 @@
     <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
+    <ClInclude Include="src\gridloading\triangleload.h" />
+    <ClInclude Include="src\incompress2D_Flow.h" />
     <ClInclude Include="src\model.h" />
     <ClInclude Include="src\patch.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />

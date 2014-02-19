@@ -8,7 +8,6 @@ struct SAConstansts {
 };
 
 
-
 template<class RS> 
 class SAModel : public Model<RS> {
 protected:
