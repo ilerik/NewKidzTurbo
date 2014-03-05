@@ -661,7 +661,7 @@ void RunBiffFlatPlate() {
 	};
 };
 
-void RunBlaiusTest(){	
+void RunBlasiusTest(){	
 
 	//Load cgns grid			
 	Grid grid = GenGrid2D(30, 40, 1.2, 0.5, 1.0, 1.0);
@@ -736,6 +736,7 @@ void RunBlaiusTest(){
 	model.DistanceSorting();
 	model.EnableViscous();
 	//model.DisableViscous();
+	model.SchemeOrder = 1;
 
 	//Save initial solution
 	model.ComputeGradients();
@@ -749,13 +750,13 @@ void RunBlaiusTest(){
 	bool isSave = true;	
 	for (int i = 0; i < 1000000; i++) {
 		model.Step();	
-		if (i % 1 == 0) {
+		if (i % 10 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
 		};
-		if ((i % 1 == 0) && (isSave)) {
+		if ((i % 100 == 0) && (isSave)) {
 			model.SaveSolution(outputSolutionFile+".txt");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
 			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
@@ -810,10 +811,97 @@ void RunIncompressibleBlasius()
 	std::getchar();
 };
 
+void CellGradientTest(){
+
+	Grid grid = Load2DTriangleGrid("D:\\Projects\\NewKidzTurbo\\Grids\\Bump Triangles\\bump.grid");
+
+	//fill in BC Markers
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for(int i=0; i<grid.faces.size(); i++){
+		Face& f = *faces[i];
+		if(f.isExternal!=1) continue;
+		//top border
+		if(f.FaceCenter.y==2.0){
+			f.BCMarker = 4;
+			continue;
+		};
+		//left border
+		if(f.FaceCenter.x==-2.0){
+			f.BCMarker = 1;
+			continue;
+		};
+		//right border
+		if(f.FaceCenter.x>2.999){
+			f.BCMarker = 2;
+			continue;
+		};
+		//bottom border
+		f.BCMarker = 3;
+	};
+	//Add Patches
+	grid.addPatch("left", 1);
+	grid.addPatch("right", 2);
+	grid.addPatch("bottom", 3);
+	grid.addPatch("top", 4);
+	grid.ConstructAndCheckPatches();
+
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+	model.BindGrid(grid);
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+	double density = 1.0;
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	for(int i=0; i<cells.size(); i++)
+	{
+		Vector Point = cells[i]->CellCenter;
+		int I = cells[i]->GlobalIndex;
+		
+		initValues.GlobalIndex = I;
+		initValues.ro = 1.0;
+		initValues.rou = Point.x;
+		initValues.rov = Point.y;
+		initValues.roE = Point.x + 2*Point.y;
+
+		model.U[i] = initValues;
+	};
+
+	//Boundary conditions
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", NoSlipBC);
+	model.SetBoundaryCondition("right", NoSlipBC);
+	model.SetBoundaryCondition("bottom", NoSlipBC);
+	model.SetBoundaryCondition("top", NoSlipBC);
+
+	model.ComputeConservativeVariablesGradients();
+	model.SaveToTechPlot("grad_test_fields.dat");
+	model.SaveCellGradientsToTechPlot2D("gradients.dat");
+
+	return;
+};
+
 void RunBumpFlow(){
 
 	Grid grid = Load2DTriangleGrid("D:\\Projects\\NewKidzTurbo\\Grids\\Bump Triangles\\bump.grid");
-	//Grid grid = Load2DTriangleGrid("D:\\Projects\\NewKidzTurbo\\Grids\\Bump Triangles\\Test.grid");
+	//Grid grid = Load2DTriangleGrid("D:\\Bump\\bump.grid");	//for ICAD comp
 	//check_grid(grid);
 
 	//fill in BC Markers
@@ -904,15 +992,16 @@ void RunBumpFlow(){
 	model.SetBoundaryCondition("bottom", SymmetryBC);
 	model.SetBoundaryCondition("top", SymmetryBC);*/
 	model.SetBoundaryCondition("left", InletBC);
-	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("right", InletBC);
 	model.SetBoundaryCondition("bottom", SymmetryBC);
-	model.SetBoundaryCondition("top", SymmetryBC);
+	model.SetBoundaryCondition("top", InletBC);
 
 	//Set wall boundaries		
 	model.SetWallBoundary("bottom", true);
 	model.ComputeWallDistances();
 	model.DistanceSorting();
 	model.DisableViscous();
+	model.SchemeOrder = 2;
 
 	//Load solution
 	model.LoadSolution("solution.txt");
@@ -952,16 +1041,18 @@ int main(int argc, char *argv[]) {
 	//RunPoiseuilleTest();
 	//RunSODTest();
 	//RunShearFlowTest();
-	//RunBlaiusTest();
+	//RunBlasiusTest();
 	//RunIncompressibleBlasius();
-	RunBumpFlow();
-	return 0;
+	//RunBumpFlow();
+	//CellGradientTest();
+	//return 0;
 
 	//Load cgns grid			
 	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\Laminar_70ms_Air.cgns";
-	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solutionUG.cgns";	
+	std::string solutionFile = "D:\\Blas\\solution.cgns";
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
 	Grid grid = LoadCGNSGrid(solutionFile);
-	check_grid(grid);
+	//check_grid(grid);
 
 	// Initialize medium model and place boundary conditions
 	Model<Roe3DSolverPerfectGas> model;
@@ -1039,6 +1130,7 @@ int main(int argc, char *argv[]) {
 	model.ComputeWallDistances();
 	model.DistanceSorting();
 	model.EnableViscous();
+	model.SchemeOrder = 2;
 	//model.DisableViscous();
 	
 	//Init model
@@ -1047,27 +1139,6 @@ int main(int argc, char *argv[]) {
 	//Save initial solution
 	model.ComputeGradients();
 	model.SaveToTechPlot("init.dat");
-	std::vector<Cell*> cells = grid.cells.getLocalNodes();
-	int Lb = 0;
-	for(int i=0; i<cells.size(); i++)
-	{
-		Cell c_b = *cells[i];
-		for(int j=0; j<4; j++)
-		{
-			if((c_b.Faces[j]==31)&&(c_b.GlobalIndex!=77))  Lb = c_b.GlobalIndex;
-		};
-	};
-	Cell c = grid.cells[77];
-	Face f_up = grid.faces[c.Faces[0]];
-	Face f_left = grid.faces[c.Faces[1]];
-	Face f_down = grid.faces[c.Faces[2]];
-	Face f_right = grid.faces[c.Faces[3]];
-
-	Cell cb = grid.cells[10];
-	Face fb_right = grid.faces[cb.Faces[0]];
-	Face fb_up = grid.faces[cb.Faces[1]];
-	Face fb_left = grid.faces[cb.Faces[2]];
-	Face fb_down = grid.faces[cb.Faces[3]];
 
 	//model.SaveSliceToTechPlot("u0_8.dat", 0.2, 72.0, 0.76, 0.8, 0, 0.06);
 	//model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
@@ -1077,12 +1148,6 @@ int main(int argc, char *argv[]) {
 	//Load solution
 	std::string outputSolutionFile = "solution";
 	//model.LoadSolution("solution.txt");
-	//model.LoadSolution(solutionFile+".txt");
-	//model.LoadSolution("sol.txt");
-	//model.LoadSolution("solInviscid.txt");
-	//model.LoadSolution("solViscousBase.txt");
-	//model.LoadSolution("solViscousTest2.txt");
-	//model.SaveSliceToTechPlot("u.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
 	//return 0;
 
 	//Run simulation

@@ -174,6 +174,7 @@ Grid LoadCGNSGrid(std::string fname) {
 
 		int nNodes;
 		int* conn;
+		
 		switch (type)
 		{
 		case QUAD_4: 

@@ -55,7 +55,7 @@ struct FaceWallInfo {
 };
 
 //Identity that holds inside log part of boundary layer
-void LogWallRealtion(const alglib::real_1d_array &x, alglib::real_1d_array & f, void *ptr)
+void LogWallRelation(const alglib::real_1d_array &x, alglib::real_1d_array & f, void *ptr)
 {
 	std::vector<double>* params = (std::vector<double>*)ptr;
 	double A = params->at(0);
@@ -172,9 +172,6 @@ public:
 
 		MediumProperties medium;
 
-		//angle for soarting layers of cells
-		double SoartingAngle;
-
 	public:		
 		SubsonicInletBoundaryCondition(Model& _model) : BoundaryCondition(_model) {			
 			medium = model.medium;
@@ -192,11 +189,6 @@ public:
 			_velocityDistribution = vD;
 			_velocityDistributionParams = params;
 		};
-
-		//std::vector<double> ComputeConvectiveFlux(Face& f) {
-		//	std::vector<double> res(5,0);
-
-		//};
 
 		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {			
 			//Compute outgoing riemann invariant
@@ -228,7 +220,7 @@ public:
 			if (_velocityDistribution != NULL) {
 				vb = _velocityDistribution(face.FaceCenter, _velocityDistributionParams);
 			};
-			double P0 = _pressure;
+			double P0 = _pressure;	//TO DO лишнии переменные
 			double Pb = P0;	
 			double Tb = _temperature;
 			return model.PrimitiveToConservativeVariables(vb, Pb, Tb, medium);
@@ -361,8 +353,14 @@ public:
 	std::map<int, Vector> gradCellsW;	
 	std::map<int, Vector> gradFacesW;	
 	std::map<int, Vector> gradCellsT;	
-	std::map<int, Vector> gradFacesT;	
-
+	std::map<int, Vector> gradFacesT;
+	//Conservative variables gradients
+	std::map<int, Vector> gradCellsRo;
+	std::map<int, Vector> gradCellsRoU;
+	std::map<int, Vector> gradCellsRoV;
+	std::map<int, Vector> gradCellsRoW;
+	std::map<int, Vector> gradCellsRoE;
+	
 	//Residual information
 	std::map<int, double> rouResidual;
 	std::map<int, double> rovResidual;
@@ -370,7 +368,7 @@ public:
 	std::map<int, double> roResidual;
 	std::map<int, double> roEResidual;
 
-public:	
+public:
 	//Medium properties
 	MediumProperties medium;
 	double SoartingAngle;
@@ -378,6 +376,7 @@ public:
 	//Properties
 	StepInfo stepInfo;
 	double totalTime;
+	int SchemeOrder;
 
 	//Accessors and settings
 	void SetGamma(double gamma) {
@@ -424,6 +423,10 @@ public:
 	void SetAngle(double angle)
 	{
 		SoartingAngle = angle;
+	};
+
+	void SetSchemeOrder(int order){
+		SchemeOrder = order;
 	};
 
 
@@ -544,6 +547,8 @@ public:
 		if (IsGradientRequired) 
 			ComputeGradients();	
 			//ComputeGradientsUniformStruct();
+
+		if(SchemeOrder==2) ComputeConservativeVariablesGradients();
 
 		//Compute convective fluxes
 		ComputeConvectiveFluxes();
@@ -696,13 +701,43 @@ public:
 	};
 	std::vector<double> ComputeConvectiveFlux(Face& f)
 	{
-		ConservativeVariables UL = U[f.FaceCell_1];
+		ConservativeVariables UL;
 		ConservativeVariables UR;
-		if (f.isExternal) {
-			UR = GetDummyCellValues(UL, f);
-		} else {
-			UR = U[f.FaceCell_2];
+		switch(SchemeOrder) {
+		//first order
+		case 1:
+			UL = U[f.FaceCell_1];
+			if (f.isExternal) {
+				UR = GetDummyCellValues(UL, f);
+			} else {
+				UR = U[f.FaceCell_2];
+			};
+			break;
+		//second order
+		case 2:
+			Vector dr = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
+			//left reconstraction
+			UL = U[f.FaceCell_1];
+			UL.ro += gradCellsRo[f.FaceCell_1]*dr;
+			UL.rou += gradCellsRoU[f.FaceCell_1]*dr;
+			UL.rov += gradCellsRoV[f.FaceCell_1]*dr;
+			UL.row += gradCellsRoW[f.FaceCell_1]*dr;
+			UL.roE += gradCellsRoE[f.FaceCell_1]*dr;
+			//right reconstraction
+			if (f.isExternal) {
+				UR = GetDummyCellValues(UL, f);
+			} else {
+				dr = f.FaceCenter - _grid.cells[f.FaceCell_2].CellCenter;
+				UR = U[f.FaceCell_2];
+				UR.ro += gradCellsRo[f.FaceCell_2]*dr;
+				UR.rou += gradCellsRoU[f.FaceCell_2]*dr;
+				UR.rov += gradCellsRoV[f.FaceCell_2]*dr;
+				UR.row += gradCellsRoW[f.FaceCell_2]*dr;
+				UR.roE += gradCellsRoE[f.FaceCell_2]*dr;
+			};
+			break;
 		};
+		//compute appropriate flux
 		return rSolver.ComputeFlux( UL,  UR, f);
 	};
 	double ComputeMaxTimeStep() {
@@ -847,7 +882,7 @@ public:
 
 	//Function to compute gradients at every cell
 	void ComputeGradients() {	
-		//Clear all previous data
+		//Clear all previous data TO DO REMOVE
 		gradCellsU.clear();
 		gradCellsV.clear();
 		gradCellsW.clear();
@@ -1078,6 +1113,15 @@ public:
 		};
 		
 	};
+	//compute conservative veriables gradients in all cells
+	void ComputeConservativeVariablesGradients()
+	{
+		ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
+		ComputeFunctionGradient(gradCellsRoU, U, &Model<RiemannSolver>::GetRoU);
+		ComputeFunctionGradient(gradCellsRoV, U, &Model<RiemannSolver>::GetRoV);
+		ComputeFunctionGradient(gradCellsRoW, U, &Model<RiemannSolver>::GetRoW);
+		ComputeFunctionGradient(gradCellsRoE, U, &Model<RiemannSolver>::GetRoE);
+	};
 
 	//Compute wall distances for every cell
 	void ComputeWallDistances() {		
@@ -1271,10 +1315,6 @@ public:
 		double vz = celldata.row/celldata.ro;
 		return Vector(vx, vy, vz);
 	};
-	double GetDensity(const ConservativeVariables& celldata) {		
-		double ro = celldata.ro;		
-		return ro;
-	};
 	double GetVelocityX(const ConservativeVariables& celldata) {		
 		double ro = celldata.ro;
 		double vx = celldata.rou/celldata.ro;		
@@ -1317,6 +1357,23 @@ public:
 		double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
 		double c = sqrt(medium.Gamma * P / ro);
 		return c;
+	};
+	//conservative variables
+	double GetDensity(const ConservativeVariables& celldata) {		
+		double ro = celldata.ro;		
+		return ro;
+	};
+	double GetRoU(const ConservativeVariables& celldata) {    
+	 return celldata.rou;
+	};
+	double GetRoV(const ConservativeVariables& celldata) {    
+	return celldata.rov;
+	};
+	double GetRoW(const ConservativeVariables& celldata) {    
+	 return celldata.row;
+	};
+	double GetRoE(const ConservativeVariables& celldata) {    
+	 return celldata.roE;
 	};
 
 	void SaveWallPressureDistribution(std::string fname) {
@@ -1969,6 +2026,118 @@ public:
 		return;
 
 	};
+	void SaveCellGradientsToTechPlot2D(std::string fname) {
+		std::ofstream ofs(fname);
+		ofs<<std::scientific;
+
+		//Access local nodes, faces, cells and flow data
+		std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+		std::vector<Face*> faces = _grid.faces.getLocalNodes();
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+		std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+		ofs<<"VARIABLES= \"X\", \"Y\", \"d_ro/dx\", \"d_ro/dy\", \"d_roU/dx\", \"d_roU/dy\", \"d_roV/dx\", \"d_roV/dy\"";
+		ofs<<", \"d_roE/dx\"";
+		ofs<<", \"d_roE/dy\"";
+		ofs<<"\n";
+			
+		ofs<<"ZONE T=\"D\"\n";
+		ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+		if (cells[0]->CGNSType == QUAD_4) {
+			ofs<<"ET=QUADRILATERAL\n";
+		};
+		if (cells[0]->CGNSType == TRI_3) {
+			ofs<<"ET=TRIANGLE\n";
+		};
+
+		ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+		ofs<<", CELLCENTERED";
+		ofs<<", CELLCENTERED";
+		ofs<<")\n";
+
+		//Map all node global indexes to natural numbers
+		std::map<int,int> toNaturalIndex;
+		std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+		int counter = 1;
+		for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+		//Nodes coordinates
+		//X
+		for (int i = 0; i<nodes.size(); i++) {
+			ofs<<nodes[i]->P.x<<"\n";
+		};
+
+		//Y
+		for (int i = 0; i<nodes.size(); i++) {
+			ofs<<nodes[i]->P.y<<"\n";
+		};
+
+		////Gradients data
+		//d_ro/d_x
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRo[idx].x<<"\n";
+		};
+				
+		//d_ro/d_y
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRo[idx].y<<"\n";
+		};
+
+		//d_roU/d_x
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoU[idx].x<<"\n";	
+		};
+
+		//d_roU/d_y
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoU[idx].y<<"\n";
+		};
+
+		//d_roV/d_x
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoV[idx].x<<"\n";
+		};
+
+		//d_roV/d_y
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoV[idx].y<<"\n";
+		};
+
+		//d_roE/d_x
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoE[idx].x<<"\n";
+		};	
+
+		//d_roE/d_y
+		for (int i = 0; i<cells.size(); i++) {
+			int idx = cells[i]->GlobalIndex;
+			ofs<<gradCellsRoE[idx].y<<"\n";
+		};	
+
+		//Connectivity list for each cell			
+		for (int i = 0; i<cells.size(); i++) {
+			if (cells[i]->CGNSType == QUAD_4) {
+			ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+				<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+				<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+				<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+			};
+			if (cells[i]->CGNSType == TRI_3) {
+			ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+				<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+				<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+			};
+		};
+		ofs.close();
+		return;
+	};
 
 	//Save solution slice in a file in Blazius coordinates
 	void SaveSliceToTechPlot(std::string fname, double xStart, double Uinf, double xMin, double xMax, double yMin, double yMax) {
@@ -2289,7 +2458,7 @@ public:
 			
 			alglib::minlmcreatev(1, x, 1e-6, state);
 			alglib::minlmsetcond(state, epsg, epsf, epsx, maxits);
-			alglib::minlmoptimize(state, LogWallRealtion, NULL, &params);
+			alglib::minlmoptimize(state, LogWallRelation, NULL, &params);
 			alglib::minlmresults(state, x, rep);
 
 			//if (rep.terminationtype != 2) {
@@ -2299,7 +2468,7 @@ public:
 			
 			alglib::real_1d_array fCheck;
 			fCheck.setlength(1);
-			LogWallRealtion(x, fCheck, &params);
+			LogWallRelation(x, fCheck, &params);
 			double checkF = fCheck[0];
 
 			faceWI.shearVelocity = exp(x[0]);
@@ -2408,20 +2577,4 @@ public:
 };
 
 
-#endif
-
-//Compute sum of normals
-/*Vector sumS(0,0,0);
-if (cells[i]->Faces.size() != 4) {
-	std::cout<<"!!!";
-	exit(0);
-};
-for (int j = 0; j<cells[i]->Faces.size(); j++) {
-	Face& f = _grid.faces[cells[i]->Faces[j]];
-	if (f.FaceCell_1 == idx) {
-		sumS += f.FaceNormal * f.FaceSquare;
-	} else {
-		sumS -= f.FaceNormal * f.FaceSquare;
-	}
-};
-ofs<<sumS.mod()<<"\n";	*/		
+#endif	
