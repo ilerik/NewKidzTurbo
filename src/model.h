@@ -182,47 +182,58 @@ public:
 		};
 
 		std::vector<double> ComputeConvectiveFlux(Face& f, ConservativeVariables UL) {					
-			ConservativeVariables UR = getDummyValues(UL, f);;			
-			return model.rSolver.F(UR, f.FaceNormal);		
+			ConservativeVariables UR = getDummyValues(UL, f);
+			Vector v(UL.rou/UL.ro, UL.rov/UL.ro, UL.row/UL.ro);
+			if (v * f.FaceNormal > 0) {
+				std::cout<<"Backflow detected near cell "<<UL.GlobalIndex<<"\n";
+			};
+			//return model.rSolver.F(UR, f.FaceNormal);
+			//std::vector<double> res(5);
+			return model.rSolver.ComputeFlux(UL, UR, f);
 		};
 
 		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {			
 			//Compute outgoing riemann invariant
 			//Obtain speed of sound			
-			Vector vd = model.GetVelocity(inV);
-			double cd = model.GetSoundSpeed(inV);
-			double Rminus = vd * face.FaceNormal / face.FaceNormal.mod() -  2*cd/(medium.Gamma - 1.0);
-			//Now solve equation Rminus = const for velocity
-			//Use Blazek recomendations	
-			/*double cost = -1.0;
-			if (vd.mod() > std::numeric_limits<double>::epsilon()) cost = - vd * face.FaceNormal / (face.FaceNormal.mod() * vd.mod());
-			double cd2 = cd*cd;
-			double c02 = cd2 + (medium.Gamma - 1.0) * vd * vd / 2.0;
-			double A = (medium.Gamma - 1.0) * cost * cost + 2;
-			double cb = A * c02 / (Rminus * Rminus * (medium.Gamma - 1.0)) - (medium.Gamma - 1.0) / 2.0;
-			cb = sqrt(cb);
-			cb = 1 + cost * cb;
-			cb *= (-Rminus *  (medium.Gamma - 1.0)) / A;
-			double cb2 = cb * cb;
-			double T0 = _temperature;	
-			double k = cb2/c02;
-			if (k > 1.0) k = 1.0;
-			double Tb = T0 * k;
-			double P0 = _pressure;
-			double Pb = P0 * pow(Tb/T0, medium.Gamma / (medium.Gamma - 1.0) );
-			double vbmod = sqrt(2* medium.Gamma * medium.Cv * (T0 - Tb));
-			Vector vb = _velocity * vbmod / _velocity.mod();*/		
+			//Vector vd = model.GetVelocity(inV);
+			//double cd = model.GetSoundSpeed(inV);
+			//double Rminus = vd * face.FaceNormal / face.FaceNormal.mod() -  2*cd/(medium.Gamma - 1.0);
+			////Now solve equation Rminus = const for velocity
+			////Use Blazek recomendations	
+			///*double cost = -1.0;
+			//if (vd.mod() > std::numeric_limits<double>::epsilon()) cost = - vd * face.FaceNormal / (face.FaceNormal.mod() * vd.mod());
+			//double cd2 = cd*cd;
+			//double c02 = cd2 + (medium.Gamma - 1.0) * vd * vd / 2.0;
+			//double A = (medium.Gamma - 1.0) * cost * cost + 2;
+			//double cb = A * c02 / (Rminus * Rminus * (medium.Gamma - 1.0)) - (medium.Gamma - 1.0) / 2.0;
+			//cb = sqrt(cb);
+			//cb = 1 + cost * cb;
+			//cb *= (-Rminus *  (medium.Gamma - 1.0)) / A;
+			//double cb2 = cb * cb;
+			//double T0 = _temperature;	
+			//double k = cb2/c02;
+			//if (k > 1.0) k = 1.0;
+			//double Tb = T0 * k;
+			//double P0 = _pressure;
+			//double Pb = P0 * pow(Tb/T0, medium.Gamma / (medium.Gamma - 1.0) );
+			//double vbmod = sqrt(2* medium.Gamma * medium.Cv * (T0 - Tb));
+			//Vector vb = _velocity * vbmod / _velocity.mod();*/		
+			//Vector vb = _velocity;
+			//if (_velocityDistribution != NULL) {
+			//	vb = _velocityDistribution(face.FaceCenter, _velocityDistributionParams);
+			//};
+			//double P0 = _pressure;
+			//double Pb = P0;	
+			//double cb = (vb * face.FaceNormal / face.FaceNormal.mod() - Rminus);
+			//cb = cb * 0.5 * (medium.Gamma - 1.0);
+			//double eb = cb*cb / ((medium.Gamma - 1.0) * medium.Gamma);
+			//double Tb = eb / medium.Cv;
+			//return model.PrimitiveToConservativeVariables(vb, Pb, Tb, medium);
 			Vector vb = _velocity;
 			if (_velocityDistribution != NULL) {
 				vb = _velocityDistribution(face.FaceCenter, _velocityDistributionParams);
 			};
-			double P0 = _pressure;
-			double Pb = P0;	
-			double cb = (vb * face.FaceNormal / face.FaceNormal.mod() - Rminus);
-			cb = cb * 0.5 * (medium.Gamma - 1.0);
-			double eb = cb*cb / ((medium.Gamma - 1.0) * medium.Gamma);
-			double Tb = eb / medium.Cv;
-			return model.PrimitiveToConservativeVariables(vb, Pb, Tb, medium);
+			return model.PrimitiveToConservativeVariables(vb, _pressure, _temperature, medium);
 		};
 	};
 
@@ -342,6 +353,7 @@ protected:
 	double CFL;	//CFL condition value (0.35 for example)
 	bool IsGradientRequired;
 	bool IsViscousFluxesRequired;
+	bool IsSecondOrder;
 
 	//Computed variables for each face
 	std::map<int, std::vector<double>> fluxes;
@@ -350,6 +362,7 @@ protected:
 	//New approach
 	std::map<int, std::vector<double>> fluxConvective;
 	std::map<int, double> maxWaveSpeed;
+	//SparseRowMatrix preconditioner;
 
 	//Gradient data storage
 	std::map<int, std::set<int>> cellNeigbours;
@@ -377,10 +390,13 @@ protected:
 	std::map<int, double> rowResidual;
 	std::map<int, double> roEResidual;
 
+
+	//Operation pressure
+	double OperatingPressure;
 public:	
 	//Medium properties
 	MediumProperties medium;
-	double SoartingAngle;
+	double SortingAngle;
 
 	//Properties
 	StepInfo stepInfo;
@@ -417,6 +433,11 @@ public:
 		rSolver.SetHartenEps(eps);
 	};
 
+	void SetOperatingPressure(double pOp) {
+		OperatingPressure = pOp;
+		rSolver.SetOperatingPressure(pOp);
+	};
+
 	//TO DO
 	void EnableViscous() {
 		IsGradientRequired = true;
@@ -428,15 +449,24 @@ public:
 		IsViscousFluxesRequired = false;
 	};
 
+	void EnableSecondOrder() {
+		IsSecondOrder = true;
+	};
+
+	void DisableSecondOrder() {
+		IsSecondOrder = false;
+	};
+
 	void SetAngle(double angle)
 	{
-		SoartingAngle = angle;
+		SortingAngle = angle;
 	};
 
 
 	//Constructor
 	Model() {	
 		totalTime = 0; //Init simulation time
+		OperatingPressure = 0; //Default value
 	};
 
 	void BindGrid(Grid& grid) {
@@ -521,11 +551,76 @@ public:
 	{
 	};
 
+	//Compute preconditioner for cell
+	SparseRowMatrix ComputePreconditioner(int gI) {
+		SparseRowMatrix P(5);
+		
+		ConservativeVariables& values = U[gI];
+		Vector Velocity = GetVelocity(values);
+		double V = Velocity.mod();
+		double u = Velocity.x;
+		double v = Velocity.y;
+		double w = Velocity.z;
+		double ro = GetDensity(values);
+
+		double Cp = medium.Cv * medium.Gamma;
+		double roCp = ro * Cp;
+		double T = GetTemperature(values);
+		double H = GetEnthalpy(values);
+
+		double roT = -ro/T;				
+		double Ur = max(V, 1e-3);
+		double theta = 1/Ur - roT/roCp;
+
+		double delta = 1.0;
+
+		P.setValue(0,0, 1);
+		P.setValue(1,1, 1);
+		P.setValue(2,2, 1);
+		P.setValue(3,3, 1);
+		P.setValue(4,4, 1);
+
+		return P;
+		
+		//Preconditioner
+		P.setValue(0,0, theta);
+		P.setValue(0,4, roT);
+		
+		P.setValue(1,0, theta*u);
+		P.setValue(1,1, ro);
+		P.setValue(1,4, roT*u);
+
+		P.setValue(2,0, theta*v);
+		P.setValue(2,2, ro);
+		P.setValue(2,4, roT*v);
+
+		P.setValue(3,0, theta*w);
+		P.setValue(3,3, ro);
+		P.setValue(3,4, roT*w);
+
+		P.setValue(4,0, theta*H-delta);
+		P.setValue(4,1, values.rou);
+		P.setValue(4,2, values.rov);
+		P.setValue(4,3, values.row);
+		P.setValue(4,4, roT*H + roCp);
+
+		return P;
+	};
+
 	//Compute convective flux and max wave propagation speed throught each face
-	void ComputeConvectiveFluxes(std::map<int, std::vector<double>>& fluxes, std::map<int, double>& maxWaveSpeed, const std::map<int, ConservativeVariables>& cellValues) {
+	void ComputeConvectiveFluxes(std::map<int, std::vector<double>>& fluxes, std::map<int, double>& maxWaveSpeed, std::map<int, ConservativeVariables>& cellValues) {
 		fluxes.clear();
 		maxWaveSpeed.clear();		
 		std::vector<Face*> faces = _grid.faces.getLocalNodes();		
+
+		//Compute gradients for second order reconstruction
+		if (IsSecondOrder) {
+			ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
+			ComputeFunctionGradient(gradCellsRoU, U, &Model<RiemannSolver>::GetRoU);
+			ComputeFunctionGradient(gradCellsRoV, U, &Model<RiemannSolver>::GetRoV);
+			ComputeFunctionGradient(gradCellsRoW, U, &Model<RiemannSolver>::GetRoW);
+			ComputeFunctionGradient(gradCellsRoE, U, &Model<RiemannSolver>::GetRoE);
+		};
 
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
@@ -533,17 +628,45 @@ public:
 			Face& f = *faces[i];
 			std::vector<double> flux;
 			ConservativeVariables UL;
-			ConservativeVariables UR;
-			Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;			
+			ConservativeVariables UR;			
+			Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
 			if (f.isExternal) {				
 				//Apply boundary conditions
-				UL = U[f.FaceCell_1]; 								
+				UL = cellValues[f.FaceCell_1]; 						
+				if (!IsSecondOrder) {
+					//Constant reconstruction
+				} else {
+					//Try linear reconstruction
+					dRL = Vector(0,0,0);
+					UL.ro = UL.ro + gradCellsRo[f.FaceCell_1] * dRL;
+					UL.rou = UL.rou + gradCellsRoU[f.FaceCell_1] * dRL;
+					UL.rov = UL.rov + gradCellsRoV[f.FaceCell_1] * dRL;
+					UL.row = UL.row + gradCellsRoW[f.FaceCell_1] * dRL;
+					UL.roE = UL.roE + gradCellsRoE[f.FaceCell_1] * dRL;
+				};
 				flux = _boundaryConditions[f.BCMarker]->ComputeConvectiveFlux(f, UL);				
 			} else {
-				UL = U[f.FaceCell_1];
-				UR = U[f.FaceCell_2];	
+				UL = cellValues[f.FaceCell_1];
+				UR = cellValues[f.FaceCell_2];	
+				if (!IsSecondOrder) {
+					//Constant reconstruction
+				} else {
+					//Try linear reconstruction					
+					UL.ro = UL.ro + gradCellsRo[f.FaceCell_1] * dRL;
+					UL.rou = UL.rou + gradCellsRoU[f.FaceCell_1] * dRL;
+					UL.rov = UL.rov + gradCellsRoV[f.FaceCell_1] * dRL;
+					UL.row = UL.row + gradCellsRoW[f.FaceCell_1] * dRL;
+					UL.roE = UL.roE + gradCellsRoE[f.FaceCell_1] * dRL;
+				
+					Vector dRR = f.FaceCenter - _grid.cells[f.FaceCell_2].CellCenter;					
+					UR.ro = UR.ro + gradCellsRo[f.FaceCell_2] * dRR;
+					UR.rou = UR.rou + gradCellsRoU[f.FaceCell_2] * dRR;
+					UR.rov = UR.rov + gradCellsRoV[f.FaceCell_2] * dRR;
+					UR.row = UR.row + gradCellsRoW[f.FaceCell_2] * dRR;
+					UR.roE = UR.roE + gradCellsRoE[f.FaceCell_2] * dRR;				
+				};
 				flux = rSolver.ComputeFlux( UL,  UR, f);
-			};		
+			};				
 
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = rSolver.MaxEigenvalue;
@@ -551,7 +674,7 @@ public:
 			//Store fluxes			
 			fluxes[f.GlobalIndex] = flux;			
 		};		
-	};
+	};	
 
 	////Compute residual for each cell
 	void ComputeResidual(std::map<int, ConservativeVariables>& residual, std::map<int, ConservativeVariables> cellValues) {
@@ -635,9 +758,13 @@ public:
 		}
 
 		//Runge-Kutta explicit time stepping
-		const int nStages = 4;
+		const int nStages = 2;
 		std::vector<double> alpha;//{ 0.0833, 0.2069, 0.4265, 1.000 };
 		if (nStages == 1) {
+			alpha.push_back(1.0);
+		};
+		if (nStages == 2) {
+			alpha.push_back(0.5);
 			alpha.push_back(1.0);
 		};
 		if (nStages == 4) {
@@ -781,48 +908,7 @@ public:
 			perm[index_map[inv_perm[c]]] = c;
 		std::cout << "  bandwidth: " 
 					<< bandwidth(G, make_iterator_property_map(&perm[0], index_map, perm[0]))
-					<< std::endl;
-  
-		
-		//{
-		//Vertex s = vertex(6, G);
-		////reverse cuthill_mckee_ordering
-		//cuthill_mckee_ordering(G, s, inv_perm.rbegin(), get(vertex_color, G), 
-		//						get(vertex_degree, G));
-		//cout << "Reverse Cuthill-McKee ordering starting at: " << s << endl;
-		//cout << "  ";    
-		//for (std::vector<Vertex>::const_iterator i = inv_perm.begin();
-		//		i != inv_perm.end(); ++i)
-		//	cout << index_map[*i] << " ";
-		//cout << endl;
-
-		//for (size_type c = 0; c != inv_perm.size(); ++c)
-		//	perm[index_map[inv_perm[c]]] = c;
-		//std::cout << "  bandwidth: " 
-		//			<< bandwidth(G, make_iterator_property_map(&perm[0], index_map, perm[0]))
-		//			<< std::endl;
-		//}
-		//{
-		//Vertex s = vertex(0, G);
-		////reverse cuthill_mckee_ordering
-		//cuthill_mckee_ordering(G, s, inv_perm.rbegin(), get(vertex_color, G),
-		//						get(vertex_degree, G));
-		//cout << "Reverse Cuthill-McKee ordering starting at: " << s << endl;
-		//cout << "  ";
-		//for (std::vector<Vertex>::const_iterator i=inv_perm.begin();
-		//	i != inv_perm.end(); ++i)
-		//	cout << index_map[*i] << " ";
-		//cout << endl;
-
-		//for (size_type c = 0; c != inv_perm.size(); ++c)
-		//	perm[index_map[inv_perm[c]]] = c;
-		//std::cout << "  bandwidth: " 
-		//			<< bandwidth(G, make_iterator_property_map(&perm[0], index_map, perm[0]))
-		//			<< std::endl;
-		//}
-
-		//{
-		
+					<< std::endl;  			
 	};
 
 	//Accessor function
@@ -843,15 +929,24 @@ public:
 		//Determine finite differencing step h		
 		double d = 0;
 		double norm = 0;
+		double typU = 0;
 		for (int i = 0; i<N; i++) {
 			int gI = getGlobalIndexFromNumber(i);			
 			for (int j = 0; j<M; j++) norm += x[i*M + j]*x[i*M + j];
-			for (int j = 0; j<M; j++) d += U[gI][j]*x[i*M + j];
+			for (int j = 0; j<M; j++) d += U[gI][j] * x[i*M + j];
+			for (int j = 0; j<M; j++) typU += U[gI][j] * abs(x[i*M + j]);
 		};		
+		typU /= M*N;
+		typU = abs(typU);
 		double h = 1.0e-7;
-		if (d > 0) {
-			h = sqrt(1.0e-14) * d / norm;
+		double signd = d>0 ? 1 : -1;		
+		if (norm == 0) {
+			h = 1.0e-7;
+		} else {
+			h = 1e-7 * sqrt(1.0e-14) * max(abs(d), typU) * signd / norm;
 		};
+		
+		std::cout<<"h = "<<h<<"\n";		
 
 		//Compute residual at new point
 		std::map<int, ConservativeVariables> Wh;
@@ -867,20 +962,29 @@ public:
 		ComputeResidual(Rh, Wh);
 
 		//Evaluate result
+		double* pw = new double[5];
 		for (int i = 0; i<N; i++) {
 			int gI = getGlobalIndexFromNumber(i);
 
-			//Jacobian
+			//Compute preconditioner
+			SparseRowMatrix P = ComputePreconditioner(gI);
+
+			//Jacobian			
 			for (int j = 0; j<M; j++) {
-				r[i*M + j] = (Rh[gI][j] - RImp[gI][j]) / h;
+				r[i*M + j] = (Rh[gI][j] - RImp[gI][j]) / h;								
 			};
 
+			mult(P, &r[i*M], pw);
+			for (int j = 0; j<M; j++) r[i*M + j] = pw[j];
+
 			//Time dependent part
-			double c = _grid.cells[gI].CellVolume / stepInfo.TimeStep;
+			double c =  _grid.cells[gI].CellVolume / stepInfo.TimeStep;
 			for (int j = 0; j<M; j++) {
 				r[i*M + j] += c * x[i*M + j];
+				//r[i*M + j] = c * x[i*M + j];
 			};
 		};
+		delete pw;
 	};		
 
 	//Implicit time step
@@ -977,20 +1081,29 @@ public:
 				if (timeStep < stepInfo.TimeStep) stepInfo.TimeStep = timeStep;
 			}
 
-			//Construct right hand side vector
+			//Construct right hand side vector			
+			double* pw = new double[5];
 			for each (std::pair<int, ConservativeVariables> p in RImp)	
 			{
 				int cN = getNumberFromGlobalIndex(p.first);
+
+				//Compute preconditioner
+				SparseRowMatrix P = ComputePreconditioner(p.first);
+
 				for (int j = 0; j<M; j++) {
-					b[cN*M + j] = -p.second[j];
+					b[cN*M + j] = -p.second[j];										
 					if (b[cN*M + j] != b[cN*M + j]) throw 1;
 					x[cN*M + j] = 0;
 				};
+
+				mult(P, &b[cN*M], pw);
+				for (int j = 0; j<M; j++) b[cN*M + j] = pw[j];
 			};
+			delete pw;
 
 			//Solve for new solution update
-			int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-7, true);
-			//int iterationsMade = gmres<Model<RiemannSolver>>(N*M, N*M, *this, b, x, 1e-15, true);
+			//int iterationsMade = bicgstab<Model<RiemannSolver>>(N*M, *this, b, x, 1e-7, true);
+			int iterationsMade = gmres<Model<RiemannSolver>>(20, N*M, *this, b, x, 1e-7, true);
 
 			//Update solution
 			totalTime += stepInfo.TimeStep;
@@ -1023,10 +1136,10 @@ public:
 
 			//Update CFL number
 			//Switched Evolution Relaxation (SER) Blazek (6.66)
-			double k = normR / normRNew;
-			if (k>1.0) CFL *= k;
+			double k = normR / normRNew;  
+			//if (k > 1.0) CFL *= k;
 			//if (iterationsMade < 5) CFL *= 2;
-			if (SERCoef > 0) CFL *= SERCoef;
+			if ((k > 1.0) && (SERCoef != 0)) CFL *= SERCoef * k;
 			normR = normRNew;
 
 			//And save convergence history
@@ -1230,7 +1343,8 @@ public:
 	
 	//Compute convective fluxes and adjust time step
 	void ComputeConvectiveFluxes() {		
-		std::vector<Face*> faces = _grid.faces.getLocalNodes();		
+		std::vector<Face*> faces = _grid.faces.getLocalNodes();	
+		
 
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
@@ -1242,7 +1356,7 @@ public:
 			Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;			
 			if (f.isExternal) {
 				//Try linear reconstruction
-				UL = U[f.FaceCell_1]; 
+				UL = U[f.FaceCell_1]; 				
 				dRL = Vector(0,0,0);
 				UL.ro = UL.ro + gradCellsRo[f.FaceCell_1] * dRL;
 				UL.rou = UL.rou + gradCellsRoU[f.FaceCell_1] * dRL;
@@ -1437,13 +1551,7 @@ public:
 		ComputeFunctionGradient(gradCellsU, U, &Model<RiemannSolver>::GetVelocityX);
 		ComputeFunctionGradient(gradCellsV, U, &Model<RiemannSolver>::GetVelocityY);
 		ComputeFunctionGradient(gradCellsW, U, &Model<RiemannSolver>::GetVelocityZ);
-		ComputeFunctionGradient(gradCellsT, U, &Model<RiemannSolver>::GetTemperature);
-		//ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
-		//ComputeFunctionGradient(gradCellsRoU, U, &Model<RiemannSolver>::GetRoU);
-		//ComputeFunctionGradient(gradCellsRoV, U, &Model<RiemannSolver>::GetRoV);
-		//ComputeFunctionGradient(gradCellsRoW, U, &Model<RiemannSolver>::GetRoW);
-		//ComputeFunctionGradient(gradCellsRoE, U, &Model<RiemannSolver>::GetRoE);
-		
+		ComputeFunctionGradient(gradCellsT, U, &Model<RiemannSolver>::GetTemperature);				
 
 		//Compute gradients at face centers
 		//Clear all previous data
@@ -1761,6 +1869,16 @@ public:
 		double E = celldata.roE/celldata.ro;
 		double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
 		return T;
+	};
+	double GetEnthalpy(const ConservativeVariables& celldata) {
+		double ro = celldata.ro;
+		double vx = celldata.rou/celldata.ro;
+		double vy = celldata.rov/celldata.ro;
+		double vz = celldata.row/celldata.ro;
+		double E = celldata.roE/celldata.ro;
+		double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+		double H = medium.Cv * medium.Gamma * T + (vx*vx+vy*vy+vz*vz)/2.0;
+		return H;
 	};
 	double GetSoundSpeed(const ConservativeVariables& celldata) {
 		double ro = celldata.ro;
@@ -2115,6 +2233,240 @@ public:
 				double vy = U[idx].rov/U[idx].ro;
 				double vz = U[idx].row/U[idx].ro;
 				double E = U[idx].roE/U[idx].ro;
+				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
+				ofs<<PStagnation<<"\n";
+			};	
+
+			//distance
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				if (_wallInfo.size() != 0) {
+					ofs<<_wallInfo[idx].distance<<"\n";
+				} else {
+					ofs<<0<<"\n";
+				};
+			};
+
+			//rouResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rouResidual[idx]<<"\n";			
+			};
+
+			//rovResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rovResidual[idx]<<"\n";			
+			};
+
+			//rowResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rowResidual[idx]<<"\n";			
+			};
+
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
+			};
+
+			//dU_dx
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].x<<"\n";			
+			};
+
+			//dU_dy
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].y<<"\n";			
+			};
+
+			//Connectivity list for each cell			
+			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+			};
+		};
+
+		ofs.close();
+		return;
+
+	};
+
+	virtual void SaveToTechPlotUndim(std::string fname, ConservativeVariables& var) {
+		std::ofstream ofs(fname);
+		ofs<<std::scientific;
+		if (_grid.gridInfo.GridDimensions == 1) {
+			//Header
+			ofs<<"VARIABLES= \"x\"\n";
+			ofs<<"\"ro\"\n";
+			ofs<<"\"u\"\n";
+			ofs<<"\"P\"\n";
+			ofs<<"\"T\"\n";
+			ofs<<"ZONE\n";
+
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			for (int i = 0; i<cells.size(); i++) {			
+				Cell& c = *cells[i];								
+				ofs<<c.CellCenter.x<<"\n";
+				ofs<<U[c.GlobalIndex].ro/var.ro<<"\n";
+				ofs<<GetVelocity(U[c.GlobalIndex]).x/GetVelocity(var).x<<"\n";
+				ofs<<GetPressure(U[c.GlobalIndex])/GetPressure(var)<<"\n";
+				ofs<<GetTemperature(U[c.GlobalIndex])/GetTemperature(var)<<"\n";
+				ofs<<"\n";
+			};		
+		};
+		if (_grid.gridInfo.GridDimensions == 2) {
+			//TO DO unify		
+			//Header
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+			ofs<<"VARIABLES= \"X\", \"Y\", \"Rho\", \"u\", \"v\", \"w\", \"E\", \"T\", \"P\"";
+			ofs<<", \"PStagnation\"";
+			ofs<<", \"distance\"";
+			ofs<<", \"rouResidual\"";
+			ofs<<", \"rovResidual\"";
+			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
+			ofs<<", \"dU_dx\"";
+			ofs<<", \"dU_dy\"";
+			ofs<<"\n";
+			
+			ofs<<"ZONE T=\"D\"\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
+
+			ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<")\n";
+
+			//Map all node global indexes to natural numbers
+			std::map<int,int> toNaturalIndex;
+			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+			int counter = 1;
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+			//Nodes coordinates
+			//X
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.x<<"\n";
+			};
+
+			//Y
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.y<<"\n";
+			};
+
+			////Solution data
+			////Rho
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].ro/var.ro<<"\n";
+			};
+				
+			//u
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou*var.ro/(U[idx].ro*var.rou)<<"\n";
+			};
+			//v
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov*var.ro/(U[idx].ro*var.rov)<<"\n";		
+			};
+			//w
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].row*var.ro/(U[idx].ro*var.row)<<"\n";
+			};
+			//E
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].roE*var.ro/(U[idx].ro*var.roE)<<"\n";
+			};
+			//T
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
+				double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+				ofs<<T<<"\n";
+			};
+			//P
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
+				double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
+				ofs<<P<<"\n";
+			};	
+
+			//PStagnation
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro/var.ro;
+				double vx = U[idx].rou/(ro*var.rou);
+				double vy = U[idx].rov/(ro*var.rov);
+				double vz = U[idx].row/(ro*var.row);
+				double E = U[idx].roE/(ro*var.roE);
 				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
 				ofs<<PStagnation<<"\n";
 			};	

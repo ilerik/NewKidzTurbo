@@ -2,6 +2,7 @@
 #define TURBO_GRIDGENERATION_GENGRID2D
 
 #include "grid.h"
+#include "cgnslib.h"
 
 Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_y)
 {
@@ -62,6 +63,7 @@ Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_
 			c.Faces[2] = (i + j*(N-1)) + N*(M-1);
 			c.Faces[3] = (i + (j+1)*(N-1)) + N*(M-1);			
 			c.CellHSize = 0;
+			c.CGNSType = QUAD_4;
 			g.cells.add(c);
 		};
 	};

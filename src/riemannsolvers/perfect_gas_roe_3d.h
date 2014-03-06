@@ -9,6 +9,7 @@ class Roe3DSolverPerfectGas {
 	//Required info
 	double gamma;
 	double eps;	
+	double opP;
 public:	
 	Roe3DSolverPerfectGas(){
 		eps = 0.05;
@@ -22,6 +23,10 @@ public:
 		eps = _eps;
 	};
 
+	void SetOperatingPressure(double _opP) {
+		opP = _opP;
+	};
+
 	//Numerical flux
 	std::vector<double> F(ConservativeVariables U, Vector n)
 	{		
@@ -31,7 +36,7 @@ public:
 		double vy = U.rov/ro;
 		double vz = U.row/ro;
 		double roe = U.roE;	//ro*e
-		double p = (gamma-1.0)*(roe-ro*(vx*vx+vy*vy+vz*vz)/2.0);		
+		double p = (gamma-1.0)*(roe-ro*(vx*vx+vy*vy+vz*vz)/2.0) - opP;		
 		res[0] = n.x * (ro*vx) + n.y*(ro*vy) + n.z*(ro*vz);
 		double vn = vx*n.x + vy*n.y + vz*n.z;
 		res[1] = n.x * (ro*vx*vx+p) + n.y*(ro*vx*vy) + n.z*(ro*vx*vz);

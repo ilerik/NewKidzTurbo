@@ -85,13 +85,13 @@ bicgstab( unsigned NN, MATRIX &A,
   dcopy(&N,r,&one,d,&one);
   dcopy(&N,d,&one,h,&one);
   dcopy(&N,h,&one,rT,&one);
-  //assert( ddot(&N,rT,&one,rT,&one)>1e-40 );
+  assert( ddot(&N,rT,&one,rT,&one)>1e-40 );
   rTh=ddot(&N,rT,&one,h,&one);
   rTr=ddot(&N,r,&one,r,&one);
   while ( rTr>err ) {
     mult(A,d,Ad);
     rTAd=ddot(&N,rT,&one,Ad,&one);
-    //assert( fabs(rTAd)>1e-40 );
+    assert( fabs(rTAd)>1e-40 );
     alpha=rTh/rTAd;
 	double minusalpha = -alpha;
     daxpy(&N,&minusalpha,Ad,&one,r,&one);
