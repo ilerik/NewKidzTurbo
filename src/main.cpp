@@ -10,6 +10,13 @@
 #include "garbarukmodel.h"
 #include "SAmodel.h"
 #include "biffplatemodel.h"
+#include "bicgstab.h"
+#include "gridloading\triangleload.h"
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/cuthill_mckee_ordering.hpp>
+#include <boost/graph/properties.hpp>
+#include <boost/graph/bandwidth.hpp>
+
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -132,7 +139,7 @@ bool RunSODTest() {
 	model.DisableViscous();
 
 	//Set computational settings
-	model.SetCFLNumber(0.35);
+	model.SetCFLNumber(1.0);
 	model.SetHartenEps(0.005);
 
 	//Bind computational grid
@@ -156,7 +163,8 @@ bool RunSODTest() {
 	//Total time
 	double maxTime = 0.2;
 	for (int i = 0; i < 2000000000; i++) {
-		model.Step();	
+		model.ExplicitTimeStep();	
+		//model.Step();
 		if (i % 1 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
@@ -637,58 +645,150 @@ void GodunovTests() {
 	return;
 };
 
-//Main program ))
-int main(int argc, char *argv[]) {	
-	//GodunovTests();
-	//RunSAFlatPlate();
-	//RunGAWCalculation();
-	//RunPoiseuilleTest();
-	RunSODTest();
-	//RunBiffFlatPlate();
-	return 0;
+void LinearSolverTests() {
+	const int N = 2;
+	double* x = new double[N];
+	double* b = new double[N];
+	x[0] = 0.0;
+	x[1] = -0.1;
+	b[0] = 1;
+	b[1] = 4;	
+	SparseRowMatrix A(N);
+	A.setValue(0,0, 1.0);
+	A.setValue(0,1, 2.0);
+	A.setValue(1,0, 3.0);
+	A.setValue(1,1, 4.0);
+	bicgstab<SparseRowMatrix>(N, A, b, x, 1e-10, true);	
+	std::cout<<x[0]<<" "<<x[1]<<std::endl;
+};
 
-	//Load cgns grid			
-	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
-	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineSA.cgns";	
-	Grid grid = LoadCGNSGrid(solutionFile);
+void ImplicitSolverTest() {
+	Model<Godunov3DSolverPerfectGas> model;
+	Grid grid;
 
-	// Initialize medium model and place boundary conditions
-	Model<Roe3DSolverPerfectGas> model;
-
-	//Set fluid properties
-	//Air
+	//Shock tube problem setting
+	double lBegin = 0;
+	double lEnd = 1.0;
+	Vector direction = Vector(1,0,0);
+	grid = GenGrid1D(1000, lBegin, lEnd, direction);
+	//grid = GenGrid1D(2, lBegin, lEnd, direction);
+	
+	//Set fluid properties	
 	model.SetGamma(1.4);
 	model.SetCv(1006.43 / 1.4);
 	model.SetMolecularWeight(28.966);
+	model.DisableViscous();	
 
-	//model.SetViscosity(1.7894e-05);
-	model.SetViscosity(1.7894e-03);
-	model.SetThermalConductivity(0.0242);
-	model.SetAngle(0.000001);
+	//Bind computational grid
+	model.BindGrid(grid);	
 
+	//Set initial conditions
+	model.SetInitialConditions(SODTestInitDistribution);
+	/*Vector velocity(0,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;
+
+	ConservativeVariables initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);		
+	model.SetInitialConditions(initValues);	*/
+
+	//Boundary conditions
+	//No slip boundary
+	Model<Godunov3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+	model.SetBoundaryCondition("left", NoSlipBC);
+	model.SetBoundaryCondition("right", NoSlipBC);
+
+	model.SaveToTechPlot("SODInit.dat");
+
+	//Total time
+	//double maxTime = 0.2;
+	//for (int i = 0; i < 2000000000; i++) {
+	//	model.ExplicitTimeStep();	
+	//	//model.Step();
+	//	if (i % 1 == 0) {
+	//		std::cout<<"Interation = "<<i<<"\n";
+	//		std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+	//		for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+	//		std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+	//	};
+	//	model.SaveToTechPlot("SOD.dat");
+	//	if (model.totalTime > 0.2) break;
+	//};
 
 	//Set computational settings
-	model.SetCFLNumber(0.35);
-	model.SetHartenEps(0.000);
+	model.SetCFLNumber(1.0);
+	model.SetHartenEps(0.005);
 
-	////Bind computational grid
-	model.BindGrid(grid);	
+	//Run computation
+	model.ImplicitSteadyState(0.2, 2, 1e-15, 0.0);
+
+	//Save result to techplot
+	model.SaveToTechPlot("SOD.dat");
+	return ;
+};
+
+int BumpFlowTestExplicit() {
+	Grid grid = Load2DTriangleGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\BumpFlow\\bump.grid");
+
+	//fill in BC Markers
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for(int i=0; i<grid.faces.size(); i++){
+		Face& f = *faces[i];
+		if(f.isExternal!=1) continue;
+		//top border
+		if(f.FaceCenter.y==2.0){
+			f.BCMarker = 4;
+			continue;
+		};
+		//left border
+		if(f.FaceCenter.x==-2.0){
+			f.BCMarker = 1;
+			continue;
+		};
+		//right border
+		if(f.FaceCenter.x>2.999){
+			f.BCMarker = 2;
+			continue;
+		};
+		//bottom border
+		f.BCMarker = 3;
+	};
+	//Add Patches
+	grid.addPatch("left", 1);
+	grid.addPatch("right", 2);
+	grid.addPatch("bottom", 3);
+	grid.addPatch("top", 4);
+	grid.ConstructAndCheckPatches();
+
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+		
+	model.BindGrid(grid);
 
 	////Initial conditions
 	ConservativeVariables initValues(0);
 
-	//Vector velocity(0.1,0,0);
-	Vector velocity(10,0,0);
-	double pressure = 101579;
+	double Mach_inf = 0.3;
 	double temperature = 300.214;
+	double pressure = 101579;
+	double sound_speed = sqrt(model.medium.Gamma*(model.medium.Gamma - 1.0)*model.medium.Cv*temperature);
+	double u_inf = Mach_inf*sound_speed;
+	double ro_inf = model.medium.Gamma*pressure/(sound_speed*sound_speed);
+	Vector velocity(u_inf,0,0);
 
-	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);		
+	//Set computational settings
+	model.SetCFLNumber(0.99);
+	model.SetHartenEps(0.000);
+	model.SetOperatingPressure(pressure);
+
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
 	model.SetInitialConditions(initValues);	
-	//Determine plate start coordinate
-	const double xPlateStart = 0.2;	
-
-	//Read solution from CGNS
-	model.ReadSolutionFromCGNS(solutionFile);		
 
 	//Boundary conditions
 	//Inlet boundary
@@ -705,6 +805,306 @@ int main(int argc, char *argv[]) {
 	//No slip boundary
 	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
 
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", InletBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", InletBC);
+
+	//Set wall boundaries		
+	model.SetWallBoundary("bottom", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.DisableViscous();
+	model.EnableSecondOrder();
+
+	//Save initial solution
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "bumpRS";
+	model.LoadSolution("bump.txt");
+
+	//Compute flow prarameters and dimensional values	
+	ConservativeVariables DimVal(0);
+	DimVal.ro = ro_inf;
+	DimVal.rou = ro_inf*sound_speed;
+	DimVal.rov = ro_inf*sound_speed;
+	DimVal.row = ro_inf*sound_speed;
+	DimVal.roE = ro_inf*sound_speed*sound_speed;
+	//model.SaveToTechPlotUndim("bumpUD.dat", DimVal);
+	//return 0;
+
+	//Convergence history
+	std::ofstream fout("convRS.dat", std::ios::app | std::ios::out);
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 100000000; i++) {
+		model.ExplicitTimeStep();	
+		fout<<i<<" "<<model.stepInfo.Residual[4]<<"\n";
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+			model.SaveToTechPlotUndim("bumpUD.dat", DimVal);
+		};
+		if (i > 15000) break;
+		if (model.totalTime > 13322) break;
+	};
+	//model.LoadSolution(outputSolutionFile+".txt");
+	//model.SetCFLNumber(1e10);
+	//model.ImplicitSteadyState(1e100, 1, 1e-15, 1.0);
+	//model.ImplicitSteadyState(1, 10, 1e-15, 1.0);
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	fout.close();
+
+	return 0;
+};
+
+int SimpleChannelTest() {
+	Grid grid = GenGrid2D(100, 100, 5.0, 2.0, 1.0, 1.0);
+
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	model.DisableViscous();
+		
+	model.BindGrid(grid);
+		
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	double Mach_inf = 0.3;
+	double temperature = 300.214;
+	double pressure = 101579;
+	double sound_speed = sqrt(model.medium.Gamma*(model.medium.Gamma - 1.0)*model.medium.Cv*temperature);
+	double u_inf = Mach_inf*sound_speed;
+	Vector velocity(u_inf,0,0);
+
+	//Set computational settings
+	model.SetCFLNumber(0.99);
+	model.SetHartenEps(0.000);
+	model.SetOperatingPressure(pressure);
+
+	//initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
+	initValues = model.PrimitiveToConservativeVariables(Vector(0,0,0), pressure, temperature, model.medium);
+	model.SetInitialConditions(initValues);	
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Set wall boundaries		
+	model.SetWallBoundary("bottom", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.DisableViscous();
+
+	//Save initial solution
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "simple";
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 100000000; i++) {
+		model.ExplicitTimeStep();	
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (i > 7500) break;
+		if (model.totalTime > 13322) break;
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	return 0;
+};
+
+int ImplicitSolverTestOneCell() {
+	Grid grid = GenGrid2D(1, 1, 1.0, 1.0, 1.0, 1.0);
+
+	// Initialize medium model and place boundary conditions
+	Model<Roe3DSolverPerfectGas> model;
+
+	//Set fluid properties
+	//Air
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	model.DisableViscous();
+
+	model.SetViscosity(1.7894e-05);
+	//model.SetViscosity(1.7894e-03);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Initial conditions
+	ConservativeVariables initValues(0);	
+	Vector velocity(10,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;
+	model.SetOperatingPressure(pressure);
+
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure + 100, temperature, model.medium);		
+	model.SetInitialConditions(initValues);	
+
+	//Boundary conditions
+	//Inlet
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);	
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);	
+	OutletBC.setParams(pressure);
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);	
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Set computational settings
+	model.SetCFLNumber(1.0e100);
+	model.SetHartenEps(0.000);
+
+	//Run computation
+	bool isSave = true;
+	model.ImplicitSteadyState(1, 1, 1e-15, 0);
+	/*for (int i = 0; i < 1000000; i++) {
+		bool isConverged = true;
+		model.ExplicitTimeStep();	
+		if (i % 1 == 0)  {
+			std::cout<<"Interation = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) {
+				std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+				if (abs(model.stepInfo.Residual[k]) > 1e-10) isConverged = false;
+			};
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if (model.totalTime > 10000) break;
+		if (isConverged) break;
+	};*/
+
+	//Save result to techplot
+	model.SaveToTechPlot("solution.dat");
+	return 0;
+};
+
+int BlasiusTest() {
+	//Load cgns grid			
+	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\MeshUniform\\solution.cgns";
+	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";
+	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineSA.cgns";	
+	Grid grid = LoadCGNSGrid(solutionFile);
+
+	// Initialize medium model and place boundary conditions
+	Model<Roe3DSolverPerfectGas> model;
+
+	//Set fluid properties
+	//Air
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);	
+
+	//model.SetViscosity(1.7894e-05);
+	model.SetViscosity(1.7894e-03);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);	
+
+	////Bind computational grid
+	model.BindGrid(grid);	
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	//Vector velocity(0.1,0,0);
+	Vector velocity(10,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;
+
+	//Set computational settings
+	model.SetCFLNumber(0.9);
+	model.SetHartenEps(0.00);
+	model.SetOperatingPressure(pressure);
+
+	/*initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);		
+	model.SetInitialConditions(initValues);	*/
+	//Determine plate start coordinate
+	const double xPlateStart = 0.2;	
+
+	//Read solution from CGNS
+	model.ReadSolutionFromCGNS(solutionFile);		
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	//OutletBC.setParams(101604);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
 	//Fixed velocity boundary condition
 	Model<Roe3DSolverPerfectGas>::ConstantVelocityBoundaryCondition FixedVelocityBC(model, velocity);
 
@@ -713,8 +1113,8 @@ int main(int argc, char *argv[]) {
 	model.SetBoundaryCondition("outlet", OutletBC);
 	model.SetBoundaryCondition("plate", NoSlipBC);	
 	model.SetBoundaryCondition("symmetry", SymmetryBC);
-	model.SetBoundaryCondition("top_left", SymmetryBC);
-	model.SetBoundaryCondition("top_right", SymmetryBC);
+	model.SetBoundaryCondition("top_left", OutletBC);
+	model.SetBoundaryCondition("top_right", OutletBC);
 	
 
 	//Set wall boundaries		
@@ -723,7 +1123,6 @@ int main(int argc, char *argv[]) {
 	model.DistanceSorting();
 	model.EnableViscous();
 	//model.DisableViscous();
-
 	 
 	//Init model
 	//model.Init();		
@@ -731,14 +1130,15 @@ int main(int argc, char *argv[]) {
 	//Save initial solution
 	model.ComputeGradients();
 	model.SaveToTechPlot("init.dat");
+	model.SaveSolution("init.sol");	
 
 	//Load solution
 	std::string outputSolutionFile = "solution";
 
-	//Run simulation
-	bool isSave = true;	
+	////Run simulation
+	bool isSave = true;		
 	for (int i = 0; i < 1000000; i++) {
-		model.Step();	
+		model.ExplicitTimeStep();			
 		if (i % 10 == 0)  {
 			std::cout<<"Interation = "<<i<<"\n";
 			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
@@ -748,17 +1148,42 @@ int main(int argc, char *argv[]) {
 		if ((i % 100 == 0) && (isSave)) {
 			model.SaveSolution(outputSolutionFile+".sol");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
-			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+			/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
+			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);			
 		};
 		if (model.totalTime > 10000) break;
 	};
+
+	//model.LoadSolution(outputSolutionFile + ".sol");
+	//model.ImplicitSteadyState(10, 1, 1e-10, 1.0);
 
 	//Save result to techplot
 	if (isSave) {
 		model.SaveSolution(outputSolutionFile+".sol");
 		model.SaveToTechPlot(outputSolutionFile+".dat");
-		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+		/*model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
+		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);*/
+		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.992, 1.0, 0, 0.06);		
 	};
-}
+	return 0;
+};
+
+//Main program ))
+int main(int argc, char *argv[]) {		
+	//SimpleChannelTest(); return 0;
+	//ImplicitSolverTestOneCell(); return 0;
+	//BlasiusTest(); return 0;
+	BumpFlowTestExplicit(); return 0;
+	//ImplicitSolverTest(); return 0;
+	//LinearSolverTests(); return 0;
+	//GodunovTests();
+	//RunSAFlatPlate();
+	//RunGAWCalculation();
+	//RunPoiseuilleTest();
+	//RunSODTest();
+	//RunBiffFlatPlate();
+
+
+	return 0;	
+};

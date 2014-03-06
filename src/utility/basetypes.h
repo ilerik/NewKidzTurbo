@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <map>
 
 
 inline double max(double a, double b) {
@@ -738,6 +739,43 @@ public:
 	TensorValue(){};
 };
 
+
+
+//Sparse matrix type
+typedef std::map<int, double> SparseRow;
+class SparseRowMatrix 
+{
+public:
+	int nRow;	//Number of rows
+	int nCol;	//Number of columns
+	std::vector<SparseRow> A;	//Array of rows
+
+	//Constructor for square matrix
+	SparseRowMatrix(int n) {
+		nCol = nRow = n;
+		A.resize(nRow);
+	};
+	
+	//Accessors
+	void setValue(int i, int j, double value) {
+		if (value == 0) {
+			A[i].erase(j);
+		} else {
+			A[i][j] = value;
+		};
+	};
+};
+
+void mult( const SparseRowMatrix &A, const double *v, double *w ) { 
+    /* ... your implementation of the multiplication ...    */
+	for (int i = 0; i<A.nRow; i++) {
+		w[i] = 0;		
+		for each (std::pair<int, double> pair in A.A[i])
+		{
+			w[i] += v[pair.first] * pair.second;
+		}
+	};
+};
 
 
 

@@ -244,7 +244,7 @@ private:
 		for(int i=0; i<layerCells.size(); i++)
 		{
 			CellWallInfo& wInfo = _wallInfo[layerCells[i]];
-			if(wInfo.angle<SoartingAngle) {
+			if(wInfo.angle<SortingAngle) {
 				int c_Ind = layerCells[i];
 				//tangential velocity in a cell
 				Vector V = Vector(U[c_Ind].rou, U[c_Ind].rov, U[c_Ind].row);

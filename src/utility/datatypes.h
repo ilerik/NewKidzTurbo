@@ -33,41 +33,24 @@ struct ConservativeVariables {
 	double roE; //Total energy * Density
 
 	ConservativeVariables() {		 
+		GlobalIndex = 0;
+		ro = 0;
+		rou = 0;
+		rov = 0;
+		row = 0;
+		roE = 0;
 	};
 
 	ConservativeVariables(int ind) {
 		GlobalIndex = ind;
-	};
-
-	void FillValuesFromPrimitiveVariables(Vector ro, double p, double T) {
-
+		ro = 0;
+		rou = 0;
+		rov = 0;
+		row = 0;
+		roE = 0;
 	};
 
 	double& operator[](int i) {
-		/*double res;
-		switch (i) {
-		case 0: {
-					res = ro;
-					break;
-				};
-		case 1: {
-					res = rou;
-					break;
-				};
-		case 2: {
-				res = rov;
-				break;
-			};
-		case 3: {
-				res = row;
-				break;
-			};
-		case 4: {
-				res = roE;
-				break;
-			};
-		};
-		return res;*/	
 		switch (i) {
 		case 0: {
 					return ro;
@@ -91,6 +74,50 @@ struct ConservativeVariables {
 				};
 		};
 	};
+
+	ConservativeVariables& operator+=(const std::vector<double>& b) {
+		ro += b[0];
+		rou += b[1];
+		rov += b[2];
+		row += b[3];
+		roE += b[4];
+		return *this;
+	};
+
+	ConservativeVariables& operator+=(const ConservativeVariables& b) {
+		ro += b.ro;
+		rou += b.rou;
+		rov += b.rov;
+		row += b.row;
+		roE += b.roE;
+		return *this;
+	};
+
+	ConservativeVariables& operator*=(const double& c) {
+		ro *= c;
+		rou *= c;
+		rov *= c;
+		row *= c;
+		roE *= c;
+		return *this;
+	};
+};
+
+//Overload some operators
+ConservativeVariables operator+(const ConservativeVariables& a, const ConservativeVariables& b) {
+	ConservativeVariables res;
+	res.ro = a.ro + b.ro;
+	res.rou = a.rou + b.rou;
+	res.rov = a.rov + b.rov;
+	res.row = a.row + b.row;
+	res.roE = a.roE + b.roE;
+	return res;
+};
+
+ConservativeVariables operator*(const ConservativeVariables& a, const double& c) {
+	ConservativeVariables res(a);					
+	res *= c;
+	return res;
 };
 
 #endif

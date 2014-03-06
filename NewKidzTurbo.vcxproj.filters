@@ -31,6 +31,12 @@
     <Filter Include="Header Files\Alglib">
       <UniqueIdentifier>{01bc6e70-fc46-42a5-8361-e7dfcad034f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\LinearSolvers">
+      <UniqueIdentifier>{0d48f905-8e9c-44f9-b849-2ae314bca799}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\LinearSolvers\CUDA">
+      <UniqueIdentifier>{ffb8e916-a97d-47bc-bab5-9f380f453cb1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -80,6 +86,21 @@
     </ClInclude>
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linearsolvers\bicgstab.h">
+      <Filter>Header Files\LinearSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linearsolvers\cgCUDA.h">
+      <Filter>Header Files\LinearSolvers\CUDA</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linearsolvers\gmres.h">
+      <Filter>Header Files\LinearSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridloading\triangleload.h">
+      <Filter>Header Files\GridLoading</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
