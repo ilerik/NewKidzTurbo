@@ -125,9 +125,12 @@ public:
 //general info
 class GridInfo {
 public:
+	std::string fileLocation;
 	int nCoords;
 	int CellDimensions;
 	int GridDimensions;	
+	int nVertices;
+	int nVolumeElements;
 };
 
 class Grid

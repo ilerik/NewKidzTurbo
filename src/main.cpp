@@ -16,6 +16,7 @@
 #include <boost/graph/cuthill_mckee_ordering.hpp>
 #include <boost/graph/properties.hpp>
 #include <boost/graph/bandwidth.hpp>
+#include "mpi.h"
 
 
 template< typename T >
@@ -1174,7 +1175,7 @@ int main(int argc, char *argv[]) {
 	//SimpleChannelTest(); return 0;
 	//ImplicitSolverTestOneCell(); return 0;
 	//BlasiusTest(); return 0;
-	BumpFlowTestExplicit(); return 0;
+	//BumpFlowTestExplicit(); return 0;
 	//ImplicitSolverTest(); return 0;
 	//LinearSolverTests(); return 0;
 	//GodunovTests();
