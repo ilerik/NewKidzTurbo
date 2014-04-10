@@ -5,6 +5,7 @@
 #include "alglibmisc.h"
 #include "cgnslib.h"
 #include "patch.h"
+#include "parmetis.h"
 #include <map>
 #include <set>
 #include <unordered_set>
@@ -129,8 +130,12 @@ public:
 	int nCoords;
 	int CellDimensions;
 	int GridDimensions;	
-	int nVertices;
-	int nVolumeElements;
+	int nNodes;
+	int nCells;
+
+	//Indexes mapping and numeration
+	std::map<idx_t, idx_t> GlobalIndexToNumber;	// cell global index to number from [0, nCells-1]
+	std::map<idx_t, idx_t> NumberToGlobalIndex;	// number from [0, nCells-1] to cell global index	
 };
 
 class Grid
@@ -139,6 +144,9 @@ public:
 	//basic grid properties
 	int GridID;
 	GridInfo gridInfo;
+
+	//partitioning info
+	std::vector<int> cellsPartitioning; // map from cell number index to processor rank
 
 	//boundaries information (BCMarker -> Patch)	
 	std::map<int, Patch> patches;

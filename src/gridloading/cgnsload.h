@@ -4,6 +4,7 @@
 #include "stdlib.h"
 #include "grid.h"
 #include "cgnslib.h"
+#include "parmetis.h"
 
 int GetElementDimensions(ElementType_t type) {
 	int dim = -1;

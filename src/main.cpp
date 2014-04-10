@@ -17,6 +17,7 @@
 #include <boost/graph/properties.hpp>
 #include <boost/graph/bandwidth.hpp>
 #include "mpi.h"
+#include "kernel.h"
 
 
 template< typename T >
@@ -1184,7 +1185,13 @@ int main(int argc, char *argv[]) {
 	//RunPoiseuilleTest();
 	//RunSODTest();
 	//RunBiffFlatPlate();
-
+	
+	Kernel _kernel;
+	_kernel.Initilize(&argc, &argv);
+	//_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
+	_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");
+	_kernel.PartitionGrid();
+	_kernel.Finalize();
 
 	return 0;	
 };

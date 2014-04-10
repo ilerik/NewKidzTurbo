@@ -111,9 +111,6 @@
     <ClInclude Include="src\mainsolver\problem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\utility\logger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\mainsolver\logger.h">
       <Filter>Header Files\MainSolver</Filter>
     </ClInclude>
