@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "parmetis.h"
 
+//Define error types
 #define err_t int
 #define TURBO_OK 0
 #define TURBO_ERROR 0
@@ -57,7 +58,7 @@ public:
 	};
 
 	//Load grid topology info
-	err_t LoadGridTopology(std::string filename) {		
+	err_t LoadGridTopologyAndInfo(std::string filename) {		
 		//Open cgns file
 		_grid.gridInfo.fileLocation = filename;
 		int cgfile, mode = CG_MODE_READ;		
@@ -68,8 +69,7 @@ public:
 		};
 				
 		//Determine the number of bases in the grid. This example assumes 
-		//one base. However it is allowed to have multiple bases. 
-   
+		//one base. However it is allowed to have multiple bases.    
 		int nBases;
 		if(cg_nbases(cgfile, &nBases)!= CG_OK) {			
 			_logger.WriteMessage(GLOBAL, FATAL_ERROR, "Cannot read number of bases.");		
@@ -79,7 +79,8 @@ public:
 			_logger.WriteMessage(GLOBAL, FATAL_ERROR, "Cannot process grid. Must be one base.");
 			return 1;
 		};
-		int base = 1;		
+		int base = 1;	
+		_grid.gridInfo.MainBaseIndex = base;
 
 		//Check the cell and physical dimensions of the base.
 		int physDim;
@@ -90,6 +91,7 @@ public:
 			cg_error_exit();
 			return 1;
 		};		
+		_grid.gridInfo.MainBaseName = std::string(cgnsName);
 		_grid.gridInfo.CellDimensions = cellDim;
 		_grid.gridInfo.GridDimensions = physDim;
 
@@ -106,6 +108,7 @@ public:
 			return 1;
 		}
 		int zone = 1;
+		_grid.gridInfo.MainZoneIndex = 1;
 
 		//Check the zone type. This should be Unstructured.
 		ZoneType_t zoneType;
@@ -120,7 +123,6 @@ public:
 
 		//Determine the number of vertices and volume elements in this */
 		//zone (and thus in the grid, because one zone is assumed). */
-
 		char zoneName[255];
 		cgsize_t sizes[3];
 		if(cg_zone_read(cgfile, base, zone, zoneName, sizes) != CG_OK) cg_error_exit();		
@@ -128,6 +130,7 @@ public:
 		int nCells = sizes[1];
 
 		//Save to grid info
+		_grid.gridInfo.MainZoneName = std::string(zoneName);
 		_grid.gridInfo.nNodes = nVertices;
 		_grid.gridInfo.nCells = nCells;
 
@@ -139,10 +142,49 @@ public:
 		char name[255];
 		DataType_t dataType;
 		if(cg_coord_info(cgfile, base, zone, 1, &dataType, name) != CG_OK)
-			cg_error_exit();	
+			cg_error_exit();			
 
 		//Load shared grid data 
 		//Connectivity info, etc.
+
+		//Read nodes coordinates
+		/* Read the x-coordinates. The y and z-coordinates can be read */
+		/* similarly. Just replace CoordinateX by CoordinateY and */
+		/* CoordinateZ respectively. This assumes Cartesian coordinates */
+		/* in double precision. Note that CGNS starts the numbering at */
+		/* 1 even if C is used. */
+	
+		int one = 1;	
+		std::vector<double> coorX(nVertices);
+		if(cg_coord_read(cgfile, base, zone, "CoordinateX", RealDouble, &one,
+						&nVertices, &coorX[0]) != CG_OK) cg_error_exit();	
+	
+		//Check if we have Y coordinate
+		std::vector<double> coorY(nVertices);
+		for (int i = 0; i<nVertices; i++) coorY[i] = 0;
+		if (nCoords > 1) {
+			if(cg_coord_read(cgfile, base, zone, "CoordinateY", RealDouble, &one,
+						&nVertices, &coorY[0]) != CG_OK) cg_error_exit();	
+		};
+	
+		//Check if its not 3D case and make all Z equal zero
+		std::vector<double> coorZ(nVertices);
+		for (int i = 0; i<nVertices; i++) coorZ[i] = 0;
+		if (nCoords > 2) {
+			if(cg_coord_read(cgfile, base, zone, "CoordinateZ", RealDouble, &one,
+						&nVertices, &coorZ[0]) != CG_OK) cg_error_exit();	
+		};
+
+		//Create grid nodes
+		_grid.localNodes.resize(nVertices);
+		for (int i = 0; i<nVertices; i++) {
+			Node newNode;
+			newNode.GlobalIndex = i+1;
+			newNode.P.x = coorX[i];
+			newNode.P.y = coorY[i];
+			newNode.P.z = coorZ[i];
+			_grid.localNodes[i] = newNode;
+		};
 		
 		//Get sections information		
 		int nSections;
@@ -153,10 +195,12 @@ public:
 		/* Loop over the number of sections and read the element */
 		/* connectivities. As CGNS starts the numbering at 1 the */
 		/* for-loop starts at 1 as well. */		
-		int* conn;
+		std::vector<int> conn;
 		int nNodes;	
-		int nConnNodes;
-		int iMainSection;	//Volume elements section index
+		int nConnNodes;		
+		int currentCellNumber = 0;
+		_grid.gridInfo.GlobalIndexToNumber.clear();
+		_grid.gridInfo.NumberToGlobalIndex.clear();
 		std::map<int, std::vector<int> > numberToElementNodes;
 		std::map<int, ElementType_t > numberToElementType;
 
@@ -164,7 +208,6 @@ public:
 		{
 			/* Determine the element type and set the pointer for the */
 			/* connectivity accordingly. */
-
 			char secName[255];
 			ElementType_t type;
 			cgsize_t eBeg;
@@ -197,35 +240,35 @@ public:
 			//For now we assume that all volume elements are in one section so following condition must hold
 			//TO DO Additional checks
 			bool isVolumeElementsSection = false;
-			if ((nElements == nCells) && (GetElementDimensions(type) == _grid.gridInfo.CellDimensions)) {
+			if ((GetElementDimensions(type) == _grid.gridInfo.CellDimensions)) {
 				isVolumeElementsSection = true;
-			};
-			if (!isVolumeElementsSection) continue;
+				_grid.gridInfo.CellsSections.push_back(sec);
+			} else {
+				isVolumeElementsSection = false;
+				_grid.gridInfo.BoundarySections.push_back(sec);
+			};			
 			
-			//Read main section connectivity info
-			iMainSection = sec;
+			//Read section connectivity info			
 			nConnNodes = nNodes*nElements;
-			conn = new int[nNodes*nElements] ; 			
+			conn.resize(nConnNodes); 			
    
 			/* Read the connectivity. Again, the node numbering of the */
 			/* connectivities start at 1. If internally a starting index */
 			/* of 0 is used (typical for C-codes) 1 must be substracted */
 			/* from the connectivities read. */
    		
-			if(cg_elements_read(cgfile, base, zone, sec, conn, NULL) != CG_OK)
+			if(cg_elements_read(cgfile, base, zone, sec, &conn[0], NULL) != CG_OK)
 				cg_error_exit();	
 
-			//Add all elements read to approriate structures
-			int counter = 0;
-			_grid.gridInfo.GlobalIndexToNumber.clear();
-			_grid.gridInfo.NumberToGlobalIndex.clear();
+			//Add all elements read to approriate structures for cells
+			if (!isVolumeElementsSection) continue;			
 			for (int ind = eBeg; ind<=eEnd; ind++) {
-				_grid.gridInfo.GlobalIndexToNumber[ind] = counter;
-				_grid.gridInfo.NumberToGlobalIndex[counter] = ind;
-				numberToElementType[counter] = type;
-				numberToElementNodes[counter].resize(nNodes);
-				for (int j = 0; j<nNodes; j++) numberToElementNodes[counter][j] = (conn[counter*nNodes + j]);
-				counter++;
+				_grid.gridInfo.GlobalIndexToNumber[ind] = currentCellNumber;
+				_grid.gridInfo.NumberToGlobalIndex[currentCellNumber] = ind;
+				numberToElementType[currentCellNumber] = type;
+				numberToElementNodes[currentCellNumber].resize(nNodes);
+				for (int j = 0; j<nNodes; j++) numberToElementNodes[currentCellNumber][j] = (conn[currentCellNumber*nNodes + j]);
+				currentCellNumber++;
 			};
 		};
 
@@ -294,6 +337,64 @@ public:
 		//Free memory
 		free(eptr);
 		free(eind);
+
+		/* Determine the number of boundary conditions for this zone. */
+
+		int nBocos;
+		if(cg_nbocos(cgfile, base, zone, &nBocos) != CG_OK)
+			cg_error_exit();
+
+		/* Loop over the number of boundary conditions. */
+
+		for(int boco=1; boco<=nBocos; boco++)
+		{
+			/* Read the info for this boundary condition. */
+			char bocoName[255];
+			BCType_t bocoType;
+			PointSetType_t ptsetType;
+			int normalIndex;
+			cgsize_t nBCElem;
+			cgsize_t normListFlag;
+			DataType_t normDataType;
+			int nDataSet;
+			if(cg_boco_info(cgfile, base, zone, boco, bocoName, &bocoType, &ptsetType,
+							&nBCElem, &normalIndex, &normListFlag, &normDataType,
+							&nDataSet) != CG_OK) cg_error_exit();
+
+			/* Read the element ID's. */
+
+			std::vector<cgsize_t> BCElemRead(nBCElem);
+			if(cg_boco_read(cgfile, base, zone, boco, &BCElemRead[0], NULL) != CG_OK) cg_error_exit();
+
+			/* And much more to make it fit into the */
+			/* internal data structures. */
+
+			//Assign to all faces boundary marker
+			bool notBoundary = false;
+			//for (int i = 0; i<nBCElem; i++) {
+			//	std::set<int> idx = indexToElementNodes[BCElemRead[i]];
+			//	if (faces.find(idx) != faces.end()) {
+			//		//Element is a face
+			//		int globalInd = faces[idx];
+			//		_grid.faces[globalInd].BCMarker = boco;
+			//		if (!_grid.faces[globalInd].isExternal) throw Exception("Boundary face must be marked isExternal");
+			//	} else {
+			//		//Its not a face so this is not valid Boundary condition
+			//		//??
+			//		notBoundary = true;
+			//	};
+			//};
+
+			//Add new patch to grid
+			if (!notBoundary) _grid.addPatch(bocoName, boco);		
+		}
+
+		//Make all boundary data consistent
+		//_grid.ConstructAndCheckPatches();
+
+		//Close CGNS file
+		_logger.WriteMessage(GLOBAL, INFORMATION, "Closing CGNS file...");
+		cg_close(cgfile);
 
 		//Synchronize
 		MPI_Barrier(_comm);
@@ -391,12 +492,15 @@ public:
 		msg<<"Number of cells = "<<localCells.size();
 		_logger.WriteMessage(LOCAL, INFORMATION, msg.str());
 
-		//Synchronize
+		//Synchronize		
 		MPI_Barrier(_comm);
-	};
+	}; 
 
 	//Load required geometric grid data
 	err_t LoadGridGeometry() {
+		//Create local cells
+
+		//
 
 
 		//Synchronize

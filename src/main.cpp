@@ -1188,8 +1188,8 @@ int main(int argc, char *argv[]) {
 	
 	Kernel _kernel;
 	_kernel.Initilize(&argc, &argv);
-	//_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
-	_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");
+	_kernel.LoadGridTopologyAndInfo("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
+	//_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");
 	_kernel.PartitionGrid();
 	_kernel.Finalize();
 

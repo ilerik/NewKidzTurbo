@@ -126,12 +126,21 @@ public:
 //general info
 class GridInfo {
 public:
+	//Basic grid properties and cgns file info
 	std::string fileLocation;
 	int nCoords;
 	int CellDimensions;
 	int GridDimensions;	
 	int nNodes;
 	int nCells;
+
+	//CGNS info
+	int MainBaseIndex; //base index (one base assumed)
+	std::string MainBaseName; 
+	int MainZoneIndex; //zone index (one zone assumed)
+	std::string MainZoneName;
+	std::vector<int> CellsSections; // volume elements sections (possible many)
+	std::vector<int> BoundarySections; // boundary elements sections (possible many)
 
 	//Indexes mapping and numeration
 	std::map<idx_t, idx_t> GlobalIndexToNumber;	// cell global index to number from [0, nCells-1]
@@ -144,6 +153,11 @@ public:
 	//basic grid properties
 	int GridID;
 	GridInfo gridInfo;
+
+	//local part of grid
+	std::vector<Node> localNodes; // all grid nodes
+	std::vector<Cell> localCells; // only local cells
+	std::vector<Face> localFaces; // only local faces
 
 	//partitioning info
 	std::vector<int> cellsPartitioning; // map from cell number index to processor rank
@@ -206,7 +220,6 @@ public:
 
 
 /// Implementation part
-
 //  Build alglib kdtree for all boundary nodes
 void Grid::BuildBoundaryKDTree(Patch& patch) {			
 	alglib::ae_int_t nx = 3;
@@ -226,6 +239,7 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	// Build tree	
 	alglib::kdtreebuild(a, nx, ny, normtype, patch.kdt);		
 };
+
 
 //Given type of element and nodes fill the properties of cell
 void Grid::ComputeGeometricProperties(Cell& cell) {
