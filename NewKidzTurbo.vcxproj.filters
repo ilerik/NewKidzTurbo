@@ -40,6 +40,15 @@
     <Filter Include="Header Files\TurbulenceModels">
       <UniqueIdentifier>{32ba5afc-9e16-4675-8d62-7b6bb8346558}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\PostProcessing">
+      <UniqueIdentifier>{c1529263-09a6-4cf1-9b0d-5907e75a5617}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\BoundaryConditions">
+      <UniqueIdentifier>{39445cbe-c818-41b4-a15f-0e6fa09db068}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\InitialConditions">
+      <UniqueIdentifier>{2bb16e69-4061-431a-baec-c92337aa010c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -105,14 +114,23 @@
     <ClInclude Include="src\mainsolver\kernel.h">
       <Filter>Header Files\MainSolver</Filter>
     </ClInclude>
-    <ClInclude Include="src\mainsolver\configuration.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\mainsolver\problem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\mainsolver\logger.h">
       <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\configuration.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridloading\CGNSReader.h">
+      <Filter>Header Files\GridLoading</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\parallelHelper.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="BoundaryCondition.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
