@@ -6,7 +6,7 @@
 #include "cgnslib.h"
 #include "parmetis.h"
 
-int GetElementDimensions(ElementType_t type) {
+int GetCGNSElementDimensions(ElementType_t type) {
 	int dim = -1;
 	switch (type) {
 	//0D Elements
@@ -18,13 +18,30 @@ int GetElementDimensions(ElementType_t type) {
 	//2D Elements
 	case QUAD_4:
 		return 2;
+	case TRI_3:
+		return 2;		
 	//3D Elements
 	case HEXA_8:
+		return 3;	
+	case PENTA_6:
 		return 3;
-	}
+	case TETRA_4:
+		return 3;
+	}	
 
 	if (dim == -1) std::cout<<"Unknown element type\n";
 	return dim;
+};
+
+bool IsSupprotedCGNSEelementType(ElementType_t type) {
+	if (type == NODE) return true;
+	if (type == BAR_2) return true;
+	if (type == QUAD_4) return true;
+	if (type == HEXA_8) return true;
+	if (type == TRI_3) return true;
+	if (type == TETRA_4) return true;
+	if (type == PENTA_6) return true;
+	return false;
 };
 
 
@@ -213,7 +230,7 @@ Grid LoadCGNSGrid(std::string fname) {
 		//Create cells if its main section (contains elements with dim = physDim)
 		//For now we assume that all volume elements are in one section so following condition must hold
 		bool isVolumeElementsSection = false;
-		if ((nVolElements == nElements) && (GetElementDimensions(type) == grid.gridInfo.CellDimensions)) {
+		if ((nVolElements == nElements) && (GetCGNSElementDimensions(type) == grid.gridInfo.CellDimensions)) {
 			isVolumeElementsSection = true;
 		};
 

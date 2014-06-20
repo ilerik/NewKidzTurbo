@@ -10,8 +10,7 @@ Grid GenGrid1D(int N, double lBegin, double lEnd, Vector direction)
 	//Normalize direction
 	direction = direction / direction.mod();
 
-	//Grid parameters
-	g.GridID = 1;
+	//Grid parameters	
 	g.gridInfo.GridDimensions = 1;
 	g.gridInfo.CellDimensions = 1;
 	g.gridInfo.nCoords = 3;

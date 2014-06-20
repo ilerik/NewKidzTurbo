@@ -1186,12 +1186,17 @@ int main(int argc, char *argv[]) {
 	//RunSODTest();
 	//RunBiffFlatPlate();
 	
-	Kernel _kernel;
+	/*Kernel _kernel;
 	_kernel.Initilize(&argc, &argv);
-	_kernel.LoadGridTopologyAndInfo("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
+	_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
+	_kernel.Finalize();*/
+	//_kernel.LoadGridTopologyAndInfo("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
+	//std::cout<<argc<<"\n"<<argv[1]<<"\n";
+	
 	//_kernel.LoadGridTopology("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");
-	_kernel.PartitionGrid();
-	_kernel.Finalize();
+	//_kernel.PartitionGrid();
+	//_kernel.GenerateGridGeometry();
+	
 
 	return 0;	
 };

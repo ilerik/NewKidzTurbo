@@ -6,13 +6,13 @@
 #include <sstream>
 
 //All possible logger mesage types
-enum LoggerMessageType {
+enum class LoggerMessageType {
 	FATAL_ERROR = 0,
 	INFORMATION = 1
 };
 
 //Possible message levels
-enum LoggerMessageLevel {
+enum class LoggerMessageLevel {
 	GLOBAL = 0,
 	LOCAL = 1
 };
@@ -27,10 +27,10 @@ public:
 	};
 
 	int WriteMessage(LoggerMessageLevel level, LoggerMessageType type, std::string msg) {
-		if (level == GLOBAL) {
+		if (level == LoggerMessageLevel::GLOBAL) {
 			if (_rank == 0) std::cout<<"GLOBAL : "<<msg<<"\n";
 		};
-		if (level == LOCAL) {
+		if (level == LoggerMessageLevel::LOCAL) {
 			std::cout<<"LOCAL  "<<_rank<<" : "<<msg<<"\n";
 		};
 		return 0;

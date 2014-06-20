@@ -9,23 +9,35 @@
 #include <map>
 #include <set>
 #include <unordered_set>
+#include <unordered_map>
+
+//Specify supported element types
+
 
 //Grid types
-struct Node {
+struct Node {	
 	int GlobalIndex; //Global index of node
-	Vector P;	//Position	
+	Vector P;		 //Position	
+};
+
+enum FaceType {
+	LOCAL,
+	BOUNDARY,
+	INTERPROCESSOR
 };
 
 struct Face {
 	ElementType_t CGNSType;
 	int GlobalIndex;
+	
+	FaceType Type;		//Type of face (boundary, local, interprocessor)
 	int FaceCell_1;		//Index of cell 1
 	int FaceCell_2;		//Index of cell 2
 	Vector FaceCenter;	//Center of face
 	Vector FaceNormal;	//Surface normal * square
 	double FaceSquare;	//Face square
 	std::vector<int> FaceNodes;	//Indexes of all face nodes
-	int isExternal;		//If its an external face (FaceCell_2 == 0)
+	int isExternal;		//If its an external face (FaceCell_2 == dummy cell global index)	
 	int BCMarker;		//Marker of boundary condition type	
 	std::map<std::string,  void*> Data; //Arbitrary data	
 
@@ -55,15 +67,20 @@ struct FaceComparer
     }
 };
 
-class Cell {
+struct Cell {
 public:
-	ElementType_t CGNSType; //CGNS cell type
-	int GlobalIndex;		
-	std::vector<int> Faces; //Indexes of all cell faces
+	//Common properties
+	int GlobalIndex;		//Global cell index
+	bool IsDummy;			//Is dummy cell
+	ElementType_t CGNSType; //CGNS cell type	
+	std::vector<int> Nodes; //Cell  node indexes
+	std::vector<int> NeigbourCells; //Indexes of neighbour cells
+	//Local properties
+	int CGNSElementIndex;	//CGNS element index	
+	std::vector<int> Faces; //Indexes of all cell faces	
 	double CellVolume;		// Volume of cell
 	Vector CellCenter;		// Center of cell
-	double CellHSize;		// Size of cell	
-	std::vector<int> Nodes; //Cell  node indexes
+	double CellHSize;		// Size of cell		
 	std::map<std::string,  void*> Data; //Arbitrary data	
 };
 
@@ -140,7 +157,13 @@ public:
 	int MainZoneIndex; //zone index (one zone assumed)
 	std::string MainZoneName;
 	std::vector<int> CellsSections; // volume elements sections (possible many)
-	std::vector<int> BoundarySections; // boundary elements sections (possible many)
+	std::vector<int> BoundarySections; // boundary elements sections (possible many)	
+
+	//raw cgns connectivity info
+	std::unordered_map<int, std::set<int> > cgnsIndexToElementNodes;	
+	std::unordered_map<int, ElementType_t > cgnsIndexToElementType;
+	std::vector<int> boundaryElements;  //Boundary faces
+	std::vector<int> volumeElements;	//Cells
 
 	//Indexes mapping and numeration
 	std::map<idx_t, idx_t> GlobalIndexToNumber;	// cell global index to number from [0, nCells-1]
@@ -150,17 +173,35 @@ public:
 class Grid
 {		
 public:	
-	//basic grid properties
-	int GridID;
+	//basic grid properties	
 	GridInfo gridInfo;
 
+	//grid connectivity info
+	//METIS style datastructures
+	std::vector<idx_t> vdist;  //cells distribution over processors
+	std::vector<idx_t> xadj;   //adjacency list shift for local cells
+	std::vector<idx_t> adjncy;	//concateneted adjacency lists for each local cell	
+
 	//local part of grid
+	//Nodes
 	std::vector<Node> localNodes; // all grid nodes
-	std::vector<Cell> localCells; // only local cells
+
+	//Cells
+	int nCells; //total number of cells
+	int nCellsLocal; //number of local cells (without dummy)
+	int nProperCells; //number of non dummy cells
+	int nDummyCells;  //number of dummy cells
+	std::vector<Cell> Cells; // all cells
+	std::vector<Cell*> localCells; // only local cells (including dummy cells)
+	std::unordered_set<int> dummyLocalCells; // dummy cells created for each boundary face element	
+	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index	
+
+	//Faces
 	std::vector<Face> localFaces; // only local faces
 
 	//partitioning info
 	std::vector<int> cellsPartitioning; // map from cell number index to processor rank
+	std::vector<int> localCellIndexes;  // indexes of local non dummy cells
 
 	//boundaries information (BCMarker -> Patch)	
 	std::map<int, Patch> patches;
@@ -172,6 +213,7 @@ public:
 	std::set<int> fixedBoundaryNodes;
 	std::set<int> movableBoundaryNodes;
 
+	//Refresh list of boundary nodes
 	void RefreshBoundaryNodes()
 	{
 		std::vector<Face*> f = faces.getLocalNodes();
@@ -212,6 +254,12 @@ public:
 	//Build alglib kdtree for all boundary nodes
 	void BuildBoundaryKDTree(Patch& patch);
 
+	//Generate local cells given partitioning
+	void GenerateLocalCells(int rank, std::vector<int>& cellsPart);	
+
+	//Update geometric properties of cells
+	void UpdateGeometricProperties(std::vector<Cell>& cells, std::vector<Face>& faces);
+
 	//Construct patches (fill in nodes and faces)
 	bool ConstructAndCheckPatches();
 
@@ -240,6 +288,19 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	alglib::kdtreebuild(a, nx, ny, normtype, patch.kdt);		
 };
 
+
+//Generate local cells given partitioning and processor rank
+void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
+	localCells.clear();
+	int localIndex = 0;
+	for (int i = 0; i<cellsPart.size(); i++) {
+		if (cellsPart[i] == rank) {
+			Cell* newCell = &Cells[i];			
+			localCells.push_back(newCell);
+			cellsGlobalToLocal[i] = localIndex++;
+		};
+	};
+};
 
 //Given type of element and nodes fill the properties of cell
 void Grid::ComputeGeometricProperties(Cell& cell) {
@@ -470,7 +531,6 @@ std::vector<Face> Grid::ObtainFaces(Cell& cell) {
 	if (!isTypeCheckPassed) throw Exception("Cell element type is not supported");
 	return res;
 };
-
 
 //Check that all boundary markers are set to some patchs
 //And fill in information about nodes and faces
