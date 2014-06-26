@@ -17,6 +17,8 @@ int GetElementDimensions(ElementType_t type) {
 	//2D Elements
 	case QUAD_4:
 		return 2;
+	case TRI_3:
+		return 2;
 	//3D Elements
 	case HEXA_8:
 		return 3;
@@ -185,6 +187,9 @@ Grid LoadCGNSGrid(std::string fname) {
 			break;	
 		case HEXA_8:
 			nNodes = 8;
+			break;
+		case TRI_3:
+			nNodes = 3;
 			break;
 
 		default:

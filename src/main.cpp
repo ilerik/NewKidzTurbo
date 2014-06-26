@@ -82,7 +82,7 @@ void TestSolver()
 	std::getchar();
 };
 
-
+//Reimann Problem solver tests
 ConservativeVariables SODTestInitDistribution(Vector r, void *par) {	
 	//Gamma
 	double gamma = 1.4;
@@ -90,7 +90,7 @@ ConservativeVariables SODTestInitDistribution(Vector r, void *par) {
 	//Left state x <= 0.5
 	double roL = 1.0;
 	double pL = 1.0;
-	Vector vL = Vector(0,0,0);
+	Vector vL = Vector(0,0,0);		
 	ConservativeVariables UL;
 	UL.ro = roL;
 	UL.rou = roL * vL.x;
@@ -114,8 +114,101 @@ ConservativeVariables SODTestInitDistribution(Vector r, void *par) {
 		return UR;
 	};
 };
+ConservativeVariables ToroTestInitDistribution1(Vector r, void *par) {	
+	//Gamma
+	double gamma = 1.4;
 
-bool RunSODTest() {
+	//Left state x <= 0.3
+	double roL = 1.0;
+	double pL = 1.0;
+	Vector vL = Vector(0.75,0,0);		
+	ConservativeVariables UL;
+	UL.ro = roL;
+	UL.rou = roL * vL.x;
+	UL.rov = roL * vL.y;
+	UL.row = roL * vL.z;
+	UL.roE = pL/(gamma-1) + roL * vL.mod() * vL.mod() / 2.0;
+	//Right state x > 0.3
+	double roR = 0.125;
+	double pR = 0.1;
+	Vector vR = Vector(0,0,0);
+	ConservativeVariables UR;
+	UR.ro = roR;
+	UR.rou = roR * vR.x;
+	UR.rov = roR * vR.y;
+	UR.row = roR * vR.z;
+	UR.roE = pR/(gamma-1) + roR * vR.mod() * vR.mod() / 2.0;
+
+	if (r.x <= 0.3) {
+		return UL;
+	} else {
+		return UR;
+	};
+};
+ConservativeVariables ToroTestInitDistribution2(Vector r, void *par) {	
+	//Gamma
+	double gamma = 1.4;
+
+	//Left state x <= 0.5
+	double roL = 1.0;
+	double pL = 0.4;
+	Vector vL = Vector(-2.0,0,0);		
+	ConservativeVariables UL;
+	UL.ro = roL;
+	UL.rou = roL * vL.x;
+	UL.rov = roL * vL.y;
+	UL.row = roL * vL.z;
+	UL.roE = pL/(gamma-1) + roL * vL.mod() * vL.mod() / 2.0;
+	//Right state x > 0.5
+	double roR = 1.0;
+	double pR = 0.4;
+	Vector vR = Vector(2.0,0,0);
+	ConservativeVariables UR;
+	UR.ro = roR;
+	UR.rou = roR * vR.x;
+	UR.rov = roR * vR.y;
+	UR.row = roR * vR.z;
+	UR.roE = pR/(gamma-1) + roR * vR.mod() * vR.mod() / 2.0;
+
+	if (r.x <= 0.5) {
+		return UL;
+	} else {
+		return UR;
+	};
+};
+ConservativeVariables ToroTestInitDistribution4(Vector r, void *par) {	
+	//Gamma
+	double gamma = 1.4;
+
+	//Left state x <= 0.4
+	double roL = 5.99924;
+	double pL = 460.894;
+	Vector vL = Vector(19.5975, 0, 0);		
+	ConservativeVariables UL;
+	UL.ro = roL;
+	UL.rou = roL * vL.x;
+	UL.rov = roL * vL.y;
+	UL.row = roL * vL.z;
+	UL.roE = pL/(gamma-1) + roL * vL.mod() * vL.mod() / 2.0;
+	//Right state x > 0.4
+	double roR = 5.99242;
+	double pR = 46.095;
+	Vector vR = Vector(-6.19633,0,0);
+	ConservativeVariables UR;
+	UR.ro = roR;
+	UR.rou = roR * vR.x;
+	UR.rov = roR * vR.y;
+	UR.row = roR * vR.z;
+	UR.roE = pR/(gamma-1) + roR * vR.mod() * vR.mod() / 2.0;
+
+	if (r.x <= 0.4) {
+		return UL;
+	} else {
+		return UR;
+	};
+};
+
+bool RunRiemannProblemTest(ConservativeVariables(*funcInitValue)(Vector, void *), int N_cells, double time) {
 	Model<Roe3DSolverPerfectGas> model;
 	Grid grid;
 
@@ -123,7 +216,8 @@ bool RunSODTest() {
 	double lBegin = 0;
 	double lEnd = 1.0;
 	Vector direction = Vector(1,0,0);
-	grid = GenGrid1D(1000, lBegin, lEnd, direction);
+	grid = GenGrid1D(N_cells, lBegin, lEnd, direction);
+
 	//grid = GenGrid2D(100, 10, 1.0, 1.0, 1.0, 1.0);
 	
 	//Set fluid properties	
@@ -135,28 +229,23 @@ bool RunSODTest() {
 	//Set computational settings
 	model.SetCFLNumber(0.35);
 	model.SetHartenEps(0.005);
+	model.SetSchemeOrder(1);
 
 	//Bind computational grid
 	model.BindGrid(grid);	
 
 	//Set initial conditions
-	model.SetInitialConditions(SODTestInitDistribution);
+	model.SetInitialConditions(funcInitValue);
 
-	//Boundary conditions
-	//No slip boundary
-	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
-	model.SetBoundaryCondition("left", NoSlipBC);
-	model.SetBoundaryCondition("right", NoSlipBC);
+	//free boundary condition
+	Model<Roe3DSolverPerfectGas>::NaturalCondition NaturalBC(model);
+	model.SetBoundaryCondition("left", NaturalBC);
+	model.SetBoundaryCondition("right", NaturalBC);
 
-	/*Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
-	model.SetBoundaryCondition("top", SymmetryBC);
-	model.SetBoundaryCondition("bottom", SymmetryBC);*/
-
-	model.SaveToTechPlot("SODInit.dat");
+	model.SaveToTechPlot("RP_Test_Init.dat");
 
 	//Total time
-	double maxTime = 0.2;
-	for (int i = 0; i < 200000000; i++) {
+		for (int i = 0; i < 200000000; i++) {
 		model.Step();
 		if (i % 1 == 0) {
 			std::cout<<"Interation = "<<i<<"\n";
@@ -164,12 +253,12 @@ bool RunSODTest() {
 			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
 			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
 		};
-		model.SaveToTechPlot("SOD.dat");
-		if (model.totalTime > 0.2) break;
+		model.SaveToTechPlot("RP_Test.dat");
+		if (model.totalTime > time) break;
 	};
 
 	//Save result to techplot
-	model.SaveToTechPlot("SOD.dat");
+	model.SaveToTechPlot("RP_Test.dat");
 	return true;
 };
 
@@ -1034,18 +1123,328 @@ void RunBumpFlow(){
 	return;
 };
 
+void RunSteadyShock(){
+
+	double xl = -1.0;
+	double xr = 1.0;
+	int N_cells = 81;	//in Katate code N_nodes is 81
+	double h = (xr - xl)/(N_cells - 1);
+
+	//real size
+	xl -= 0.5*h;
+	xr += 0.5*h;
+
+	//generate the same grid (3D)
+	Grid grid = GenGrid1D(N_cells, xl, xr, Vector(1,0,0));
+
+	//read solution file
+	double read;	//variable for reading
+	std::vector<double> den, vel, press, temp;
+	std::ifstream ifs("D:\\Projects\\NewKidzTurbo\\Grids\\SteadyShock1D\\ns_shock_structure.dat");
+	ifs >> read;
+	while(!ifs.eof())
+	{
+		ifs >> read;
+		ifs >> read;
+		den.push_back(read);
+		ifs >> read;
+		vel.push_back(read);
+		ifs >> read;
+		press.push_back(read);
+		ifs >> read;
+		temp.push_back(read);
+		ifs >> read >> read;
+	};
+	//create and set model
+	Model<Roe3DSolverPerfectGas> model;	
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+	
+	model.SetViscosity(1.0);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+	model.BindGrid(grid);
+
+	////Initial conditions
+	double rho_inf = 1.17;		//my value
+	double R = (model.medium.Gamma - 1.0)*model.medium.Cv; // R/M for air
+	double T_inf = 400.0;
+	double c_inf = sqrt(model.medium.Gamma*R*T_inf); //speed of sound for air while 400K
+	double p_inf = rho_inf*(model.medium.Gamma - 1.0)*model.medium.Cv*T_inf;
+
+	//set initial condition according to Katate solution
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	for(int i=0; i<cells.size(); i++)
+	{
+		Cell c = *cells[i];
+		ConservativeVariables VAR;
+		VAR.GlobalIndex = c.GlobalIndex;
+		VAR.ro = den[i]*rho_inf;
+		VAR.rou = VAR.ro*c_inf*vel[i];
+		VAR.rov = 0;
+		VAR.row = 0;
+		double pressure = press[i]*p_inf;
+		double roe = pressure/(model.medium.Gamma - 1.0);
+		VAR.roE = roe + 0.5*VAR.rou*VAR.rou/VAR.ro;
+		model.U[c.GlobalIndex] = VAR;
+	};
+
+	//save our left and right values
+	double PRESSURE_INLET_l = press[0]*p_inf;
+	double TEMPERATURE_INLET_l = PRESSURE_INLET_l/((model.medium.Gamma - 1.0)*den[0]*rho_inf*model.medium.Cv);
+	double VELOCITY_INLET_l = c_inf*vel[0];
+
+	double PRESSURE_INLET_r = press[N_cells - 1]*p_inf;
+	double TEMPERATURE_INLET_r = PRESSURE_INLET_r/((model.medium.Gamma - 1.0)*den[N_cells - 1]*rho_inf*model.medium.Cv);
+	double VELOCITY_INLET_r = c_inf*vel[N_cells - 1];
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(PRESSURE_INLET_l, TEMPERATURE_INLET_l, Vector(VELOCITY_INLET_l, 0, 0));
+
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(PRESSURE_INLET_r, TEMPERATURE_INLET_r, Vector(VELOCITY_INLET_r, 0, 0));
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", InletBC);
+	model.SetBoundaryCondition("right", OutletBC);
+
+	//Set wall boundaries		
+	model.EnableViscous();
+	model.SchemeOrder = 1;
+
+	//Load solution
+	//model.LoadSolution("solution.txt");
+	model.SaveToTechPlot("init.dat");
+	std::string outputSolutionFile = "solution";
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 1901; i++) {
+		model.Step();	
+		if (i % 50 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 1 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			//model.SaveToTechPlotUndim(outputSolutionFile+".dat", DimVal);
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+	};
+	std::getchar();
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		//model.SaveToTechPlotUndim(outputSolutionFile+".dat", DimVal);
+	};
+
+	return;
+};
+
+void RunVoronka()
+{
+	double alpha = 4*PI/180;
+	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\Voronka.cgns";
+	Grid grid = LoadCGNSGrid(solutionFile);
+	grid.addPatch("side_wall", 6);
+	grid.ComputeGeometryToAxisymmetric(alpha, 6);
+
+	// Initialize medium model and place boundary conditions
+	Model<Roe3DSolverPerfectGas> model;
+
+	//Set fluid properties
+	//Air
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+
+	//model.SetViscosity(1.7894e-05);
+	model.SetViscosity(1.7894e-03);
+	model.SetThermalConductivity(0.0242);
+	model.SetAngle(0.000001);
+	model.SetAxiSymmetric();
+	
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+
+	////Bind computational grid
+	model.BindGrid(grid);
+
+	////Initial conditions
+	ConservativeVariables initValues(0);
+
+	Vector velocity(-10.0,0,0);
+	double pressure = 101579;
+	double temperature = 300;
+
+	//Set initial conditions
+	initValues = model.PrimitiveToConservativeVariables(velocity, pressure, temperature, model.medium);
+	model.SetInitialConditions(initValues);
+
+	//Read solution from CGNS
+	model.ReadSolutionFromCGNS(solutionFile);
+
+	//Boundary conditions
+	//Inlet boundary
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Periodic boundary condition
+	Model<Roe3DSolverPerfectGas>::PeriodicAxisymmetricBoundaryCondition PeriodicBC(model);
+	PeriodicBC.setParams(alpha);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("inlet", InletBC);
+	model.SetBoundaryCondition("outlet", OutletBC);
+	model.SetBoundaryCondition("wall", NoSlipBC);
+	model.SetBoundaryCondition("front_wall", NoSlipBC);
+	model.SetBoundaryCondition("symmetry", SymmetryBC);
+	model.SetBoundaryCondition("side_wall", PeriodicBC);
+
+	//Set wall boundaries		
+	//model.SetWallBoundary("wall", true);
+	//model.SetWallBoundary("front_wall", true);
+	//model.ComputeWallDistances();
+	//model.DistanceSorting();
+	model.DisableViscous();
+	model.SchemeOrder = 2;	
+
+	//Save initial solution
+	//model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "solution";
+	//model.LoadSolution("solution.txt");
+	//return 0;
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 10 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");;
+	};
+};
+
+void ConvertGrid(char* file_name)
+{
+	std::string gridFile = "D:\\Projects\\NewKidzTurbo\\Grids\\SimpleCircle.cgns";
+	Grid grid = LoadCGNSGrid(gridFile);
+
+	//write full info about grid
+	std::ofstream ofs(file_name);
+	std::vector<Node*> nodes = grid.nodes.getLocalNodes();
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+
+	//write nodes info
+	ofs << nodes.size() << '\n';
+	for(int i=0; i<nodes.size(); i++)
+	{
+		ofs << nodes[i]->GlobalIndex << '\n';
+		ofs << nodes[i]->P.x << ' ';
+		ofs << nodes[i]->P.y << ' ';
+		ofs << nodes[i]->P.z << '\n';
+	};
+
+	//write cells info
+	ofs << cells.size() << '\n';
+	for(int i=0; i<cells.size(); i++)
+	{
+		ofs << cells[i]->GlobalIndex << '\n';
+		ofs << cells[i]->CellCenter.x << ' ';
+		ofs << cells[i]->CellCenter.y << ' ';
+		ofs << cells[i]->CellCenter.z << '\n';
+		ofs << cells[i]->CellVolume << '\n';
+		int faces_size = cells[i]->Faces.size();
+		ofs << faces_size;
+		for(int j=0; j<faces_size; j++) ofs << ' ' << cells[i]->Faces[j];
+		ofs << '\n';
+		int nodes_size = cells[i]->Nodes.size();
+		ofs << nodes_size;
+		for(int j=0; j<nodes_size; j++) ofs << ' ' << cells[i]->Nodes[j];
+		ofs << '\n';
+	};
+
+	//write faces info
+	ofs << faces.size() << '\n';
+	for(int i=0; i<faces.size(); i++)
+	{
+		ofs << faces[i]->GlobalIndex << '\n';
+		ofs << faces[i]->FaceCenter.x << ' ';
+		ofs << faces[i]->FaceCenter.y << ' ';
+		ofs << faces[i]->FaceCenter.z << '\n';
+		ofs << faces[i]->isExternal << '\n';
+		ofs << faces[i]->BCMarker << '\n';
+		ofs << faces[i]->FaceSquare << '\n';
+		ofs << faces[i]->FaceNormal.x << ' ';
+		ofs << faces[i]->FaceNormal.y << ' ';
+		ofs << faces[i]->FaceNormal.z << '\n';
+		ofs << faces[i]->FaceCell_1 << ' ';
+		ofs << faces[i]->FaceCell_2 << '\n';
+		int nodes_size = faces[i]->FaceNodes.size();
+		ofs << nodes_size;
+		for(int j=0; j<nodes_size; j++) ofs << ' ' << faces[i]->FaceNodes[j];
+		ofs << '\n';
+	};
+	ofs.close();
+
+	return;
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {
 	//RunSAFlatPlate();
 	//RunGAWCalculation();
 	//RunPoiseuilleTest();
-	//RunSODTest();
+	RunRiemannProblemTest(SODTestInitDistribution, 200, 0.2);
 	//RunShearFlowTest();
 	//RunBlasiusTest();
 	//RunIncompressibleBlasius();
 	//RunBumpFlow();
 	//CellGradientTest();
-	//return 0;
+	//RunSteadyShock();
+	//RunVoronka();
+	//ConvertGrid("SimpleCircle.dat");
+	return 0;
 
 	//Load cgns grid			
 	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\Laminar_70ms_Air.cgns";

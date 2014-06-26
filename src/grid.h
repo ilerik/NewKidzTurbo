@@ -21,7 +21,7 @@ struct Face {
 	int FaceCell_1;		//Index of cell 1
 	int FaceCell_2;		//Index of cell 2
 	Vector FaceCenter;	//Center of face
-	Vector FaceNormal;	//Surface normal * square
+	Vector FaceNormal;	//unit vector
 	double FaceSquare;	//Face square
 	std::vector<int> FaceNodes;	//Indexes of all face nodes
 	int isExternal;		//If its an external face (FaceCell_2 == 0)
@@ -173,6 +173,9 @@ public:
 	std::vector<Face> Grid::ObtainFaces(Cell& cell);
 	void ComputeGeometricProperties(Cell& cell);
 	void ComputeGeometricProperties(Face& face);
+
+	//for axisymmetric 2.5D task with X symmetry axys for quadrolatiral grid
+	void ComputeGeometryToAxisymmetric(double alpha, int BC_Marker);
 	
 	//Patch operation section
 	void addPatch(std::string name, int bcMarker) {		
@@ -277,6 +280,12 @@ void Grid::ComputeGeometricProperties(Face& face) {
 	//Check cell type and compute face square and normal
 	bool isTypeCheckPassed = false;
 
+	//Compute face center (independent from type)
+	face.FaceCenter = Vector(0,0,0);
+	for (int i = 0; i<face.FaceNodes.size(); i++) face.FaceCenter += nodes[face.FaceNodes[i]].P;
+	face.FaceCenter /= face.FaceNodes.size();	
+
+	//compute normals
 	if (face.CGNSType == QUAD_4) {
 		isTypeCheckPassed = true;
 		
@@ -318,11 +327,6 @@ void Grid::ComputeGeometricProperties(Face& face) {
 	};
 
 	if (!isTypeCheckPassed) throw Exception("Face element type is not supported");
-	
-	//Compute face center (independent from type)
-	face.FaceCenter = Vector(0,0,0);
-	for (int i = 0; i<face.FaceNodes.size(); i++) face.FaceCenter += nodes[face.FaceNodes[i]].P;
-	face.FaceCenter /= face.FaceNodes.size();	
 };
 
 //Given type of cell element and nodes obtain face without geometric properties
@@ -468,6 +472,98 @@ bool Grid::ConstructAndCheckPatches() {
 		};
 	};
 	return checkResult;
+};
+
+void Grid::ComputeGeometryToAxisymmetric(double alpha, int Periodic_BC_Marker)
+{
+	double ZERO = 1e-10;
+	std::vector<Cell*> cells_array = cells.getLocalNodes();
+	//compute max global index of faces
+	int MaxFaceIndex = 0;
+	std::vector<Face*> faces_array = faces.getLocalNodes();	//compute max global index of faces
+	for(int i=0; i<faces.size(); i++)
+	{
+		int GI = faces_array[i]->GlobalIndex;
+		if(MaxFaceIndex<GI) MaxFaceIndex = GI;
+	};
+
+	for(int i=0; i<cells.size(); i++)
+	{
+		Cell c = *cells_array[i];
+		double R = c.CellCenter.y;
+		int top, bottom, left, right;	//Global index of appropriate faces;
+		int n_horiz = 0;		//horizontal faces number
+		int n_vert = 0;			//vertical one
+		//determine relative faces positions
+		for(int j=0; j<4; j++)	//just four faces
+		{
+			Face f = faces[c.Faces[j]];
+			if(abs(f.FaceNormal*Vector(1,0,0)) < ZERO)	//horizontal faces
+			{
+				if((f.FaceCenter.y - R)>0) top = f.GlobalIndex;
+				else bottom = f.GlobalIndex;
+				n_horiz++;
+			}else  //vertical ones
+			{
+				if((f.FaceCenter.x - c.CellCenter.x)>0) right = f.GlobalIndex;
+				else left = f.GlobalIndex;
+				n_vert++;
+			};
+		};
+		//check correctness
+		if((n_vert!=2)||(n_horiz!=2))
+		{
+			std::cout << "can't recompute geometry properties for axisymmtric grid" << '\n';
+			std::getchar();
+			return;
+		};
+
+		double a = faces[top].FaceCenter.y - faces[bottom].FaceCenter.y;	//height of 2D cell
+		double h = faces[right].FaceCenter.x - faces[left].FaceCenter.x;	//lenght of 2D cell
+
+		//compute areas of all faces
+		faces[top].FaceSquare = alpha*(R + 0.5*a)*h;
+		faces[bottom].FaceSquare = alpha*(R - 0.5*a)*h;
+		faces[left].FaceSquare = alpha*R*a;
+		faces[right].FaceSquare = alpha*R*a;
+
+		//add two new faces
+		Face f1, f2;
+
+		f1.GlobalIndex = ++MaxFaceIndex;
+		f2.GlobalIndex = ++MaxFaceIndex;
+		f1.isExternal = true;
+		f2.isExternal = true;
+		f1.FaceCell_1 = c.GlobalIndex;
+		f2.FaceCell_1 = c.GlobalIndex;
+		f1.FaceSquare = c.CellVolume;
+		f2.FaceSquare = c.CellVolume;
+		Vector n;
+		n.x = 0;
+		n.y = -sin(0.5*alpha);
+		n.z = cos(0.5*alpha);
+		f1.FaceNormal = n;
+		n.z = -cos(0.5*alpha);
+		f2.FaceNormal = n;
+		Vector FaceCenter = c.CellCenter;
+		FaceCenter.y = R*cos(0.5*alpha);
+		FaceCenter.z = R*sin(0.5*alpha);
+		f1.FaceCenter = FaceCenter;
+		FaceCenter.z *= -1;
+		f2.FaceCenter = FaceCenter;
+		f1.BCMarker = Periodic_BC_Marker;
+		f2.BCMarker = Periodic_BC_Marker;
+		faces.add(f1);
+		faces.add(f2);
+		c.Faces.push_back(f1.GlobalIndex);
+		c.Faces.push_back(f2.GlobalIndex);
+		
+		//compute cell volume
+		c.CellVolume = alpha*R*a*h;
+		if(c.CellVolume<=0) std::cout << "Negative Volume" << '\n';
+		
+	};
+	return;
 };
 
 #endif

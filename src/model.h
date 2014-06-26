@@ -160,6 +160,42 @@ public:
 		};
 	};
 
+	class NaturalCondition : public BoundaryCondition {
+	public:
+		NaturalCondition(Model& _model) : BoundaryCondition(_model) {};
+
+		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face){
+			return inV;
+		};
+	};
+
+	//symmetry axis is the same that X axis
+	class PeriodicAxisymmetricBoundaryCondition : public BoundaryCondition {
+	public:
+		PeriodicAxisymmetricBoundaryCondition(Model& _model) : BoundaryCondition(_model) {};
+		double alpha;
+
+		void setParams(double _alpha){
+			alpha = _alpha;
+		};
+
+		ConservativeVariables getDummyValues(ConservativeVariables inV, const Face& face) {
+			//first case
+			ConservativeVariables res = inV;
+			if(face.FaceCenter.z>0)
+			{
+				res.rov = inV.rov*cos(alpha) - inV.row*sin(alpha);
+				res.row = inV.row*cos(alpha) + inV.rov*sin(alpha);
+			}else
+			{
+				//second case
+				res.rov = inV.rov*cos(alpha) + inV.row*sin(alpha);
+				res.row = inV.row*cos(alpha) - inV.rov*sin(alpha);
+			};
+			return res;
+		};
+	};
+
 	class SubsonicInletBoundaryCondition : public BoundaryCondition {
 		double _pressure;
 		double _temperature;
@@ -337,6 +373,7 @@ public:
 	double CFL;	//CFL condition value (0.35 for example)
 	bool IsGradientRequired;
 	bool IsViscousFluxesRequired;
+	bool IsAxySymmetric;
 
 	//Computed variables for each face
 	std::map<int, std::vector<double>> fluxes;
@@ -429,10 +466,16 @@ public:
 		SchemeOrder = order;
 	};
 
+	void SetAxiSymmetric()
+	{
+		IsAxySymmetric = true;
+	};
+
 
 	//Constructor
 	Model() {	
 		totalTime = 0; //Init simulation time
+		IsAxySymmetric = false;	//default value
 	};
 
 	void BindGrid(Grid& grid) {
@@ -2348,6 +2391,28 @@ public:
 			for (int i = 0; i<U.size(); i++) {
 				U[i+1].row = U[i+1].ro * inputBuffer[i];
 			};
+		};
+
+		//load Velocities for axysymmetric problems
+		if(IsAxySymmetric==true)
+		{
+			// load radial and axial velocity components
+			cg_field_read(fn,index_base,index_zone,index_flow, "Axial_Velocity" , RealDouble, irmin, irmax, (void*)inputBuffer);
+			for (int i = 0; i<U.size(); i++) {
+				U[i+1].rou = U[i+1].ro * inputBuffer[i];
+			};
+
+			cg_field_read(fn,index_base,index_zone,index_flow, "Radial_Velocity" , RealDouble, irmin, irmax, (void*)inputBuffer);
+			for (int i = 0; i<U.size(); i++) {
+				U[i+1].rov = U[i+1].ro * inputBuffer[i];
+			};
+
+			//read tangential component
+			cg_field_read(fn,index_base,index_zone,index_flow, "Swirl_Velocity" , RealDouble, irmin, irmax, (void*)inputBuffer);
+			for (int i = 0; i<U.size(); i++) {
+				U[i+1].row = U[i+1].ro * inputBuffer[i];
+			};
+
 		};
 
 		// load stagnation energy

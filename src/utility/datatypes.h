@@ -39,6 +39,7 @@ struct ConservativeVariables {
 		GlobalIndex = ind;
 	};
 
+	//TO DO - VEctor ro
 	void FillValuesFromPrimitiveVariables(Vector ro, double p, double T) {
 
 	};
