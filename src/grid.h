@@ -322,7 +322,7 @@ void Grid::ComputeGeometricProperties(Face& face) {
 		face.FaceSquare = 1.0;
 
 		//Compute normal		
-		face.FaceNormal = (cells[face.FaceCell_1].CellCenter - face.FaceCenter);		
+		face.FaceNormal = (face.FaceCenter - cells[face.FaceCell_1].CellCenter);		
 		face.FaceNormal = face.FaceNormal / face.FaceNormal.mod();		
 	};
 

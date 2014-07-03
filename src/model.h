@@ -374,6 +374,7 @@ public:
 	bool IsGradientRequired;
 	bool IsViscousFluxesRequired;
 	bool IsAxySymmetric;
+	bool IsLimiterRequired;
 
 	//Computed variables for each face
 	std::map<int, std::vector<double>> fluxes;
@@ -397,6 +398,9 @@ public:
 	std::map<int, Vector> gradCellsRoV;
 	std::map<int, Vector> gradCellsRoW;
 	std::map<int, Vector> gradCellsRoE;
+
+	//limiters map
+	std::map<int, std::vector<double> > limiters;		//from cell Index to limiters values
 	
 	//Residual information
 	std::map<int, double> rouResidual;
@@ -457,6 +461,23 @@ public:
 		IsViscousFluxesRequired = false;
 	};
 
+	void EnableLimiter() {
+		IsLimiterRequired = true;
+	};
+
+	void DisableLimiter() {
+		IsLimiterRequired = false;
+		std::vector<double> unity;						//fill vector of size 5 by unities
+		for(int i=0; i<5; i++) unity.push_back(1);
+
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+		for(int i=0; i<cells.size(); i++)
+		{
+			limiters[cells[i]->GlobalIndex] = unity;
+		};
+		return;
+	};
+
 	void SetAngle(double angle)
 	{
 		SoartingAngle = angle;
@@ -476,6 +497,7 @@ public:
 	Model() {	
 		totalTime = 0; //Init simulation time
 		IsAxySymmetric = false;	//default value
+		IsLimiterRequired = false;
 	};
 
 	void BindGrid(Grid& grid) {
@@ -560,6 +582,70 @@ public:
 	{
 	};
 
+	//Limiters Part
+	std::vector<double> ComputeLimiter(Cell& c) {
+
+	ConservativeVariables U_c = U[c.GlobalIndex];		//Values of c cell
+	ConservativeVariables U_max = U_c;					//Max and Min Values from c cell and its neighbours
+	ConservativeVariables U_min = U_c;			
+
+	for(int i = 0; i<c.Faces.size(); i++)			//find U_min and U_max
+	{
+		ConservativeVariables U_neigh;						//Values in i-neighbour cell
+		int neigh_cell;									//index of neighbour cell
+		Face cur_face = _grid.faces[c.Faces[i]];
+		if(cur_face.isExternal!=0) continue;
+		if(cur_face.FaceCell_1 == c.GlobalIndex)		//find i-neighbour cell
+		{
+			neigh_cell = cur_face.FaceCell_2;
+		}else neigh_cell = cur_face.FaceCell_1;
+
+		U_neigh = U[neigh_cell];				//Values of i-neighbour cell
+		for (int j = 0; j < 5; j++)
+		{
+				if(U_max[j] < U_neigh[j]) U_max[j] = U_neigh[j];	//find U_max,U_min
+				if(U_min[j] > U_neigh[j]) U_min[j] = U_neigh[j];
+		};
+	};
+
+	std::vector<double> res(5,1);			//Limiter values for all conservetive variables in Cell c					
+	std::vector<Vector> grad;				//Gradient in Cell c
+	grad.push_back(gradCellsRo[c.GlobalIndex]);
+	grad.push_back(gradCellsRoU[c.GlobalIndex]);
+	grad.push_back(gradCellsRoV[c.GlobalIndex]);
+	grad.push_back(gradCellsRoW[c.GlobalIndex]);
+	grad.push_back(gradCellsRoE[c.GlobalIndex]);
+
+	for(int i=0; i<c.Faces.size(); i++)			//calc limiter - res
+	{
+		std::vector<double> res_new(5);			//to find minimal values
+		Vector FaceCenter = _grid.faces[c.Faces[i]].FaceCenter;
+		std::vector<double> delta2(5);							//special function					
+		for(int j=0; j<5; j++)
+		{
+			delta2[j] = grad[j]*(FaceCenter - c.CellCenter);
+			if(delta2[j] > 0) res_new[j] = (U_max[j] - U_c[j])/delta2[j];
+			if(delta2[j] < 0) res_new[j] = (U_min[j] - U_c[j])/delta2[j];
+			if(delta2[j] ==0) res_new[j] = 1;
+			if(res_new[j] > 1)	res_new[j] = 1;
+			if(res[j] > res_new[j]) res[j] = res_new[j];	//find min res_new
+		};
+	};
+	return res;
+};
+
+	//computes all limiters 
+	void ComputeLimiters() {
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+		limiters.clear();
+		for(int i=0; i<cells.size(); i++)
+		{
+			Cell c = *cells[i];
+			limiters[c.GlobalIndex] = ComputeLimiter(c);
+		};
+		return;
+	};
+
 	void Step() {
 		//all special calculations
 		AditionalStepComputations();
@@ -591,7 +677,10 @@ public:
 			ComputeGradients();	
 			//ComputeGradientsUniformStruct();
 
-		if(SchemeOrder==2) ComputeConservativeVariablesGradients();
+		if(SchemeOrder==2) {
+			ComputeConservativeVariablesGradients();
+			if(IsLimiterRequired == true) ComputeLimiters();
+		};
 
 		//Compute convective fluxes
 		ComputeConvectiveFluxes();
@@ -761,22 +850,24 @@ public:
 			Vector dr = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
 			//left reconstraction
 			UL = U[f.FaceCell_1];
-			UL.ro += gradCellsRo[f.FaceCell_1]*dr;
-			UL.rou += gradCellsRoU[f.FaceCell_1]*dr;
-			UL.rov += gradCellsRoV[f.FaceCell_1]*dr;
-			UL.row += gradCellsRoW[f.FaceCell_1]*dr;
-			UL.roE += gradCellsRoE[f.FaceCell_1]*dr;
+			std::vector<double> limL = limiters[f.FaceCell_1];	//left limiter values
+			UL.ro += (gradCellsRo[f.FaceCell_1]*dr)*limL[0];
+			UL.rou += (gradCellsRoU[f.FaceCell_1]*dr)*limL[1];
+			UL.rov += (gradCellsRoV[f.FaceCell_1]*dr)*limL[2];
+			UL.row += (gradCellsRoW[f.FaceCell_1]*dr)*limL[3];
+			UL.roE += (gradCellsRoE[f.FaceCell_1]*dr)*limL[4];
 			//right reconstraction
 			if (f.isExternal) {
 				UR = GetDummyCellValues(UL, f);
 			} else {
 				dr = f.FaceCenter - _grid.cells[f.FaceCell_2].CellCenter;
 				UR = U[f.FaceCell_2];
-				UR.ro += gradCellsRo[f.FaceCell_2]*dr;
-				UR.rou += gradCellsRoU[f.FaceCell_2]*dr;
-				UR.rov += gradCellsRoV[f.FaceCell_2]*dr;
-				UR.row += gradCellsRoW[f.FaceCell_2]*dr;
-				UR.roE += gradCellsRoE[f.FaceCell_2]*dr;
+				std::vector<double> limR = limiters[f.FaceCell_2];	//right limiter values
+				UR.ro += (gradCellsRo[f.FaceCell_2]*dr)*limR[0];
+				UR.rou += (gradCellsRoU[f.FaceCell_2]*dr)*limR[1];
+				UR.rov += (gradCellsRoV[f.FaceCell_2]*dr)*limR[2];
+				UR.row += (gradCellsRoW[f.FaceCell_2]*dr)*limR[3];
+				UR.roE += (gradCellsRoE[f.FaceCell_2]*dr)*limR[4];
 			};
 			break;
 		};

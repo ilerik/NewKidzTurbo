@@ -145,6 +145,7 @@ ConservativeVariables ToroTestInitDistribution1(Vector r, void *par) {
 		return UR;
 	};
 };
+//на первом порядке разваливается
 ConservativeVariables ToroTestInitDistribution2(Vector r, void *par) {	
 	//Gamma
 	double gamma = 1.4;
@@ -208,7 +209,7 @@ ConservativeVariables ToroTestInitDistribution4(Vector r, void *par) {
 	};
 };
 
-bool RunRiemannProblemTest(ConservativeVariables(*funcInitValue)(Vector, void *), int N_cells, double time) {
+bool RunRiemannProblemTest(ConservativeVariables(*funcInitValue)(Vector, void *), int N_cells, double time, int order) {
 	Model<Roe3DSolverPerfectGas> model;
 	Grid grid;
 
@@ -229,10 +230,12 @@ bool RunRiemannProblemTest(ConservativeVariables(*funcInitValue)(Vector, void *)
 	//Set computational settings
 	model.SetCFLNumber(0.35);
 	model.SetHartenEps(0.005);
-	model.SetSchemeOrder(1);
+	model.SetSchemeOrder(order);
 
 	//Bind computational grid
-	model.BindGrid(grid);	
+	model.BindGrid(grid);
+	if(order > 1) model.EnableLimiter();
+	else model.DisableLimiter();
 
 	//Set initial conditions
 	model.SetInitialConditions(funcInitValue);
@@ -825,7 +828,8 @@ void RunBlasiusTest(){
 	model.DistanceSorting();
 	model.EnableViscous();
 	//model.DisableViscous();
-	model.SchemeOrder = 1;
+	model.SchemeOrder = 2;
+	model.DisableLimiter();
 
 	//Save initial solution
 	model.ComputeGradients();
@@ -1435,21 +1439,22 @@ int main(int argc, char *argv[]) {
 	//RunSAFlatPlate();
 	//RunGAWCalculation();
 	//RunPoiseuilleTest();
-	RunRiemannProblemTest(SODTestInitDistribution, 200, 0.2);
+	//RunRiemannProblemTest(ToroTestInitDistribution1, 100, 0.15, 2);
+	//RunRiemannProblemTest(SODTestInitDistribution, 400, 0.2, 2);
 	//RunShearFlowTest();
-	//RunBlasiusTest();
+	//RunBlasiusTest();		//test has bad grid (not from ANSYS)
 	//RunIncompressibleBlasius();
 	//RunBumpFlow();
 	//CellGradientTest();
 	//RunSteadyShock();
 	//RunVoronka();
 	//ConvertGrid("SimpleCircle.dat");
-	return 0;
+	//return 0;
 
 	//Load cgns grid			
 	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\Laminar_70ms_Air.cgns";
-	std::string solutionFile = "D:\\Blas\\solution.cgns";
-	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
+	//std::string solutionFile = "D:\\BlasLimiters\\solution.cgns";
+	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
 	Grid grid = LoadCGNSGrid(solutionFile);
 	//check_grid(grid);
 
@@ -1530,6 +1535,8 @@ int main(int argc, char *argv[]) {
 	model.DistanceSorting();
 	model.EnableViscous();
 	model.SchemeOrder = 2;
+	model.EnableLimiter();
+	//model.DisableLimiter();
 	//model.DisableViscous();
 	
 	//Init model
