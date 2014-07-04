@@ -84,6 +84,9 @@
     <ClInclude Include="src\incompress2D_Flow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

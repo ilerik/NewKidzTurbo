@@ -135,6 +135,7 @@
     <ClInclude Include="src\patch.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
+    <ClInclude Include="src\tests.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />

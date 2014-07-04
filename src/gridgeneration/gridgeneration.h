@@ -4,7 +4,7 @@
 #include "gengrid2D.h"
 #include "gengrid1D.h"
 
-#endif
+
 
 bool check_grid(Grid g)
 {
@@ -83,3 +83,6 @@ bool check_grid(Grid g)
 
 	return good_grid;
 };
+
+
+#endif

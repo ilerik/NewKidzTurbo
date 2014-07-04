@@ -165,4 +165,32 @@ Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_
 	return g;
 };
 
+//squeeze a grid to the X axis by k times (whithout normals recomputing)
+Grid GripGridToX(Grid grid, double k)
+{
+	//first compress coordinate y for all nodes
+	std::vector<Node*> nodes = grid.nodes.getLocalNodes();
+	for(int i=0; i<nodes.size(); i++) nodes[i]->P.y /= k;
+
+	//then compress cells coordinates and volumes
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	for(int i=0; i<cells.size(); i++)
+	{
+		cells[i]->CellCenter.y /= k;
+		cells[i]->CellVolume /= k;
+	};
+
+	//then compress all faces coordinates and length
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+	for(int i=0; i<faces.size(); i++)
+	{
+		Face f = *faces[i];
+		grid.ComputeGeometricProperties(*faces[i]);
+		f = *faces[i];
+		if(f.FaceNormal*(f.FaceCenter - grid.cells[f.FaceCell_1].CellCenter) < 0) faces[i]->FaceNormal *= -1; 
+	};
+
+	return grid;
+};
+
 #endif
