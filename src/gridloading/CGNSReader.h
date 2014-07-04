@@ -4,12 +4,13 @@
 //Inspired by Coolfluid3 code implementation
 //https://github.com/coolfluid/coolfluid3/blob/master/cf3/mesh/CGNS/Reader.cpp
 
+#include "stdafx.h"
+
 #include "grid.h"
 #include "cgnslib.h"
 #include "logger.h"
 #include <string>
 #include <vector>
-#include "boost/algorithm/string/replace.hpp"
 #include "parallelHelper.h"
 
 namespace GridLoading {
@@ -614,6 +615,7 @@ public:
 			newCell.IsDummy = (i >= grid.nProperCells);
 
 			//If dummy then determine boundary condition
+			
 
 			//Fill in neighbours
 			newCell.NeigbourCells.clear();

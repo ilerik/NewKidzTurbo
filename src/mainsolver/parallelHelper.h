@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <time.h>
+#include <assert.h>
 
 //Class that implements MPI-based operations for distributed memory architecture
 class ParallelHelper {

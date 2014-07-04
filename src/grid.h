@@ -10,6 +10,7 @@
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
+#include <algorithm>
 
 //Specify supported element types
 
@@ -49,6 +50,18 @@ struct Face {
 		CGNSType = type;
 		FaceNodes = nodes;
 	};
+
+	bool operator<( const Face& second ) const
+    {
+		//Compare length
+		if (FaceNodes.size() < second.FaceNodes.size()) return true;
+		if (FaceNodes.size() > second.FaceNodes.size()) return false;
+		//In case length are equal
+		for (int i = 0; i<FaceNodes.size(); i++)
+			if (FaceNodes[i] != second.FaceNodes[i]) return FaceNodes[i] < second.FaceNodes[i];
+		//Last case they are equal
+		return false;
+    }
 };
 
 struct FaceComparer
@@ -59,7 +72,7 @@ struct FaceComparer
 		//Compare length
 		if (first.FaceNodes.size() < second.FaceNodes.size()) return true;
 		if (first.FaceNodes.size() > second.FaceNodes.size()) return false;
-		//In case length are equal
+		//In case length are equal		
 		for (int i = 0; i<first.FaceNodes.size(); i++)
 			if (first.FaceNodes[i] != second.FaceNodes[i]) return first.FaceNodes[i] < second.FaceNodes[i];
 		//Last case they are equal
@@ -72,6 +85,7 @@ public:
 	//Common properties
 	int GlobalIndex;		//Global cell index
 	bool IsDummy;			//Is dummy cell
+	int BCMarker;			//Boundary condition marker
 	ElementType_t CGNSType; //CGNS cell type	
 	std::vector<int> Nodes; //Cell  node indexes
 	std::vector<int> NeigbourCells; //Indexes of neighbour cells
@@ -197,6 +211,7 @@ public:
 	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index	
 
 	//Faces
+	int nFaces; //number of local faces
 	std::vector<Face> localFaces; // only local faces
 
 	//partitioning info
@@ -228,7 +243,6 @@ public:
 		};					
 	};
 		
-
 	Grid(void) {	
 		gridInfo.GridDimensions = 2;		//Default value
 	};
@@ -241,9 +255,9 @@ public:
 	DistributedEntityManager<Face> faces;
 
 	//Geometric properties computation
-	std::vector<Face> Grid::ObtainFaces(Cell& cell);
-	void ComputeGeometricProperties(Cell& cell);
-	void ComputeGeometricProperties(Face& face);
+	std::vector<Face> Grid::ObtainFaces(Cell* cell);
+	void ComputeGeometricProperties(Cell* cell);
+	void ComputeGeometricProperties(Face* face);
 	
 	//Patch operation section
 	void addPatch(std::string name, int bcMarker) {		
@@ -292,6 +306,8 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 //Generate local cells given partitioning and processor rank
 void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
 	localCells.clear();
+
+	//Assign local indexes
 	int localIndex = 0;
 	for (int i = 0; i<cellsPart.size(); i++) {
 		if (cellsPart[i] == rank) {
@@ -300,230 +316,234 @@ void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
 			cellsGlobalToLocal[i] = localIndex++;
 		};
 	};
+
+	//Generate faces
+
+
+	//Update grometric properties of all cells
 };
 
 //Given type of element and nodes fill the properties of cell
-void Grid::ComputeGeometricProperties(Cell& cell) {
+void Grid::ComputeGeometricProperties(Cell* cell) {
 	//Check cell type and compute cell volume
 	bool isTypeCheckPassed = false;
 
-	if (cell.CGNSType == HEXA_8) {
+	if (cell->CGNSType == HEXA_8) {
 		isTypeCheckPassed = true;
 
-		cell.CellVolume = 0;
-		Vector rOrigin = nodes[cell.Nodes[0]].P;
-		for (int i = 0; i<cell.Faces.size(); i++) {
+		cell->CellVolume = 0;
+		Vector rOrigin = nodes[cell->Nodes[0]].P;
+		for (int i = 0; i<cell->Faces.size(); i++) {
 			//Get face
-			Face& face = faces[cell.Faces[i]];
+			Face& face = faces[cell->Faces[i]];
 			//Consider normal direction
 			double direction = 1;
-			if (cell.GlobalIndex != face.FaceCell_1) direction = -1;
+			if (cell->GlobalIndex != face.FaceCell_1) direction = -1;
 			//Compute normal vector
-			cell.CellVolume += direction * (face.FaceCenter - rOrigin) * face.FaceSquare * face.FaceNormal;
+			cell->CellVolume += direction * (face.FaceCenter - rOrigin) * face.FaceSquare * face.FaceNormal;
 		};
-		cell.CellVolume /= 3;
+		cell->CellVolume /= 3;
 	};
 
-	if (cell.CGNSType == QUAD_4) {
+	if (cell->CGNSType == QUAD_4) {
 		isTypeCheckPassed = true;
 
 		//Compute cell volume
-		cell.CellVolume = 0;
-		Vector a = nodes[cell.Nodes[1]].P - nodes[cell.Nodes[0]].P; 
-		Vector b = nodes[cell.Nodes[2]].P - nodes[cell.Nodes[0]].P; 
-		cell.CellVolume += (a & b).mod() / 2.0;
-		a = nodes[cell.Nodes[2]].P - nodes[cell.Nodes[0]].P; 
-		b = nodes[cell.Nodes[3]].P - nodes[cell.Nodes[0]].P; 
-		cell.CellVolume += (a & b).mod() / 2.0;
+		cell->CellVolume = 0;
+		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
+		Vector b = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
+		cell->CellVolume += (a & b).mod() / 2.0;
+		a = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
+		b = nodes[cell->Nodes[3]].P - nodes[cell->Nodes[0]].P; 
+		cell->CellVolume += (a & b).mod() / 2.0;
 	};
 
-	if (cell.CGNSType == TRI_3) {
+	if (cell->CGNSType == TRI_3) {
 		isTypeCheckPassed = true;
 
 		//Compute cell volume
-		cell.CellVolume = 0;
-		Vector a = nodes[cell.Nodes[1]].P - nodes[cell.Nodes[0]].P; 
-		Vector b = nodes[cell.Nodes[2]].P - nodes[cell.Nodes[0]].P; 
-		cell.CellVolume += (a & b).mod() / 2.0;		
+		cell->CellVolume = 0;
+		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
+		Vector b = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
+		cell->CellVolume += (a & b).mod() / 2.0;		
 	};
 
-	if (cell.CGNSType == BAR_2) {
+	if (cell->CGNSType == BAR_2) {
 		isTypeCheckPassed = true;
 
 		//Compute cell volume
-		Vector a = nodes[cell.Nodes[1]].P - nodes[cell.Nodes[0]].P; 
-		cell.CellVolume = a.mod();		
+		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
+		cell->CellVolume = a.mod();		
 	};
 
 	if (!isTypeCheckPassed) throw Exception("Cell element type is not supported");
 
 	//Compute cell center (independent from type)
-	cell.CellCenter = Vector(0,0,0);
-	for (int i = 0; i<cell.Nodes.size(); i++) cell.CellCenter += nodes[cell.Nodes[i]].P;
-	cell.CellCenter /= cell.Nodes.size();
+	cell->CellCenter = Vector(0,0,0);
+	for (int i = 0; i<cell->Nodes.size(); i++) cell->CellCenter += nodes[cell->Nodes[i]].P;
+	cell->CellCenter /= cell->Nodes.size();
 };
-
-void Grid::ComputeGeometricProperties(Face& face) {
+void Grid::ComputeGeometricProperties(Face* face) {
 	//Check cell type and compute face square and normal
 	bool isTypeCheckPassed = false;
 
-	if (face.CGNSType == QUAD_4) {
+	if (face->CGNSType == QUAD_4) {
 		isTypeCheckPassed = true;
 		
 		//Compute surface area and normal
-		face.FaceNormal = Vector(0,0,0);
-		Vector a = nodes[face.FaceNodes[1]].P - nodes[face.FaceNodes[0]].P; 
-		Vector b = nodes[face.FaceNodes[2]].P - nodes[face.FaceNodes[0]].P; 
-		face.FaceNormal += (a & b) / 2.0;
-		a = nodes[face.FaceNodes[2]].P - nodes[face.FaceNodes[0]].P; 
-		b = nodes[face.FaceNodes[3]].P - nodes[face.FaceNodes[0]].P; 
-		face.FaceNormal += (a & b) / 2.0;
+		face->FaceNormal = Vector(0,0,0);
+		Vector a = nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P; 
+		Vector b = nodes[face->FaceNodes[2]].P - nodes[face->FaceNodes[0]].P; 
+		face->FaceNormal += (a & b) / 2.0;
+		a = nodes[face->FaceNodes[2]].P - nodes[face->FaceNodes[0]].P; 
+		b = nodes[face->FaceNodes[3]].P - nodes[face->FaceNodes[0]].P; 
+		face->FaceNormal += (a & b) / 2.0;
 
 		//Normalize	
-		face.FaceSquare = face.FaceNormal.mod();
-		face.FaceNormal /= face.FaceSquare;		
+		face->FaceSquare = face->FaceNormal.mod();
+		face->FaceNormal /= face->FaceSquare;		
 	};
 
-	if (face.CGNSType == BAR_2) {
+	if (face->CGNSType == BAR_2) {
 		isTypeCheckPassed = true;
 
 		//Compute surface area
-		face.FaceSquare = (nodes[face.FaceNodes[1]].P - nodes[face.FaceNodes[0]].P).mod();		
+		face->FaceSquare = (nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).mod();		
 
 		//Compute normal		
-		face.FaceNormal.x = (nodes[face.FaceNodes[1]].P - nodes[face.FaceNodes[0]].P).y;
-		face.FaceNormal.y = -(nodes[face.FaceNodes[1]].P - nodes[face.FaceNodes[0]].P).x;
-		face.FaceNormal = face.FaceNormal / face.FaceNormal.mod();
+		face->FaceNormal.x = (nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).y;
+		face->FaceNormal.y = -(nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).x;
+		face->FaceNormal = face->FaceNormal / face->FaceNormal.mod();
 	};
 
-	if (face.CGNSType == NODE) {		
+	if (face->CGNSType == NODE) {		
 		isTypeCheckPassed = true;
 
 		//Compute surface area
-		face.FaceSquare = 1.0;
+		face->FaceSquare = 1.0;
 
 		//Compute normal		
-		face.FaceNormal = (cells[face.FaceCell_1].CellCenter - face.FaceCenter);		
-		face.FaceNormal = face.FaceNormal / face.FaceNormal.mod();		
+		face->FaceNormal = (cells[face->FaceCell_1].CellCenter - face->FaceCenter);		
+		face->FaceNormal = face->FaceNormal / face->FaceNormal.mod();		
 	};
 
 	if (!isTypeCheckPassed) throw Exception("Face element type is not supported");
 	
 	//Compute face center (independent from type)
-	face.FaceCenter = Vector(0,0,0);
-	for (int i = 0; i<face.FaceNodes.size(); i++) face.FaceCenter += nodes[face.FaceNodes[i]].P;
-	face.FaceCenter /= face.FaceNodes.size();	
+	face->FaceCenter = Vector(0,0,0);
+	for (int i = 0; i<face->FaceNodes.size(); i++) face->FaceCenter += nodes[face->FaceNodes[i]].P;
+	face->FaceCenter /= face->FaceNodes.size();	
 };
 
 //Given type of cell element and nodes obtain face without geometric properties
-std::vector<Face> Grid::ObtainFaces(Cell& cell) {
+std::vector<Face> Grid::ObtainFaces(Cell* cell) {
 	std::vector<Face> res;
 
 	//Check cell type
 	bool isTypeCheckPassed = false;
 
-	if (cell.CGNSType == HEXA_8) {
+	if (cell->CGNSType == HEXA_8) {
 		isTypeCheckPassed = true;
 		std::vector<int> nodes;
 
 		//Add faces one by one		
-		nodes.push_back(cell.Nodes[0]);
-		nodes.push_back(cell.Nodes[1]);
-		nodes.push_back(cell.Nodes[2]);
-		nodes.push_back(cell.Nodes[3]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[3]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[0]);
-		nodes.push_back(cell.Nodes[4]);
-		nodes.push_back(cell.Nodes[7]);
-		nodes.push_back(cell.Nodes[3]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[4]);
+		nodes.push_back(cell->Nodes[7]);
+		nodes.push_back(cell->Nodes[3]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[0]);
-		nodes.push_back(cell.Nodes[1]);
-		nodes.push_back(cell.Nodes[5]);
-		nodes.push_back(cell.Nodes[4]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[5]);
+		nodes.push_back(cell->Nodes[4]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[4]);
-		nodes.push_back(cell.Nodes[5]);
-		nodes.push_back(cell.Nodes[6]);
-		nodes.push_back(cell.Nodes[7]);
+		nodes.push_back(cell->Nodes[4]);
+		nodes.push_back(cell->Nodes[5]);
+		nodes.push_back(cell->Nodes[6]);
+		nodes.push_back(cell->Nodes[7]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 		
-		nodes.push_back(cell.Nodes[1]);
-		nodes.push_back(cell.Nodes[5]);
-		nodes.push_back(cell.Nodes[6]);
-		nodes.push_back(cell.Nodes[2]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[5]);
+		nodes.push_back(cell->Nodes[6]);
+		nodes.push_back(cell->Nodes[2]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[2]);
-		nodes.push_back(cell.Nodes[6]);
-		nodes.push_back(cell.Nodes[7]);
-		nodes.push_back(cell.Nodes[3]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[6]);
+		nodes.push_back(cell->Nodes[7]);
+		nodes.push_back(cell->Nodes[3]);
 		res.push_back(Face(QUAD_4, nodes));
 		nodes.clear();
 	};
 
-	if (cell.CGNSType == QUAD_4) {
+	if (cell->CGNSType == QUAD_4) {
 		isTypeCheckPassed = true;
 		std::vector<int> nodes;
 		//Add faces one by one
-		nodes.push_back(cell.Nodes[0]);
-		nodes.push_back(cell.Nodes[1]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[1]);
-		nodes.push_back(cell.Nodes[2]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[2]);
-		nodes.push_back(cell.Nodes[3]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[3]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[3]);
-		nodes.push_back(cell.Nodes[0]);
+		nodes.push_back(cell->Nodes[3]);
+		nodes.push_back(cell->Nodes[0]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 	}
 
-	if (cell.CGNSType == TRI_3) {
+	if (cell->CGNSType == TRI_3) {
 		isTypeCheckPassed = true;
 		std::vector<int> nodes;
 		//Add faces one by one
-		nodes.push_back(cell.Nodes[0]);
-		nodes.push_back(cell.Nodes[1]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[1]);
-		nodes.push_back(cell.Nodes[2]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[2]);
-		nodes.push_back(cell.Nodes[0]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[0]);
 		res.push_back(Face(BAR_2, nodes));
 		nodes.clear();		
 	}
 
-	if (cell.CGNSType == BAR_2) {
+	if (cell->CGNSType == BAR_2) {
 		isTypeCheckPassed = true;
 		std::vector<int> nodes;
 		//Add faces one by one
-		nodes.push_back(cell.Nodes[0]);		
+		nodes.push_back(cell->Nodes[0]);		
 		res.push_back(Face(NODE, nodes));
 		nodes.clear();
 
-		nodes.push_back(cell.Nodes[1]);		
+		nodes.push_back(cell->Nodes[1]);		
 		res.push_back(Face(NODE, nodes));
 		nodes.clear();
 	}

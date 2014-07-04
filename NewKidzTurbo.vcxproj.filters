@@ -129,8 +129,11 @@
     <ClInclude Include="src\mainsolver\parallelHelper.h">
       <Filter>Header Files\MainSolver</Filter>
     </ClInclude>
-    <ClInclude Include="BoundaryCondition.h">
+    <ClInclude Include="src\boundaryconditions\BoundaryCondition.h">
       <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -175,6 +178,9 @@
     </ClCompile>
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp">
       <Filter>Header Files\Alglib</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

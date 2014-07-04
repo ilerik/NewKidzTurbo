@@ -83,6 +83,9 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -114,6 +117,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -125,7 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="BoundaryCondition.h" />
+    <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
     <ClInclude Include="src\grid.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
@@ -152,10 +158,17 @@
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp" />
-    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibmisc.cpp" />
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibmisc.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\ap.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\dataanalysis.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\diffequations.cpp" />
@@ -167,7 +180,14 @@
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\solvers.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\specialfunctions.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\main.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

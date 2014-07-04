@@ -245,10 +245,10 @@ Grid LoadCGNSGrid(std::string fname) {
 			counter++;
 			newCell.CGNSType = type;	
 			//Fill in geometric properties
-			grid.ComputeGeometricProperties(newCell);
+			grid.ComputeGeometricProperties(&newCell);
 
 			//Obtain faces based on cell type
-			std::vector<Face> newFaces = grid.ObtainFaces(newCell);
+			std::vector<Face> newFaces = grid.ObtainFaces(&newCell);
 			for (int i = 0; i<newFaces.size(); i++) {				
 				std::set<int> idx; for (int j = 0; j<newFaces[i].FaceNodes.size(); j++) idx.insert(newFaces[i].FaceNodes[j]);
 
@@ -265,7 +265,7 @@ Grid LoadCGNSGrid(std::string fname) {
 					face.GlobalIndex = faceGlobalIndex++;
 					face.FaceCell_1 = newCell.GlobalIndex;
 					face.isExternal = true;
-					grid.ComputeGeometricProperties(face);	
+					grid.ComputeGeometricProperties(&face);	
 
 					//Adjust face normal to point outside the cell
 					double df = face.FaceNormal * (newCell.CellCenter - face.FaceCenter);
