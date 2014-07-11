@@ -15,17 +15,6 @@
 
 namespace GridLoading {
 
-///CGNS error handling macro
-#define CALL_CGNS(cgns_func) {                                                 \
-                               const int ierr = cgns_func;                    \
-                               if (ierr)                                       \
-                               {                                               \
-                                 const char * error_msg = cg_get_error();      \
-								  _logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, error_msg); \
-                                 cg_error_exit();	\
-                               }                                               \
-                             };
-
 #define CGNS_CHAR_MAX 1024
 #define CGNS_VERT_IDX 0
 #define CGNS_CELL_IDX 1

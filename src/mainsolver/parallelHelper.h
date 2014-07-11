@@ -45,6 +45,11 @@ public:
 		isInitilized = false;
 	};
 
+	//Is master node
+	inline bool IsMaster() {
+		return _rank == 0;
+	};
+
 	//Barrier
 	double Barrier() {
 		double t = 0.0;
@@ -59,6 +64,49 @@ public:
 		return t;		
 	};
 
+	//Gather one integer from each process
+	void GatherCounts(int N, std::vector<int>& result) {		
+		if (IsMaster()) {			
+			result.resize(_nProcessors);
+			MPI_Gather(&N, 1, MPI_INT, &result[0], 1, MPI_INT, 0, _comm);
+		} else {
+			MPI_Gather(&N, 1, MPI_INT, NULL, 1, MPI_INT, 0, _comm);
+		};		
+	};
+
+	//Gather arrays of double of different size on master node
+	void GathervInt(std::vector<int>& local, std::vector<int>& counts, std::vector<int>& result) {		
+		if (IsMaster()) {			
+			//Make displacement array
+			std::vector<int> displs(counts.size());
+			int totalSize = 0;
+			for (int i = 0; i<counts.size(); i++) {
+				displs[i] = totalSize;
+				totalSize += counts[i];
+			};
+			result.resize(totalSize);
+			MPI_Gatherv(&local[0], local.size(), MPI_INT, &result[0], &counts[0], &displs[0], MPI_INT, 0, _comm);
+		} else {
+			MPI_Gatherv(&local[0], local.size(), MPI_INT, NULL, NULL, NULL, MPI_INT, 0, _comm);
+		};		
+	};
+
+	//Gather arrays of double of different size on master node
+	void GathervDouble(std::vector<double>& local, std::vector<int>& counts, std::vector<double>& result) {		
+		if (IsMaster()) {			
+			//Make displacement array
+			std::vector<int> displs(counts.size());
+			int totalSize = 0;
+			for (int i = 0; i<counts.size(); i++) {
+				displs[i] = totalSize;
+				totalSize += counts[i];
+			};
+			result.resize(totalSize);
+			MPI_Gatherv(&local[0], local.size(), MPI_DOUBLE, &result[0], &counts[0], &displs[0], MPI_DOUBLE, 0, _comm);
+		} else {
+			MPI_Gatherv(&local[0], local.size(), MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, _comm);
+		};		
+	};
 };
 
 #endif

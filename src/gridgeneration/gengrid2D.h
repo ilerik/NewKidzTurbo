@@ -168,14 +168,17 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 	};	
 
 	//Fill in grid info
-
+	g.gridInfo.CellDimensions = 2;
 	
-
 	//Add boundary names
-	g.addPatch("left", 1);
-	g.addPatch("right", 2);
-	g.addPatch("bottom", 3);
-	g.addPatch("top", 4);
+	if (!periodicX) {
+		g.addPatch("left", 1);
+		g.addPatch("right", 2);
+	};
+	if (!periodicY) {
+		g.addPatch("bottom", 3);
+		g.addPatch("top", 4);
+	};
 	//g.ConstructAndCheckPatches();
 	
 	return g;

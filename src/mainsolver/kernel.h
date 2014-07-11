@@ -5,6 +5,7 @@
 #include "logger.h"
 #include "parmetis.h"
 #include "CGNSReader.h"
+#include "CGNSWriter.h"
 #include "parallelHelper.h"
 
 //Define error types
@@ -22,6 +23,7 @@ private:
 
 	//Helper for CGNS i\o
 	GridLoading::CGNSReader _cgnsReader;
+	PostProcessing::CGNSWriter _cgnsWriter;
 
 	//Grid data
 	Grid _grid;
@@ -60,6 +62,7 @@ public:
 
 			//Initialize cgns i\o subsystem
 			_cgnsReader.Init(_logger, _parallelHelper);
+			_cgnsWriter.Init(_logger, _parallelHelper);
 		} catch (...) {
 			//Exception was thrown but shouldnt
 			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Kernel initialization failed");
@@ -74,6 +77,7 @@ public:
 	//Finilize kernel work
 	turbo_errt Finalize() {
 		_cgnsReader.Finalize();
+		_cgnsWriter.Finalize();
 		_parallelHelper.Finalize();			
 		return TURBO_OK;
 	};
@@ -84,7 +88,16 @@ public:
 		PartitionGrid();
 		//_grid.UpdateGeometricProperties();
 		return TURBO_OK;
-	};		
+	};	
+
+	//Save grid to CGNS file
+	turbo_errt SaveGrid(std::string filename)
+	{
+		_cgnsWriter.CreateFile(filename);
+		_cgnsWriter.WriteGridToFile(_grid);
+		_cgnsWriter.CloseFile();
+		return TURBO_OK;
+	}
 
 	//Bind existing grid to kernel
 	turbo_errt BindGrid(Grid& grid) {
@@ -248,9 +261,9 @@ public:
 		};*/		
 
 		//Update cells geometric properties
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
+		/*for (int i = 0; i < _grid.nCellsLocal; i++) {
 			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-		};
+		};*/
 
 		//Synchronize
 		_parallelHelper.Barrier();

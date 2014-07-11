@@ -1188,8 +1188,8 @@ int main(int argc, char *argv[]) {
 	//RunSODTest();
 	//RunBiffFlatPlate();
     
-	RunSODTest();
-	return 0;
+	//RunSODTest();
+	//return 0;
 	
 	Kernel _kernel;	
 	_kernel.Initilize(&argc, &argv);
@@ -1198,7 +1198,8 @@ int main(int argc, char *argv[]) {
 	_kernel.BindGrid(_grid);
 	//_kernel.SaveGrid("result.cgns");
 	//_kernel.SaveSolution();
-	_kernel.Finalize();
+	_kernel.SaveGrid("grid.cgns");
+	_kernel.Finalize();	
 	//_kernel.LoadGridTopologyAndInfo("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
 	//std::cout<<argc<<"\n"<<argv[1]<<"\n";
 	
