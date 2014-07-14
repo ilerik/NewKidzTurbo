@@ -610,7 +610,17 @@ public:
 
 		//Gather connectivity information		
 		std::vector<int> nEdges;
-		_parallelHelper->GatherCounts(nEdgesLocal, nEdges);		
+		_parallelHelper->AllgatherCounts(nEdgesLocal, nEdges);		
+
+		std::ostringstream msg;
+		msg<<"vdist[] = \n";
+		for (int i = 0; i<=nProcessors; i++) msg<<grid.vdist[i]<<" ";
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		msg.clear();
+		msg<<"nEdges[] = \n";
+		for (int i = 0; i<nProcessors; i++) msg<<nEdges[i]<<" ";
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Gather xadj structure
 		std::vector<int> xadj;
@@ -640,6 +650,7 @@ public:
 		_parallelHelper->Allgatherv(adjncyLocal, nEdges, adjncy);
 
 		//Create basic cells structures (only type and nodes and connectivity)
+		grid.nCells = nCells;
 		grid.Cells.resize(nCells);
 		for (int i = 0; i<grid.nCells; i++) {
 			Cell newCell;			
@@ -694,7 +705,7 @@ public:
 		grid.xadj.push_back(currentInd);
 		for (int i = grid.vdist[rank]; i < grid.vdist[rank + 1]; i++)
 		{		
-			int index = i - grid.vdist[rank];
+			int index = i;
 			int elementID = _cellGToC[i];
 			int start = xadj[index];
 			int end = xadj[index+1];
@@ -707,6 +718,10 @@ public:
 			grid.xadj.push_back(currentInd);
 		};					
 		
+		msg.clear();
+		msg<<"vdist[] = \n";
+		for (int i = 0; i<=nProcessors; i++) msg<<grid.vdist[i]<<" ";
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());			
 		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good read.");			
 
 		//Synchronize

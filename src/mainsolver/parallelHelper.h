@@ -73,6 +73,12 @@ public:
 			MPI_Gather(&N, 1, MPI_INT, NULL, 1, MPI_INT, 0, _comm);
 		};		
 	};
+	
+	//All gather one integer
+	void AllgatherCounts(int N, std::vector<int>& result) {				
+		result.resize(_nProcessors);
+		MPI_Allgather(&N, 1, MPI_INT, &result[0], 1, MPI_INT, _comm);			
+	};
 
 	//Gather arrays of double of different size on master node
 	void GathervInt(std::vector<int>& local, std::vector<int>& counts, std::vector<int>& result) {		

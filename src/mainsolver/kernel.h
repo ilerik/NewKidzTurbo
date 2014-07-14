@@ -142,13 +142,13 @@ public:
 		a value of 1/nparts. If ncon is greater than 1, the target sub-domain weights for each sub-domain
 		are stored contiguously (similar to the vwgt array). Note that the sum of all of the tpwgts for a
 		give vertex weight should be one. */
-		real_t* tpwgts = new real_t[ncon*nparts];
+		std::vector<real_t> tpwgts(ncon*nparts);
 		for (int i = 0; i<nparts; i++) tpwgts[i] = 1.0/nparts;
 
 		/* An array of size ncon that is used to specify the imbalance tolerance for each vertex weight, with 1
 		being perfect balance and nparts being perfect imbalance. A value of 1.05 for each of the ncon
 		weights is recommended. */
-		real_t* ubvec = new real_t[ncon]; // imbalance tolerance for each vertex weight,
+		std::vector<real_t> ubvec(ncon); // imbalance tolerance for each vertex weight,
 		ubvec[0] = 1.02;	// recomended default value 
 
 		//Algoritm options for displaing information
@@ -158,12 +158,24 @@ public:
 		idx_t edgecut; // Upon successful completion, the number of edges that are cut by the partitioning is written to this parameter.
 
 		/* This is an array of size equal to the number of locally-stored vertices. Upon successful completion the
-		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */
+		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
 		std::vector<idx_t> part(_grid.nCellsLocal);
+		std::ostringstream msg;
+		msg<<"vdist[] = \n";
+		for (int i = 0; i<=_nProcessors; i++) msg<<_grid.vdist[i]<<" ";
+		msg<<"\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		msg.clear();
+		msg<<"xadj[] = \n";
+		for (int i = 0; i<_grid.xadj.size(); i++) msg<<_grid.xadj[i]<<" ";
+		msg<<"\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
-		int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], &_grid.adjncy[0], vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, ubvec, options, &edgecut, &part[0], &_comm);			
+		_parallelHelper.Barrier();
+		int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], &_grid.adjncy[0], vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
 		if (result != METIS_OK) {
 			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
 			return TURBO_ERROR;
@@ -175,12 +187,22 @@ public:
 			recvcounts[i] = _grid.vdist[i+1] - _grid.vdist[i];
 		};
 		
+		msg.clear();
+		msg<<part.size()<<"\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		msg.clear();
+		msg<<"recvcounts[] = \n";
+		for (int i = 0; i<_nProcessors; i++) msg<<recvcounts[i]<<" ";
+		msg<<"\n";
+
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
 
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Otput result information
-		std::ostringstream msg;
+		msg.clear();
 		msg<<"Partitioning edgecut = "<<edgecut;
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, msg.str());		
 		
@@ -212,11 +234,7 @@ public:
 		//Otput result
 		msg.str(std::string());
 		msg<<"Number of local cells = "<<_grid.nCellsLocal;
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
-
-		//Free memory
-		free(tpwgts);
-		free(ubvec);													
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());															
 
 		//Synchronize		
 		_parallelHelper.Barrier();
