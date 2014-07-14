@@ -1193,12 +1193,12 @@ int main(int argc, char *argv[]) {
 	
 	Kernel _kernel;	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 10, 10, 1.0, 1.0, 1.0, 1.0);
-	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
-	_kernel.BindGrid(_grid);
-	//_kernel.SaveGrid("result.cgns");
+	//Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 10, 10, 1.0, 1.0, 1.0, 1.0);
+	_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
+	//_kernel.BindGrid(_grid);
+	_kernel.SaveGrid("result.cgns");
 	//_kernel.SaveSolution();
-	_kernel.SaveGrid("grid.cgns");
+	//_kernel.SaveGrid("grid.cgns");
 	_kernel.Finalize();	
 	//_kernel.LoadGridTopologyAndInfo("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\SODShockTube\\SodShockTube.cgns");
 	//std::cout<<argc<<"\n"<<argv[1]<<"\n";

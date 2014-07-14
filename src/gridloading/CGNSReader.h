@@ -465,7 +465,7 @@ public:
 		open_file(fname);
 
 		//Read number of bases
-		CALL_CGNS(cg_nbases(m_file.idx, &m_file.nbBases));
+		CALL_CGNS(cg_nbases(m_file.idx, &m_file.nbBases));		
 
 		//We assume that only one base allowed
 		if (m_file.nbBases != 1) {
@@ -474,7 +474,7 @@ public:
 
 		//Read base info and all other grid info recursivelly
 		m_base.idx = 1;
-		read_base();
+		read_base();		
 
 		//Close file
 		CALL_CGNS(cg_close(m_file.idx));
@@ -482,6 +482,8 @@ public:
 		//Fill in grid info structure
 		//TODO		
 		grid.gridInfo.CellDimensions = m_base.cell_dim;
+
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Copy nodes information
 		grid.localNodes = nodes;
@@ -496,6 +498,8 @@ public:
 			_cellGToC[globalIndex++] = cgnsIndex;
 		};
 
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
+
 		//Dummy cells\boundary faces
 		grid.nDummyCells = faces.size();
 		_faceCToG.clear();
@@ -506,6 +510,8 @@ public:
 			_faceCToG[cgnsIndex] = globalIndex;
 			_faceGToC[globalIndex++] = cgnsIndex;
 		};
+
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Initially distribute vertices uniformly over processors		
 		nCells = grid.nCells = globalIndex;
@@ -569,27 +575,73 @@ public:
 
 		//Call graph generation function
 		idx_t* _xadj;
-		idx_t* _adjncy;
+		idx_t* _adjncy;		
 		MPI_Comm _comm = _parallelHelper->getComm();
-		/*if (nProcessors != 1) {
+		if (nProcessors != 1) {
 			int result = ParMETIS_V3_Mesh2Dual(&grid.vdist[0], &eptr[0], &eind[0], &numflag, &ncommon, &_xadj, &_adjncy, &_comm);
 			if (result != METIS_OK) {
 				_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_Mesh2Dual failed.");
 				exit(0);			
 			};
-		} else {*/
-		//We use serial function (TO DO parallelize)
-		int result = METIS_MeshToDual(&ne, &nn, &eptr[0], &eind[0], &ncommon, &numflag, &_xadj, &_adjncy);			
-		if (result != METIS_OK) {				
-			_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "METIS_MeshToDual failed.");
-			exit(0);
+		} else {
+			//We use serial function (TO DO parallelize)
+			int result = METIS_MeshToDual(&ne, &nn, &eptr[0], &eind[0], &ncommon, &numflag, &_xadj, &_adjncy);			
+			if (result != METIS_OK) {				
+				_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "METIS_MeshToDual failed.");
+				exit(0);
+			};
 		};
-		//};		
 
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good transform.");	
+		
+		//Make local copies of _xadj amd _adjncy
+		std::vector<int> xadjLocal;
+		xadjLocal.resize(grid.vdist[rank+1] - grid.vdist[rank]);
+		for (int i = 0; i<xadjLocal.size(); i++) xadjLocal[i] = _xadj[i];
+		int nEdgesLocal = _xadj[grid.vdist[rank+1] - grid.vdist[rank]];
+		std::vector<int> adjncyLocal;
+		adjncyLocal.resize(nEdgesLocal);
+		for (int i = 0; i<adjncyLocal.size(); i++) adjncyLocal[i] = _adjncy[i];		
+		
+		
+		//Free memory
+		METIS_Free(_xadj);
+		METIS_Free(_adjncy);
+
+		//Gather connectivity information		
+		std::vector<int> nEdges;
+		_parallelHelper->GatherCounts(nEdgesLocal, nEdges);		
+
+		//Gather xadj structure
+		std::vector<int> xadj;
+		std::vector<int> adjncy;
+		std::vector<int> counts;
+		for (int i = 0; i<nProcessors; i++) counts.push_back(grid.vdist[i+1] - grid.vdist[i]);				
+		_parallelHelper->Allgatherv(xadjLocal, counts, xadj);
+
+		//Further renumbering for serial CSR
+		int k = 1;	
+		int totalEdges = 0;
+		for (int i = 0; i<xadj.size(); i++) {
+			if (i >= grid.vdist[k]) {
+				totalEdges += nEdges[k-1];
+				k++;				
+			};
+			xadj[i] += totalEdges;			
+		};
+		totalEdges += nEdges[nEdges.size() - 1];
+
+		//Add total number of edges to xadj
+		/*int totalEdges = 0;
+		for (int i = 0; i<nEdges.size(); i++) totalEdges += nEdges[i];*/
+		xadj.push_back(totalEdges);
+		
+		//Gather adjncy structure		
+		_parallelHelper->Allgatherv(adjncyLocal, nEdges, adjncy);
 
 		//Create basic cells structures (only type and nodes and connectivity)
 		grid.Cells.resize(nCells);
-		for (int i = 0; i<nCells; i++) {
+		for (int i = 0; i<grid.nCells; i++) {
 			Cell newCell;			
 			int elementID = _cellGToC[i];
 			newCell.GlobalIndex = i;			
@@ -607,15 +659,16 @@ public:
 			
 
 			//Fill in neighbours
-			newCell.NeigbourCells.clear();
-			for (int j = _xadj[i]; j<_xadj[i+1]; j++) {
-				int neighbour = _adjncy[j];
+			newCell.NeigbourCells.clear();				
+			for (int j = xadj[i]; j<xadj[i+1]; j++) {
+				int neighbour = adjncy[j];
 				int neighbourCGNS = _cellGToC[neighbour];
 				std::vector<int> nnodes = elementNodes[neighbourCGNS];
 				newCell.NeigbourCells.push_back(neighbour);
 			};			
 			grid.Cells[i] = newCell;
 		};	
+		
 
 		//Now exclude dummy cells information from graph structure
 		grid.xadj.clear();
@@ -634,17 +687,19 @@ public:
 			};
 		};
 		grid.vdist[nProcessors] = grid.nProperCells;
+		grid.nCellsLocal = grid.vdist[rank+1] - grid.vdist[rank];
 
 		//Fill in xadj and adjncy (exclude dummy)
 		int currentInd = 0;
 		grid.xadj.push_back(currentInd);
 		for (int i = grid.vdist[rank]; i < grid.vdist[rank + 1]; i++)
 		{		
+			int index = i - grid.vdist[rank];
 			int elementID = _cellGToC[i];
-			int start = _xadj[i];
-			int end = _xadj[i+1];
+			int start = xadj[index];
+			int end = xadj[index+1];
 			for (int j = start; j<end; j++) {
-				int nIndex = _adjncy[j];
+				int nIndex = adjncy[j];
 				if (nIndex >= grid.nProperCells) continue; //Skip dummy
 				grid.adjncy.push_back(nIndex);
 				currentInd++;
@@ -652,10 +707,10 @@ public:
 			grid.xadj.push_back(currentInd);
 		};					
 		
+		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good read.");			
 
-		//Free memory
-		METIS_Free(_xadj);
-		METIS_Free(_adjncy);
+		//Synchronize
+		_parallelHelper->Barrier();
 		
 		return grid;
 	};

@@ -127,7 +127,7 @@ public:
 					
 		//Gather number of cells on master node
 		std::vector<int> nCellsPerProcessor;
-		_parallelHelper->GatherCounts(grid.nCellsLocal, nCellsPerProcessor);
+		_parallelHelper->GatherCounts(grid.nCellsLocal, nCellsPerProcessor);						
 
 		//Cells elements connectivity for current processor
 		std::vector<cgsize_t> LocalElements;
@@ -136,15 +136,20 @@ public:
 			LocalElements.push_back(cell->CGNSType);
 			for (int j = 0; j<cell->Nodes.size(); j++) LocalElements.push_back(cell->Nodes[j] + 1); //Adjust by 1 for cgns proper numbering
 		};
+		
 
 		//Gather local elements arrays sizes
 		std::vector<int> nLocalElementsSize;
 		_parallelHelper->GatherCounts(LocalElements.size(), nLocalElementsSize);
 
+
 		//Gather all elements on master node
 		std::vector<cgsize_t> AllElements;
 		_parallelHelper->GathervInt(LocalElements, nLocalElementsSize, AllElements);
 		
+
+		//Compute total number of cells
+		int totalCells = _parallelHelper->SumInt(grid.nCellsLocal);
 
 		//Write to cgns database file
 		if (_parallelHelper->IsMaster()) {
@@ -152,15 +157,17 @@ public:
 			m_base.cell_dim = grid.gridInfo.CellDimensions;
 			m_base.phys_dim = grid.gridInfo.CellDimensions;
 			CALL_CGNS(cg_base_write(m_file.idx, "Base", m_base.cell_dim, m_base.phys_dim, &m_base.idx));
+				
 
 			//Create zone
 			m_zone.coord_dim = grid.gridInfo.CellDimensions;
 			m_zone.name = "Zone";	
 			m_zone.type = Unstructured;
-			m_zone.size[0] = grid.localNodes.size(); //NVertex
-			m_zone.size[1] = grid.nCells; //NCells
+			m_zone.size[0] = grid.localNodes.size(); //NVertex			
+			m_zone.size[1] = totalCells; //NCells
 			m_zone.size[2] = 0; //NBoundaryVertex			
 			CALL_CGNS(cg_zone_write(m_file.idx, m_base.idx, m_zone.name.c_str(), m_zone.size, m_zone.type, &m_zone.idx));
+			
 
 			//Write nodes coordinates		
 			int G;
@@ -188,6 +195,7 @@ public:
 				//Write coords to file
 				CALL_CGNS(cg_coord_write(m_file.idx, m_base.idx, m_zone.idx, RealDouble, "CoordinateZ", &coords[0], &C));
 			};			
+			
 
 			//Write cells elements info into main section			
 			int start = 1;
@@ -196,13 +204,38 @@ public:
 			end -= 1;
 			int S;
 			CALL_CGNS(cg_section_write(m_file.idx, m_base.idx, m_zone.idx, "Cells",  MIXED, start, end, 0, &AllElements[0], &S));
+			
 		};
 		_parallelHelper->Barrier();
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing grid.");				
 	};
 
 	//Write physical field to file 
-	void WriteField(Grid& grid, std::string fieldName, const std::vector<double>& variable) {		
+	void WriteField(Grid& grid, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
+		//Check if variable array lenght equals number of local cells
+		if (variable.size() != grid.nCellsLocal) {
+			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Number of field variebles doesn't equal to number of cells.");
+			exit(0);
+		};
+
+		//Gather number of cells on master node
+		std::vector<int> nCellsPerProcessor;
+		_parallelHelper->GatherCounts(grid.nCellsLocal, nCellsPerProcessor);				
+
+		//Gather all elements on master node
+		std::vector<double> AllVariables;
+		_parallelHelper->GathervDouble(variable, nCellsPerProcessor, AllVariables);
+
+		if (_parallelHelper->IsMaster()) {
+			//Write solution node first if it doesnt exist
+			int S;
+			CALL_CGNS(cg_sol_write(m_file.idx, m_base.idx, m_zone.idx, solutionName.c_str(), CellCenter, &S));
+
+			//Write flow field data
+			int F;
+			CALL_CGNS(cg_field_write(m_file.idx, m_base.idx, m_zone.idx, S, RealDouble, fieldName.c_str(), &AllVariables[0], &F));
+		};
+
 		_parallelHelper->Barrier();
 	};
 
@@ -212,6 +245,7 @@ public:
 			CALL_CGNS(cg_close(m_file.idx));
 		};
 		_parallelHelper->Barrier();
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "CGNS file closed.");				
 	};
 };
 

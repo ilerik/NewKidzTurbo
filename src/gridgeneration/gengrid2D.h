@@ -142,16 +142,31 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
 		}
 	}
+	
 
 	//Fill in connectivity info
 	g.vdist.clear();
 	g.xadj.clear();
-	g.adjncy.clear();	
+	g.adjncy.clear();
 
 	//TO DO generalize
-	assert(nProc == 1);
+	int nProcessors = pHelper->getProcessorNumber();
+	int vProc = g.nProperCells / nProcessors;
+	int vLeft = g.nProperCells % nProcessors;
+	g.vdist.resize(nProcessors + 1);
+	g.vdist[0] = 0;
+	for (int i = 0; i<nProcessors; i++) {
+		g.vdist[i+1] = g.vdist[i] + vProc;
+		if (vLeft > 0) {
+			g.vdist[i+1]++;
+			vLeft--;
+		};
+	};
+	g.vdist[nProcessors] = g.nProperCells;
+
+	/*assert(nProc == 1);
 	g.vdist.push_back(0);		
-	g.vdist.push_back(g.nProperCells);
+	g.vdist.push_back(g.nProperCells);*/
 
 	int currentInd = 0;
 	g.xadj.push_back(currentInd);
@@ -165,10 +180,15 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 			currentInd++;
 		};
 		g.xadj.push_back(currentInd);
-	};	
+	};
+
+	//Eliminate non local cells		
+	g.nCellsLocal = -g.vdist[rank] + g.vdist[rank + 1];		
+	//g.Cells.erase(g.Cells.begin() + g.vdist[rank + 1], g.Cells.end());
+	//g.Cells.erase(g.Cells.begin(), g.Cells.begin() + g.vdist[rank]);	
 
 	//Fill in grid info
-	g.gridInfo.CellDimensions = 2;
+	g.gridInfo.CellDimensions = 2;	
 	
 	//Add boundary names
 	if (!periodicX) {
@@ -180,6 +200,7 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 		g.addPatch("top", 4);
 	};
 	//g.ConstructAndCheckPatches();
+	pHelper->Barrier();
 	
 	return g;
 };

@@ -19,22 +19,42 @@ enum class LoggerMessageLevel {
 
 //Implementation of logging mechanism
 class Logger {
+	int _nProcessors;
 	int _rank;
+	ParallelHelper* _parallelHelper;
+	std::ofstream _output;
 public:	
-	int InitLogging(std::string filename, int rank) {
-		_rank = rank;
+	int InitLogging(ParallelHelper& parallelHelper, std::string filename) {
+		_parallelHelper = &parallelHelper;
+		_nProcessors = _parallelHelper->getProcessorNumber();
+		_rank = _parallelHelper->getRank();		
+		std::ostringstream fname;
+		fname<<filename<<_rank;
+		_output.open(fname.str(), std::ios_base::out);
 		return 0;
 	};
 
 	int WriteMessage(LoggerMessageLevel level, LoggerMessageType type, std::string msg) {
 		if (level == LoggerMessageLevel::GLOBAL) {
-			if (_rank == 0) std::cout<<"GLOBAL : "<<msg<<"\n";
+			if (_rank == 0) {
+				_output<<"GLOBAL : "<<msg<<"\n";
+				_output.flush();
+				//std::cout<<"GLOBAL : "<<msg<<"\n";
+			};			
 		};
-		if (level == LoggerMessageLevel::LOCAL) {
-			std::cout<<"LOCAL  "<<_rank<<" : "<<msg<<"\n";
+		if (level == LoggerMessageLevel::LOCAL) {						
+			_output<<"LOCAL rank = "<<_rank<<" : "<<msg<<"\n";
+			_output.flush();			
+			//std::cout<<"LOCAL  "<<_rank<<" : "<<msg<<"\n";
 		};
 		return 0;
 	};
+
+	int FinilizeLogging() {
+		_output.close();
+		return 0;
+	};
+	
 };
 
 #endif

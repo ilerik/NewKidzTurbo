@@ -107,6 +107,27 @@ public:
 			MPI_Gatherv(&local[0], local.size(), MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, _comm);
 		};		
 	};
+
+	//Wrapper for Allgatherv (int)
+	void Allgatherv(std::vector<int>& local, std::vector<int>& counts, std::vector<int>& result) {
+		//Make displacement array
+		std::vector<int> displs(counts.size());
+		int totalSize = 0;
+		for (int i = 0; i<counts.size(); i++) {
+			displs[i] = totalSize;
+			totalSize += counts[i];
+		};
+		result.resize(totalSize);
+		MPI_Allgatherv(&local[0], local.size(), MPI_INT, &result[0], &counts[0], &displs[0], MPI_INT, _comm);		
+	};
+	////Agregation
+	
+	//Sum of integers
+	inline int SumInt(int x) {
+		int res;
+		MPI_Allreduce(&x, &res, 1, MPI_INT, MPI_SUM, _comm);
+		return res;
+	};
 };
 
 #endif

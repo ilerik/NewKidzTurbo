@@ -58,7 +58,7 @@ public:
 
 			//Initialize loggin subsistem
 			_logfilename = "kernel.log"; //TO DO
-			_logger.InitLogging(_logfilename, _rank);
+			_logger.InitLogging(_parallelHelper, _logfilename);
 
 			//Initialize cgns i\o subsystem
 			_cgnsReader.Init(_logger, _parallelHelper);
@@ -79,6 +79,7 @@ public:
 		_cgnsReader.Finalize();
 		_cgnsWriter.Finalize();
 		_parallelHelper.Finalize();			
+		_logger.FinilizeLogging();
 		return TURBO_OK;
 	};
 
@@ -95,6 +96,11 @@ public:
 	{
 		_cgnsWriter.CreateFile(filename);
 		_cgnsWriter.WriteGridToFile(_grid);
+
+		//Write partitioning to solution
+		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
+		_cgnsWriter.WriteField(_grid, "SolutionInit", "Density", part); 
+
 		_cgnsWriter.CloseFile();
 		return TURBO_OK;
 	}
@@ -103,7 +109,7 @@ public:
 	turbo_errt BindGrid(Grid& grid) {
 		_grid = grid;
 		PartitionGrid();
-		GenerateGridGeometry();
+		//GenerateGridGeometry();
 		return TURBO_OK;
 	};
 
@@ -153,7 +159,7 @@ public:
 
 		/* This is an array of size equal to the number of locally-stored vertices. Upon successful completion the
 		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */
-		std::vector<idx_t> part(_grid.nProperCells);
+		std::vector<idx_t> part(_grid.nCellsLocal);
 
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
@@ -165,15 +171,13 @@ public:
 
 		//Gather partitioning on every processor
 		std::vector<int> recvcounts(_nProcessors);
-		std::vector<int> displs(_nProcessors);
-		displs[0] = 0;
 		for (int i = 0; i<_nProcessors; i++) {
 			recvcounts[i] = _grid.vdist[i+1] - _grid.vdist[i];
-			if (i>0) displs[i] = displs[i-1] + recvcounts[i-1];
 		};
+		
+		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
 
-		_grid.cellsPartitioning.resize(_grid.nProperCells);
-		MPI_Allgatherv(&part[0], _grid.nProperCells, IDX_T, &_grid.cellsPartitioning[0], &recvcounts[0], &displs[0], IDX_T, _comm);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Otput result information
 		std::ostringstream msg;
@@ -189,13 +193,20 @@ public:
 		};
 
 		//Extract local cells indexes		
+		_grid.localCells.clear();
 		_grid.localCellIndexes.clear();
 		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (!_grid.Cells[i].IsDummy)) _grid.localCellIndexes.push_back(i);
+			if ((_grid.cellsPartitioning[i] == _rank) && (!_grid.Cells[i].IsDummy)) {
+				_grid.localCells.push_back(&_grid.Cells[i]);
+				_grid.localCellIndexes.push_back(i);
+			};
 		};		
 		_grid.nCellsLocal = _grid.localCellIndexes.size(); //Without dummy cells
 		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (_grid.Cells[i].IsDummy)) _grid.localCellIndexes.push_back(i);
+			if ((_grid.cellsPartitioning[i] == _rank) && (_grid.Cells[i].IsDummy)) {
+				_grid.localCells.push_back(&_grid.Cells[i]);
+				_grid.localCellIndexes.push_back(i);
+			};
 		};		
 
 		//Otput result
@@ -205,7 +216,7 @@ public:
 
 		//Free memory
 		free(tpwgts);
-		free(ubvec);									
+		free(ubvec);													
 
 		//Synchronize		
 		_parallelHelper.Barrier();
