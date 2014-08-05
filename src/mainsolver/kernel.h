@@ -87,7 +87,7 @@ public:
 	turbo_errt LoadGrid(std::string filename) {
 		_grid = _cgnsReader.LoadGrid(filename, _parallelHelper);
 		PartitionGrid();
-		//_grid.UpdateGeometricProperties();
+		GenerateGridGeometry();
 		return TURBO_OK;
 	};	
 
@@ -109,7 +109,7 @@ public:
 	turbo_errt BindGrid(Grid& grid) {
 		_grid = grid;
 		PartitionGrid();
-		//GenerateGridGeometry();
+		GenerateGridGeometry();
 		return TURBO_OK;
 	};
 
@@ -201,18 +201,28 @@ public:
 
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
-		//Otput result information
-		msg.clear();
-		msg<<"Partitioning edgecut = "<<edgecut;
-		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, msg.str());		
+		//Otput result information		
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Partitioning edgecut = ", edgecut);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCells = ", _grid.nCells);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nProperCells = ", _grid.nProperCells);		
 		
 		//Add dummy cells
 		for (int i = _grid.nProperCells; i<_grid.nCells; i++) {
 			Cell* cell = &_grid.Cells[i];
 			int neigbour = cell->NeigbourCells[0];
 			int p = _grid.cellsPartitioning[neigbour];
-			_grid.cellsPartitioning.push_back(p);
+			_grid.cellsPartitioning.push_back(p);			
 		};
+
+		//Otput cells partitioning
+		msg.clear();
+		msg<<"Partitioning = [ ";
+		for (int p : _grid.cellsPartitioning) {
+			msg<<p<<" ";
+		};
+		msg<<"]\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());		
+
 
 		//Extract local cells indexes		
 		_grid.localCells.clear();
@@ -221,6 +231,7 @@ public:
 			if ((_grid.cellsPartitioning[i] == _rank) && (!_grid.Cells[i].IsDummy)) {
 				_grid.localCells.push_back(&_grid.Cells[i]);
 				_grid.localCellIndexes.push_back(i);
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
 			};
 		};		
 		_grid.nCellsLocal = _grid.localCellIndexes.size(); //Without dummy cells
@@ -228,6 +239,7 @@ public:
 			if ((_grid.cellsPartitioning[i] == _rank) && (_grid.Cells[i].IsDummy)) {
 				_grid.localCells.push_back(&_grid.Cells[i]);
 				_grid.localCellIndexes.push_back(i);
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
 			};
 		};		
 
@@ -246,56 +258,98 @@ public:
 	//Load required geometric grid data to appropriate data structures
 	//Provided we have pationed grid
 	turbo_errt GenerateGridGeometry() {
+		//return turbo_errt::TURBO_OK;
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation started");
+
 		//Create local cells
 		_grid.localCells.resize(_grid.localCellIndexes.size());		
 		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {					
 			_grid.localCells[i] = &_grid.Cells[_grid.localCellIndexes[i]];			
-		};		
+		};
 
-		//Compute dummy cell geometric properties
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", _grid.localCellIndexes.size());		
 
 		//Create faces		
 		int faceIndex = 0;
-		std::map<std::set<int>, int> faces;	//Face nodes to face index
-		std::map<int, int> faceCell_1; //Face index to cell1
-		std::map<int, int> faceCell_2; //Face index to cell2
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
+		std::map<std::set<int>, int> faces;	//Face nodes to face index		
+		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {
 			//Generate all faces for the cell
-			Cell* cell = _grid.localCells[i];
-			std::vector<Face> newFaces = _grid.ObtainFaces(cell);
+			Cell* cell = _grid.localCells[i];		
+			std::vector<Face> newFaces;
+			if (!cell->IsDummy) {
+				newFaces = _grid.ObtainFaces(cell);
+			} else {
+				Face boundaryFace;
+				boundaryFace.CGNSType = cell->CGNSType;
+				boundaryFace.FaceNodes = cell->Nodes;
+				boundaryFace.BCMarker = cell->BCMarker;
+				newFaces.clear();
+				newFaces.push_back(boundaryFace);
+			};
 			for (int j = 0; j<newFaces.size(); j++) {
-				Face& face = newFaces[j];
-				face.GlobalIndex = faceIndex++;
+				Face& face = newFaces[j];				
 				std::set<int> nodes(face.FaceNodes.begin(), face.FaceNodes.end());
-				std::pair<std::set<int>, int> newFaceInfo(nodes, face.GlobalIndex);
+				std::pair<std::set<int>, int> newFaceInfo(nodes, 0);
 				std::pair<std::map<std::set<int>, int>::iterator, bool> result = faces.insert( newFaceInfo );				
 				//Add face and save connectivity info
-				if ( result.second ) {					
-					faceCell_1[face.GlobalIndex] = cell->GlobalIndex;					
+				if ( result.second ) {	
+					face.GlobalIndex = faceIndex;
+					result.first->second = face.GlobalIndex;
 					_grid.localFaces.push_back(face);
+					_grid.localFaces[faceIndex].isExternal = true;
+					_grid.localFaces[faceIndex].FaceCell_1 = i;
+					_grid.localCells[i]->Faces.push_back(face.GlobalIndex);
+					faceIndex++;
 				} else {
-					faceCell_2[face.GlobalIndex] = cell->GlobalIndex;
-					faceIndex--;
+					int fIndex = result.first->second;
+					_grid.localFaces[fIndex].isExternal = false;
+					_grid.localFaces[fIndex].FaceCell_2 = i;
+					_grid.localCells[i]->Faces.push_back(fIndex);
 				};
 			};
 		};
 
-		//Generate face geometric properties		
-		_grid.nFaces = faceIndex;
-		_grid.localFaces.resize(_grid.nFaces);
-		/*for (std::set<Face>::iterator it = faces.begin(); it != faces.end(); ++it) {
-			int index = it->GlobalIndex;
-			_grid.localFaces[index] = *it;
-			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
-		};*/		
-
 		//Update cells geometric properties
-		/*for (int i = 0; i < _grid.nCellsLocal; i++) {
+		for (int i = 0; i < _grid.nCellsLocal; i++) {
 			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-		};*/
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		};		
+
+		//Generate face geometric properties		
+		_grid.nFaces = faceIndex;		
+		for (Face& face : _grid.localFaces) {
+			int index = face.GlobalIndex;						
+			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+
+			//Orient normal
+			Vector cellCenter = _grid.localCells[_grid.localFaces[index].FaceCell_1]->CellCenter;
+			Vector faceCenter = _grid.localFaces[index].FaceCenter;
+			if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
+				_grid.localFaces[index].FaceNormal *= -1;
+			};
+
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
+		};
+
+
+		//Compute dummy cell geometric properties
+		for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {
+			int neighbour = _grid.localCells[i]->NeigbourCells[0];
+			Cell& cell = _grid.Cells[neighbour];
+			_grid.localCells[i]->CellVolume = cell.CellVolume;
+
+			//Reflect cell center over boundary face plane
+			Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
+			Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
+			Vector dummyCenter = cell.CellCenter - 2 * dR;
+			_grid.localCells[i]->CellCenter = dummyCenter;
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		};
 
 		//Synchronize
 		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation finished");
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished generating local geometry and faces");	
 		return TURBO_OK;
 	};
@@ -316,7 +370,7 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt ReadInitialConditions() {
+	turbo_errt ReadInitialConditions(std::string solutionName) {
 		//Synchronize
 		//MPI_Barrier(_comm);
 		return TURBO_OK;

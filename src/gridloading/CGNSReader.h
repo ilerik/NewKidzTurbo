@@ -493,7 +493,7 @@ public:
 		_cellCToG.clear();
 		_cellGToC.clear();
 		int globalIndex = 0;		
-		for each (int cgnsIndex in cells) {
+		for (int cgnsIndex : cells) {
 			_cellCToG[cgnsIndex] = globalIndex;
 			_cellGToC[globalIndex++] = cgnsIndex;
 		};
@@ -504,7 +504,7 @@ public:
 		grid.nDummyCells = faces.size();
 		_faceCToG.clear();
 		_faceGToC.clear();
-		for each (int cgnsIndex in faces) {
+		for (int cgnsIndex : faces) {
 			_cellCToG[cgnsIndex] = globalIndex;
 			_cellGToC[globalIndex] = cgnsIndex;
 			_faceCToG[cgnsIndex] = globalIndex;

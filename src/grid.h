@@ -62,6 +62,20 @@ struct Face {
 		//Last case they are equal
 		return false;
     }
+
+	//Utility function outputs face info
+	std::string getInfo() {
+		std::ostringstream msg;
+		msg << "Face Info :\n";
+		msg << "Global Index : " << GlobalIndex << "\n";
+		msg << "CGNS Type : " << cg_ElementTypeName(CGNSType) << "\n";
+		msg << "Nodes : ";
+		for (int ind : FaceNodes) msg << ind << " ";
+		msg << "\n";
+		msg << "IsExternal = " << isExternal << "\n";
+		msg << "FaceNormal = (" << FaceNormal.x << "," << FaceNormal.y << "," << FaceNormal.z << ")\n";
+		return msg.str();
+	};
 };
 
 struct FaceComparer
@@ -96,6 +110,22 @@ public:
 	Vector CellCenter;		// Center of cell
 	double CellHSize;		// Size of cell		
 	std::map<std::string,  void*> Data; //Arbitrary data	
+
+	//Utility function outputs cell info
+	std::string getInfo() {
+		std::ostringstream msg;
+		msg << "Cell Info :\n";
+		msg << "Global Index : " << GlobalIndex << "\n";
+		msg << "CGNS Type : " << cg_ElementTypeName(CGNSType) << "\n";
+		msg << "Nodes : ";
+		for (int ind : Nodes) msg << ind << " ";
+		msg << "\n";	
+		msg << "Neighbours : ";
+		for (int ind : NeigbourCells) msg << ind << " ";
+		msg << "\n";	
+		msg << "CellCenter = (" << CellCenter.x << "," << CellCenter.y << "," << CellCenter.z << ")\n";
+		return msg.str();
+	};
 };
 
 
@@ -332,7 +362,7 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 		isTypeCheckPassed = true;
 
 		cell->CellVolume = 0;
-		Vector rOrigin = nodes[cell->Nodes[0]].P;
+		Vector rOrigin = localNodes[cell->Nodes[0]].P;
 		for (int i = 0; i<cell->Faces.size(); i++) {
 			//Get face
 			Face& face = faces[cell->Faces[i]];
@@ -350,11 +380,11 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 
 		//Compute cell volume
 		cell->CellVolume = 0;
-		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
-		Vector b = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
+		Vector a = localNodes[cell->Nodes[1]].P - localNodes[cell->Nodes[0]].P; 
+		Vector b = localNodes[cell->Nodes[2]].P - localNodes[cell->Nodes[0]].P; 
 		cell->CellVolume += (a & b).mod() / 2.0;
-		a = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
-		b = nodes[cell->Nodes[3]].P - nodes[cell->Nodes[0]].P; 
+		a = localNodes[cell->Nodes[2]].P - localNodes[cell->Nodes[0]].P; 
+		b = localNodes[cell->Nodes[3]].P - localNodes[cell->Nodes[0]].P; 
 		cell->CellVolume += (a & b).mod() / 2.0;
 	};
 
@@ -363,8 +393,8 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 
 		//Compute cell volume
 		cell->CellVolume = 0;
-		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
-		Vector b = nodes[cell->Nodes[2]].P - nodes[cell->Nodes[0]].P; 
+		Vector a = localNodes[cell->Nodes[1]].P - localNodes[cell->Nodes[0]].P; 
+		Vector b = localNodes[cell->Nodes[2]].P - localNodes[cell->Nodes[0]].P; 
 		cell->CellVolume += (a & b).mod() / 2.0;		
 	};
 
@@ -372,7 +402,7 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 		isTypeCheckPassed = true;
 
 		//Compute cell volume
-		Vector a = nodes[cell->Nodes[1]].P - nodes[cell->Nodes[0]].P; 
+		Vector a = localNodes[cell->Nodes[1]].P - localNodes[cell->Nodes[0]].P; 
 		cell->CellVolume = a.mod();		
 	};
 
@@ -380,9 +410,11 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 
 	//Compute cell center (independent from type)
 	cell->CellCenter = Vector(0,0,0);
-	for (int i = 0; i<cell->Nodes.size(); i++) cell->CellCenter += nodes[cell->Nodes[i]].P;
+	for (int i = 0; i<cell->Nodes.size(); i++) cell->CellCenter += localNodes[cell->Nodes[i]].P;
 	cell->CellCenter /= cell->Nodes.size();
 };
+
+
 void Grid::ComputeGeometricProperties(Face* face) {
 	//Check cell type and compute face square and normal
 	bool isTypeCheckPassed = false;
@@ -392,11 +424,11 @@ void Grid::ComputeGeometricProperties(Face* face) {
 		
 		//Compute surface area and normal
 		face->FaceNormal = Vector(0,0,0);
-		Vector a = nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P; 
-		Vector b = nodes[face->FaceNodes[2]].P - nodes[face->FaceNodes[0]].P; 
+		Vector a = localNodes[face->FaceNodes[1]].P - localNodes[face->FaceNodes[0]].P; 
+		Vector b = localNodes[face->FaceNodes[2]].P - localNodes[face->FaceNodes[0]].P; 
 		face->FaceNormal += (a & b) / 2.0;
-		a = nodes[face->FaceNodes[2]].P - nodes[face->FaceNodes[0]].P; 
-		b = nodes[face->FaceNodes[3]].P - nodes[face->FaceNodes[0]].P; 
+		a = localNodes[face->FaceNodes[2]].P - localNodes[face->FaceNodes[0]].P; 
+		b = localNodes[face->FaceNodes[3]].P - localNodes[face->FaceNodes[0]].P; 
 		face->FaceNormal += (a & b) / 2.0;
 
 		//Normalize	
@@ -408,11 +440,11 @@ void Grid::ComputeGeometricProperties(Face* face) {
 		isTypeCheckPassed = true;
 
 		//Compute surface area
-		face->FaceSquare = (nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).mod();		
+		face->FaceSquare = (localNodes[face->FaceNodes[1]].P - localNodes[face->FaceNodes[0]].P).mod();		
 
 		//Compute normal		
-		face->FaceNormal.x = (nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).y;
-		face->FaceNormal.y = -(nodes[face->FaceNodes[1]].P - nodes[face->FaceNodes[0]].P).x;
+		face->FaceNormal.x = (localNodes[face->FaceNodes[1]].P - localNodes[face->FaceNodes[0]].P).y;
+		face->FaceNormal.y = -(localNodes[face->FaceNodes[1]].P - localNodes[face->FaceNodes[0]].P).x;
 		face->FaceNormal = face->FaceNormal / face->FaceNormal.mod();
 	};
 
@@ -431,7 +463,7 @@ void Grid::ComputeGeometricProperties(Face* face) {
 	
 	//Compute face center (independent from type)
 	face->FaceCenter = Vector(0,0,0);
-	for (int i = 0; i<face->FaceNodes.size(); i++) face->FaceCenter += nodes[face->FaceNodes[i]].P;
+	for (int i = 0; i<face->FaceNodes.size(); i++) face->FaceCenter += localNodes[face->FaceNodes[i]].P;
 	face->FaceCenter /= face->FaceNodes.size();	
 };
 

@@ -50,6 +50,20 @@ public:
 		return 0;
 	};
 
+	int WriteMessage(LoggerMessageLevel level, LoggerMessageType type, std::string msg, int n) {
+		if (level == LoggerMessageLevel::GLOBAL) {
+			if (_rank == 0) {
+				_output<<"GLOBAL : "<<msg<<n<<"\n";
+				_output.flush();				
+			};			
+		};
+		if (level == LoggerMessageLevel::LOCAL) {						
+			_output<<"LOCAL rank = "<<_rank<<" : "<<msg<<n<<"\n";
+			_output.flush();						
+		};
+		return 0;
+	};
+
 	int FinilizeLogging() {
 		_output.close();
 		return 0;

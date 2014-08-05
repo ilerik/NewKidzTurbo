@@ -1193,9 +1193,9 @@ int main(int argc, char *argv[]) {
 	
 	Kernel _kernel;	
 	_kernel.Initilize(&argc, &argv);
-	//Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 100, 100, 1.0, 1.0, 1.0, 1.0);
-	//_kernel.BindGrid(_grid);
-	_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 2, 2, 1.0, 1.0, 1.0, 1.0);
+	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
 	_kernel.SaveGrid("result.cgns");
 	//_kernel.SaveSolution();

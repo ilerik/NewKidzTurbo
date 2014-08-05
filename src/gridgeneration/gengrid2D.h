@@ -39,9 +39,9 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 	};
 	y_p[0] = 0;
 	y_p[M-1] = size_y;
-	g.localNodes.clear();
-	for (int i = 0; i<N; i++) {
-		for (int j = 0; j<M; j++) {
+	g.localNodes.clear();	
+	for (int j = 0; j<M; j++) {
+		for (int i = 0; i<N; i++) {
 			Node new_node;
 			new_node.GlobalIndex = i + j * N;
 			new_node.P.x = x_p[i];//(size_x*i) / (N-1);
@@ -52,9 +52,9 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 	};	
 
 	//Create cells
-	g.nCells = (N-1)*(M-1);
-	for (int i = 0; i<(N-1); i++) {
-		for (int j = 0; j<(M-1); j++) {
+	g.nCells = (N-1)*(M-1);	
+	for (int j = 0; j<(M-1); j++) {
+		for (int i = 0; i<(N-1); i++) {
 			Cell c;
 			c.GlobalIndex = i + j*(N-1);
 			c.Nodes.resize(4);
@@ -74,11 +74,11 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 			g.Cells.push_back(c);
 		};
 	};
-	g.nProperCells = g.nCells;	
+	g.nProperCells = g.nCells;		
 
-	//Dummy cells and connectivity info
-	for (int i = 0; i<(N-1); i++) {
-		for (int j = 0; j<(M-1); j++) {
+	//Dummy cells and connectivity info	
+	for (int j = 0; j<(M-1); j++) {
+		for (int i = 0; i<(N-1); i++) {
 			int cIndex = i + j*(N-1);
 			//Left neighbour
 			int neighbour = -1;
@@ -88,6 +88,10 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 				dummyCell.GlobalIndex = g.nCells++;
 				dummyCell.NeigbourCells.push_back(cIndex);
 				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + j * N);
+				dummyCell.Nodes.push_back(i + (j+1) * N);
 				dummyCell.BCMarker = 1;				
 				g.Cells.push_back(dummyCell);
 				neighbour = dummyCell.GlobalIndex;
@@ -103,6 +107,10 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 				dummyCell.GlobalIndex = g.nCells++;
 				dummyCell.NeigbourCells.push_back(cIndex);
 				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i+1 + j * N);
+				dummyCell.Nodes.push_back(i+1 + (j+1) * N);
 				dummyCell.BCMarker = 2;				
 				g.Cells.push_back(dummyCell);
 				neighbour = dummyCell.GlobalIndex;
@@ -111,13 +119,17 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 			if (i != N-2) neighbour = i+1 + j*(N-1);
 			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
 
-			//Bottom neighbour
+			//Top neighbour
 			if ((j == 0) && (!periodicY)) {				
 				//Create dummy cell
 				Cell dummyCell;
 				dummyCell.GlobalIndex = g.nCells++;
 				dummyCell.NeigbourCells.push_back(cIndex);
 				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + j * N);
+				dummyCell.Nodes.push_back(i+1 + j * N);
 				dummyCell.BCMarker = 3;				
 				g.Cells.push_back(dummyCell);
 				neighbour = dummyCell.GlobalIndex;
@@ -126,13 +138,17 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 			if (j != 0) neighbour = i + (j-1)*(N-1);
 			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
 
-			//Top neighbour
+			//Bottom neighbour
 			if ((j == M-2) && (!periodicY)) {				
 				//Create dummy cell
 				Cell dummyCell;
 				dummyCell.GlobalIndex = g.nCells++;
 				dummyCell.NeigbourCells.push_back(cIndex);
 				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + (j+1) * N);
+				dummyCell.Nodes.push_back(i+1 + (j+1) * N);				
 				dummyCell.BCMarker = 4;				
 				g.Cells.push_back(dummyCell);
 				neighbour = dummyCell.GlobalIndex;
@@ -143,6 +159,7 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 		}
 	}
 	
+	g.nDummyCells = g.Cells.size() - g.nProperCells;
 
 	//Fill in connectivity info
 	g.vdist.clear();
