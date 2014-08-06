@@ -39,14 +39,14 @@ private:
 	//Internal storage		
 	int nVariables; //number of variables in each cell
 	std::vector<double> Values;	//Conservative variables
-	std::vector<double> Residual; //Residual values			
+	std::vector<double> Residual; //Residual values
+	std::vector<Vector> GradientT;
 
 public:
 	//Parallel helper
 	ParallelHelper* getParallelHelper() {
 		return &_parallelHelper;
-	};
-	
+	};	
 
 	//Initialize computational kernel
 	turbo_errt Initilize(int *argc, char **argv[]) {		
@@ -85,7 +85,7 @@ public:
 
 	//Load grid from CGNS file
 	turbo_errt LoadGrid(std::string filename) {
-		_grid = _cgnsReader.LoadGrid(filename, _parallelHelper);
+		_grid = _cgnsReader.LoadGrid(filename);
 		PartitionGrid();
 		GenerateGridGeometry();
 		return TURBO_OK;
@@ -95,12 +95,7 @@ public:
 	turbo_errt SaveGrid(std::string filename)
 	{
 		_cgnsWriter.CreateFile(filename);
-		_cgnsWriter.WriteGridToFile(_grid);
-
-		//Write partitioning to solution
-		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
-		_cgnsWriter.WriteField(_grid, "SolutionInit", "Density", part); 
-
+		_cgnsWriter.WriteGridToFile(_grid);		
 		_cgnsWriter.CloseFile();
 		return TURBO_OK;
 	}
@@ -256,7 +251,7 @@ public:
 	}; 
 
 	//Load required geometric grid data to appropriate data structures
-	//Provided we have pationed grid
+	//Provided we have partioned grid
 	turbo_errt GenerateGridGeometry() {
 		//return turbo_errt::TURBO_OK;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation started");
@@ -355,12 +350,15 @@ public:
 	};
 
 	turbo_errt InitParallelExchange() {
+		//Determine values required
 
 		//Synchronize
 		_parallelHelper.Barrier();
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Parallel data exchange initialized");	
 		return TURBO_OK;
 	};
+
+
 
 	turbo_errt ReadBoundaryConditions() {
 
@@ -370,9 +368,85 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt ReadInitialConditions(std::string solutionName) {
-		//Synchronize
-		//MPI_Barrier(_comm);
+	turbo_errt ReadInitialConditions(std::string solutionName) {		
+
+		//Read physical data
+		std::vector<double> density(_grid.nCellsLocal);
+		std::vector<double> velocityX(_grid.nCellsLocal);
+		std::vector<double> velocityY(_grid.nCellsLocal);
+		std::vector<double> velocityZ(_grid.nCellsLocal);		
+		_cgnsReader.ReadField(_grid, solutionName, "Density", density);
+		_cgnsReader.ReadField(_grid, solutionName, "VelocityX", velocityX);
+		_cgnsReader.ReadField(_grid, solutionName, "VelocityY", velocityY);
+		_cgnsReader.ReadField(_grid, solutionName, "VelocityZ", velocityZ);
+
+		//Fill data structures
+		nVariables = 5;
+		Values.resize(nVariables * _grid.nCellsLocal);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = density[i];
+			double rou = velocityX[i] * ro;
+			double rov = velocityY[i] * ro;
+			double row = velocityZ[i] * ro;
+			Values[i + 0] = ro;
+			Values[i + 1] = rou;
+			Values[i + 2] = rov;
+			Values[i + 3] = row;
+		};
+
+		//Synchronize		
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished reading initial conditions");	
+		return TURBO_OK;
+	};
+
+	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
+		//Open file
+		_cgnsWriter.OpenFile(fname);
+
+		//Write physical quantities
+		//Density
+		std::vector<double> buffer(_grid.nCellsLocal);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i + 0];
+			buffer[i] = ro;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Density", buffer); 
+
+		//VelocityX
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i + 0];
+			double rou = Values[i + 1];
+			double u = rou / ro;
+			buffer[i] = u;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "VelocityX", buffer); 
+
+		//VelocityY
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i + 0];
+			double rov = Values[i + 2];
+			double v = rov / ro;
+			buffer[i] = v;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "VelocityY", buffer); 
+
+		//VelocityZ
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i + 0];
+			double row = Values[i + 3];
+			double w = row / ro;
+			buffer[i] = w;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "VelocityZ", buffer); 
+
+		//Write partitioning to solution
+		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
+		_cgnsWriter.WriteField(_grid, solutionName, "Processor", part); 
+
+		//Close file
+		_cgnsWriter.CloseFile();
+
 		return TURBO_OK;
 	};
 
@@ -392,6 +466,9 @@ public:
 	//Implicit time step
 	void ImplicitTimeStep() {
 	};
+
+	//Medium properties and features
+
 
 };
 

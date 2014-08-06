@@ -94,6 +94,8 @@ protected:
 		DataType_t normalDataType;
 		int nDataSet;
 	} m_boco; 
+
+	std::string fileLocation;
 public:
 	
 	//Constructor
@@ -112,14 +114,26 @@ public:
 	};
 
 	//Create new cgns file or rewrite existing
-	void CreateFile(std::string fname) {
+	void CreateFile(std::string fname) {		
 		int mode = CG_MODE_WRITE;
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Opening cgns file " + fname + " for writing.");				
 		if (_parallelHelper->IsMaster()) {
 			CALL_CGNS(cg_open(fname.c_str(), mode, &m_file.idx));
 		};
+		fileLocation = fname;
 		_parallelHelper->Barrier();
-	};
+	};	
+
+	//Open existing file
+	void OpenFile(std::string fname) {		
+		int mode = CG_MODE_MODIFY;
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Opening cgns file " + fname + " for writing.");				
+		if (_parallelHelper->IsMaster()) {
+			CALL_CGNS(cg_open(fname.c_str(), mode, &m_file.idx));
+		};
+		fileLocation = fname;
+		_parallelHelper->Barrier();
+	};	
 
 	//Write grid structure to file
 	void WriteGridToFile(Grid& grid) {

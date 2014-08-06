@@ -430,6 +430,8 @@ private:
 		for (m_zone.idx = 1; m_zone.idx<=m_base.nbZones; ++m_zone.idx)
 			read_zone();
 
+		//
+		m_zone.idx = 1;
 	};
 
 public:
@@ -450,7 +452,7 @@ public:
 	};
 
 	//Read CGNS mesh from file
-	Grid LoadGrid(std::string fname, ParallelHelper) {
+	Grid LoadGrid(std::string fname) {
 		//Initialize
 		cells.clear();
 		faces.clear();
@@ -728,6 +730,91 @@ public:
 		_parallelHelper->Barrier();
 		
 		return grid;
+	};
+
+	//Read physical field from opened CGNS file
+	void ReadField(Grid& grid, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
+		//Open file		 
+		open_file(grid.gridInfo.fileLocation, CG_MODE_READ);
+
+		//Check if variable array lenght equals number of local cells
+		if (variable.size() != grid.nCellsLocal) {
+			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Number of field variebles doesn't equal to number of cells.");
+			exit(0);
+		};
+
+		//Check if such solution exist
+		bool solutionFound = false;
+		int nSols = 0;
+		//Determine number of solutions
+		CALL_CGNS(cg_nsols(m_file.idx, m_base.idx, m_zone.idx, &nSols));
+
+		//Find solution with given name
+		int S = 0;
+		for (S = 1; S<=nSols; S++) {
+			//Read solution name and grid location
+			char solName[256];
+			GridLocation_t gridLocation;
+			CALL_CGNS(cg_sol_info(m_file.idx, m_base.idx, m_zone.idx, S, solName, &gridLocation));
+
+			//Check if it's needed solution
+			if (std::string(solName) == solutionName) {
+				solutionFound = true;
+				if (gridLocation != CellCenter) {
+					_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Could not read solution with grid location not CellCenter.");
+					_parallelHelper->Barrier();
+					return;
+				};
+				break;
+			};
+		};
+
+		//If we didnt find solution
+		if (!solutionFound) {
+			_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Could not find solution with such name.");
+			_parallelHelper->Barrier();
+			return;
+		};
+
+		//Find field with given name
+		bool fieldFound = false;
+		DataType_t datatype;
+		int nFields;
+		CALL_CGNS(cg_nfields(m_file.idx, m_base.idx, m_zone.idx, S, &nFields));
+		for (int F = 1; F<=nFields; F++) {
+			//Read solution name and grid location
+			char fieldname[256];			
+			CALL_CGNS(cg_field_info(m_file.idx, m_base.idx, m_zone.idx, S, F, &datatype, fieldname));
+
+			//Check if it's needed field
+			if (std::string(fieldname) == fieldName) {
+				fieldFound = true;	
+				break;
+			};
+		};
+
+		//If we didnt find field
+		if (!solutionFound) {
+			_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Could not find field with such name.");
+			_parallelHelper->Barrier();
+			return;
+		};
+
+		//Read cell values for each cell
+		for (int i = 0; i<grid.nCellsLocal; i++) {
+			int cIndex = grid.localCells[i]->GlobalIndex;
+			int cgnsIndex = _cellGToC[cIndex];
+			cgsize_t range_min[1]; 
+			range_min[0] = cgnsIndex;
+			cgsize_t range_max[1];
+			range_max[0] = cgnsIndex;
+			cg_field_read(m_file.idx, m_base.idx, m_zone.idx, S, fieldName.c_str(), datatype, range_min, range_max, &variable[i]);
+		};
+	
+		_parallelHelper->Barrier();		
+
+		//Close file
+		CALL_CGNS(cg_close(m_file.idx));
 	};
 
 }; //CGNSReader class
