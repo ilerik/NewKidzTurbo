@@ -1,17 +1,44 @@
-#ifndef TURBO_GridLoading_CGNSReader
+#ifndef TURBO_BoundaryConditions_BoundaryCondition
 #define TURBO_BoundaryConditions_BoundaryCondition
 
 #include <vector>
+#include <grid.h>
+#include "GasModel.h"
+#include "BoundaryConditionConfiguration.h"
 
-//Base class for all boundary conditions
-class BoundaryCondition {
-public:	
-	virtual ~BoundaryCondition() {};
+namespace BoundaryConditions {
 
-	//Interface functions
-	virtual std::vector<double> getDummyCellValues() {} = 0;
+	//Boundary condition result type
+	enum class BoundaryConditionResultType
+	{
+		Dirichlet, //Fixed value
+		Neumann    //Fixed flux
+	};
 
-private:
+	//Base class for all boundary conditions
+	class BoundaryCondition {
+		Grid* _grid;
+		GasModel* _gasModel;	
+	public:	
+		//Result types
+		std::vector<BoundaryConditionResultType> bcResultTypes;
+
+		virtual ~BoundaryCondition() {};
+
+		//Interface functions
+		virtual std::vector<double> getDummyValues(std::vector<double> values, const Face& face) = 0;	
+
+		virtual void setGrid(Grid& grid) {
+			_grid = &grid;
+		};
+
+		virtual void setGasModel(GasModel& gasModel) {
+			_gasModel = &gasModel;
+		};
+
+		//virtual void setRiemannSolver(RiemannSolver& rSolver) = 0;
+		virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) = 0; 
+	};
 
 };
 

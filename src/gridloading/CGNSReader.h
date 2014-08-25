@@ -282,6 +282,8 @@ private:
 		boost::algorithm::replace_all(m_boco.name,":","_");
 		boost::algorithm::replace_all(m_boco.name,"/","_");
 
+		// Read boundary condition types
+
 		// Read the element ID's
 		int* boco_elems = new int [m_boco.nBC_elem];
 		void* NormalList(NULL);
@@ -666,10 +668,7 @@ public:
 				newCell.Nodes.push_back(_nodeCToG[elementNodes[elementID][j]]);
 			};
 			//Set dumminess
-			newCell.IsDummy = (i >= grid.nProperCells);
-
-			//If dummy then determine boundary condition
-			
+			newCell.IsDummy = (i >= grid.nProperCells);						
 
 			//Fill in neighbours
 			newCell.NeigbourCells.clear();				
@@ -682,6 +681,16 @@ public:
 			grid.Cells[i] = newCell;
 		};	
 		
+		//Modify dummy cells BCMarkers and create patches for grid
+		for (int BCMarker = 0; BCMarker < bcNames.size(); BCMarker++) {
+			grid.addPatch(bcNames[BCMarker], BCMarker);
+			for (int faceCGNSIndex : bcElements[BCMarker]) {	
+				int faceIndex = _faceCToG[faceIndex];
+				grid.Cells[faceIndex].BCMarker = BCMarker;
+				grid.patches[BCMarker].addFace(faceIndex);
+				for (int nodeIndex : grid.Cells[faceIndex].Nodes) grid.patches[BCMarker].addNode(nodeIndex);
+			};
+		};
 
 		//Now exclude dummy cells information from graph structure
 		grid.xadj.clear();

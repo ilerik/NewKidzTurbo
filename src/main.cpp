@@ -1198,6 +1198,10 @@ int main(int argc, char *argv[]) {
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
 	_kernel.ReadInitialConditions("FlowSolution.E:1");
+	_kernel.ReadConfiguration("");
+	_kernel.InitCalculation();
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
 	_kernel.SaveGrid("result.cgns");
 	_kernel.SaveSolution("result.cgns", "Solution");
 	//_kernel.SaveSolution();
