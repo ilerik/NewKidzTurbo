@@ -6,8 +6,10 @@
 #include "parallelHelper.h"
 #include <assert.h>
 
-Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size_y, double q_x, double q_y, bool periodicX = false, bool periodicY = false)
+Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
 {
+	double size_x = x_max - x_min;
+	double size_y = y_max - y_min;
 	int rank = pHelper->getRank();
 	int nProc = pHelper->getProcessorNumber();
 	int cartI;
@@ -44,8 +46,8 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double size_x, double size
 		for (int i = 0; i<N; i++) {
 			Node new_node;
 			new_node.GlobalIndex = i + j * N;
-			new_node.P.x = x_p[i];//(size_x*i) / (N-1);
-			new_node.P.y = y_p[j];//(size_y*j) / (M-1);
+			new_node.P.x = x_p[i] + x_min;//(size_x*i) / (N-1);
+			new_node.P.y = y_p[j] + y_min;//(size_y*j) / (M-1);
 			new_node.P.z = 0;
 			g.localNodes.push_back(new_node); 
 		};

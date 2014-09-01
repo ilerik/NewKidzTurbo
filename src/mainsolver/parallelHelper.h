@@ -134,6 +134,13 @@ public:
 		MPI_Allreduce(&x, &res, 1, MPI_INT, MPI_SUM, _comm);
 		return res;
 	};
+
+	//Minimum
+	inline double Min(double x) {
+		double res;
+		MPI_Allreduce(&x, &res, 1, MPI_DOUBLE, MPI_MIN, _comm);
+		return res;
+	};
 };
 
 #endif

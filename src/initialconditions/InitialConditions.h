@@ -3,14 +3,16 @@
 
 #include "grid.h"
 #include "GasModel.h"
+#include "configuration.h"
 
 namespace InitialConditions {	
 
 	//Base class for all custom initial conditions
-	class InitialConditions {
+	class InitialConditions {		
+	public:			
 		Grid* _grid;
 		GasModel* _gasModel;	
-	public:			
+
 		virtual ~InitialConditions() {};
 
 		//Interface functions
@@ -69,10 +71,10 @@ namespace InitialConditions {
 			//Convert to conservative variables
 			initValues.resize(5);
 			initValues[0] = ro;
-			initValues[0] = ro * u;
-			initValues[0] = ro * v;
-			initValues[0] = ro * w;
-			initValues[0] = roE;// + (u*u + v*v + w*w) / 2.0);
+			initValues[1] = ro * u;
+			initValues[2] = ro * v;
+			initValues[3] = ro * w;
+			initValues[4] = roE;// + (u*u + v*v + w*w) / 2.0);
 
 			return initValues;
 		};	

@@ -19,6 +19,7 @@
 //Step info
 class StepInfo {
 public:
+	double Time;
 	double TimeStep;
 	std::vector<double> Residual;
 	ConservativeVariables ResidualNew;

@@ -88,100 +88,100 @@ std::string int_to_hex( T i )
 //};
 //
 //
-ConservativeVariables SODTestInitDistribution(Vector r, void *par) {	
-	//Gamma
-	double gamma = 1.4;
-
-	//Left state x <= 0.5
-	double roL = 1.0;
-	double pL = 1.0;
-	Vector vL = Vector(0,0,0);
-	ConservativeVariables UL;
-	UL.ro = roL;
-	UL.rou = roL * vL.x;
-	UL.rov = roL * vL.y;
-	UL.row = roL * vL.z;
-	UL.roE = pL/(gamma-1) + roL * vL.mod() * vL.mod() / 2.0;
-	//Right state x > 0.5
-	double roR = 0.125;
-	double pR = 0.1;
-	Vector vR = Vector(0,0,0);
-	ConservativeVariables UR;
-	UR.ro = roR;
-	UR.rou = roR * vR.x;
-	UR.rov = roR * vR.y;
-	UR.row = roR * vR.z;
-	UR.roE = pR/(gamma-1) + roR * vR.mod() * vR.mod() / 2.0;
-
-	if (r.x <= 0.5) {
-		return UL;
-	} else {
-		return UR;
-	};
-};
-
-bool RunSODTest() {
-	//Model<Roe3DSolverPerfectGas> model;
-	Model<Godunov3DSolverPerfectGas> model;
-	Grid grid;
-
-	//Shock tube problem setting
-	double lBegin = 0;
-	double lEnd = 1.0;
-	Vector direction = Vector(1,0,0);
-	grid = GenGrid1D(1000, lBegin, lEnd, direction);
-	//grid = GenGrid2D(100, 10, 1.0, 1.0, 1.0, 1.0);
-	
-	//Set fluid properties	
-	model.SetGamma(1.4);
-	model.SetCv(1006.43 / 1.4);
-	model.SetMolecularWeight(28.966);
-	model.DisableViscous();	
-
-	//Set computational settings
-	model.SetCFLNumber(0.5);
-	model.SetHartenEps(0.00);
-	model.DisableSecondOrder();
-
-	//Bind computational grid
-	model.BindGrid(grid);	
-
-	//Set initial conditions
-	model.SetInitialConditions(SODTestInitDistribution);
-
-	//Boundary conditions
-
-	//No slip boundary
-	//Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
-	Model<Godunov3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
-	model.SetBoundaryCondition("left", NoSlipBC);
-	model.SetBoundaryCondition("right", NoSlipBC);	
-
-	/*Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
-	model.SetBoundaryCondition("top", SymmetryBC);
-	model.SetBoundaryCondition("bottom", SymmetryBC);*/
-
-	model.SaveToTechPlot("SODInit.dat");
-
-	//Total time
-	double maxTime = 0.2;
-	for (int i = 0; i < 2000000000; i++) {
-		model.ExplicitTimeStep();	
-		//model.Step();
-		if (i % 1 == 0) {
-			std::cout<<"Interation = "<<i<<"\n";
-			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
-			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
-			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
-		};
-		model.SaveToTechPlot("SOD.dat");
-		if (model.totalTime > 0.2) break;
-	};
-
-	//Save result to techplot
-	model.SaveToTechPlot("SOD.dat");
-	return true;
-};
+//ConservativeVariables SODTestInitDistribution(Vector r, void *par) {	
+//	//Gamma
+//	double gamma = 1.4;
+//
+//	//Left state x <= 0.5
+//	double roL = 1.0;
+//	double pL = 1.0;
+//	Vector vL = Vector(0,0,0);
+//	ConservativeVariables UL;
+//	UL.ro = roL;
+//	UL.rou = roL * vL.x;
+//	UL.rov = roL * vL.y;
+//	UL.row = roL * vL.z;
+//	UL.roE = pL/(gamma-1) + roL * vL.mod() * vL.mod() / 2.0;
+//	//Right state x > 0.5
+//	double roR = 0.125;
+//	double pR = 0.1;
+//	Vector vR = Vector(0,0,0);
+//	ConservativeVariables UR;
+//	UR.ro = roR;
+//	UR.rou = roR * vR.x;
+//	UR.rov = roR * vR.y;
+//	UR.row = roR * vR.z;
+//	UR.roE = pR/(gamma-1) + roR * vR.mod() * vR.mod() / 2.0;
+//
+//	if (r.x <= 0.5) {
+//		return UL;
+//	} else {
+//		return UR;
+//	};
+//};
+//
+//bool RunSODTest() {
+//	//Model<Roe3DSolverPerfectGas> model;
+//	Model<Godunov3DSolverPerfectGas> model;
+//	Grid grid;
+//
+//	//Shock tube problem setting
+//	double lBegin = 0;
+//	double lEnd = 1.0;
+//	Vector direction = Vector(1,0,0);
+//	grid = GenGrid1D(1000, lBegin, lEnd, direction);
+//	//grid = GenGrid2D(100, 10, 1.0, 1.0, 1.0, 1.0);
+//	
+//	//Set fluid properties	
+//	model.SetGamma(1.4);
+//	model.SetCv(1006.43 / 1.4);
+//	model.SetMolecularWeight(28.966);
+//	model.DisableViscous();	
+//
+//	//Set computational settings
+//	model.SetCFLNumber(0.5);
+//	model.SetHartenEps(0.00);
+//	model.DisableSecondOrder();
+//
+//	//Bind computational grid
+//	model.BindGrid(grid);	
+//
+//	//Set initial conditions
+//	model.SetInitialConditions(SODTestInitDistribution);
+//
+//	//Boundary conditions
+//
+//	//No slip boundary
+//	//Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+//	Model<Godunov3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+//	model.SetBoundaryCondition("left", NoSlipBC);
+//	model.SetBoundaryCondition("right", NoSlipBC);	
+//
+//	/*Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+//	model.SetBoundaryCondition("top", SymmetryBC);
+//	model.SetBoundaryCondition("bottom", SymmetryBC);*/
+//
+//	model.SaveToTechPlot("SODInit.dat");
+//
+//	//Total time
+//	double maxTime = 0.2;
+//	for (int i = 0; i < 2000000000; i++) {
+//		model.ExplicitTimeStep();	
+//		//model.Step();
+//		if (i % 1 == 0) {
+//			std::cout<<"Interation = "<<i<<"\n";
+//			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+//			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+//			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+//		};
+//		model.SaveToTechPlot("SOD.dat");
+//		if (model.totalTime > 0.2) break;
+//	};
+//
+//	//Save result to techplot
+//	model.SaveToTechPlot("SOD.dat");
+//	return true;
+//};
 
 //struct PoiseuilleSettingStruct {
 //	double PIn;
@@ -1173,6 +1173,85 @@ bool RunSODTest() {
 //	return 0;
 //};
 
+//SOD Test new version
+class SodTestInitialConditions : public InitialConditions::InitialConditions
+{
+public:
+	virtual std::vector<double> getInitialValues(const Cell& cell) {
+		std::vector<double> initValues;
+			//http://en.wikipedia.org/wiki/Sod_shock_tube
+			//Grid sizes
+			double Lx = 0.02; // SI 2 cm				
+
+			//Other velocities
+			double v = 0;
+			double w = 0;
+
+			//Left state
+			double roL = 1.0;
+			double PL = 1.0;
+			double uL = 0;
+			
+			//Right state
+			double roR = 0.125;
+			double PR = 0.1;
+			double uR = 0;
+
+			//Cell center
+			double x = cell.CellCenter.x;
+			double y = cell.CellCenter.y;
+			double z = cell.CellCenter.z;
+				
+			//Values
+			double u = 0;
+			double ro = 0;
+			double roE = 0;
+			if (x <= 0.5) {
+				ro = roL;
+				u = uL;
+				roE = PL/(_gasModel->Gamma - 1.0);
+			} else {
+				ro = roR;
+				u = uR;
+				roE = PR/(_gasModel->Gamma - 1.0);
+			};
+			
+			//Convert to conservative variables
+			initValues.resize(_gasModel->nConservativeVariables);
+			initValues[0] = ro;
+			initValues[1] = ro * u;
+			initValues[2] = ro * v;
+			initValues[3] = ro * w;
+			initValues[4] = roE;// + (u*u + v*v + w*w) / 2.0);
+
+			return initValues;		
+	};
+};
+
+void runSodTest(int argc, char *argv[]) {
+	Kernel _kernel;	
+	_kernel.Initilize(&argc, &argv);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 1000, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
+	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
+	//_kernel.ReadInitialConditions("FlowSolution.E:1");
+	_kernel.ReadConfiguration("");	
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	SodTestInitialConditions ic;
+	_kernel.GenerateInitialConditions(ic);	
+
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();	
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	//_kernel.SaveSolution();
+	//_kernel.SaveGrid("grid.cgns");
+	_kernel.Finalize();	
+};
+
 //Main program ))
 int main(int argc, char *argv[]) {		
 	//SimpleChannelTest(); return 0;
@@ -1190,18 +1269,21 @@ int main(int argc, char *argv[]) {
     
 	//RunSODTest();
 	//return 0;
+
+	runSodTest(argc, argv);
+	return 0;
 	
 	Kernel _kernel;	
 	_kernel.Initilize(&argc, &argv);
-	//Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 2, 2, 1.0, 1.0, 1.0, 1.0);
-	//_kernel.BindGrid(_grid);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 30, 90, -0.25, 0.25, -0.75, 0.75, 1.0, 1.0);
+	_kernel.BindGrid(_grid);
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
-	_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
-	_kernel.ReadInitialConditions("FlowSolution.E:1");
+	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
+	//_kernel.ReadInitialConditions("FlowSolution.E:1");
 	_kernel.ReadConfiguration("");
 	_kernel.InitCalculation();
 	_kernel.RunCalculation();
-	_kernel.FinalizeCalculation();
+	_kernel.FinalizeCalculation();	
 	_kernel.SaveGrid("result.cgns");
 	_kernel.SaveSolution("result.cgns", "Solution");
 	//_kernel.SaveSolution();

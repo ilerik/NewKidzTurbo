@@ -18,12 +18,11 @@ public:
 
 	//Thermodynamic Gas Model Structure
 	ModelType_t GasModel;
-	
-	//Temporary gas model fields
 	double IdealGasConstant;
 	double SpecificHeatRatio;
-	double SpecificHeatRatioVolume;
-	double SpecificHeatRatioPressure;
+	double SpecificHeatVolume;
+	double SpecificHeatPressure;
+
 
 	//Boundary conditions		
 	std::map<std::string, BoundaryConditionConfiguration> BoundaryConditions;

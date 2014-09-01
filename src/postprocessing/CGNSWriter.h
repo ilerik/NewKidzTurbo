@@ -95,7 +95,11 @@ protected:
 		int nDataSet;
 	} m_boco; 
 
-	std::string fileLocation;
+	std::string fileLocation; //File location
+
+	//Dictionary of created solution nodes to their indexes
+	std::map<std::string, int> solutionNameToS;
+
 public:
 	
 	//Constructor
@@ -126,6 +130,7 @@ public:
 
 	//Open existing file
 	void OpenFile(std::string fname) {		
+		//Open file for modification
 		int mode = CG_MODE_MODIFY;
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Opening cgns file " + fname + " for writing.");				
 		if (_parallelHelper->IsMaster()) {
@@ -133,6 +138,35 @@ public:
 		};
 		fileLocation = fname;
 		_parallelHelper->Barrier();
+
+		//Obtain information about existing solution nodes
+		int nSolutions = 0;		
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Getting information about existing solutions.");				
+		if (_parallelHelper->IsMaster()) {
+			//Trying to get solutions number
+			int ierror = cg_nsols(m_file.idx, m_base.idx, m_zone.idx, &nSolutions );
+			if (ierror) {
+				//Error while reading asuuming no solutions
+				_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Could't get any solutions info. Assuming no solutions exist.");	
+			};
+		};
+		
+		//Reading names of all exiting solutions
+		char solName[256]; //TO DO remove hardcode (use cgns constant instead)
+		solutionNameToS.clear();		
+		for (int S = 0; S<nSolutions; S++) {
+			if (_parallelHelper->IsMaster()) {				
+				GridLocation_t gridLocation;
+				CALL_CGNS(cg_sol_info(m_file.idx, m_base.idx, m_zone.idx, S, solName, &gridLocation));
+				
+				//We dont support other grid locations
+				if (gridLocation == GridLocation_t::CellCenter) {					
+					solutionNameToS[std::string(solName)] = S; //Add solution name
+				};
+			};			
+		};
+		_parallelHelper->Barrier();
+
 	};	
 
 	//Write grid structure to file
@@ -224,8 +258,27 @@ public:
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing grid.");				
 	};
 
+	//Write new solution node to file
+	void WriteSolution(Grid& grid, std::string solutionName) {		
+		//Write solution node		
+		int S;
+		CALL_CGNS(cg_sol_write(m_file.idx, m_base.idx, m_zone.idx, solutionName.c_str(), CellCenter, &S));
+		solutionNameToS[ solutionName ] = S;
+	};
+
 	//Write physical field to file 
 	void WriteField(Grid& grid, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
+		//Check if solution node was created
+		int S;
+		bool isExistingSolution = (solutionNameToS.find(solutionName) != solutionNameToS.end());		
+		if (!isExistingSolution) {
+			//Error trying to write solution that wasnt created
+			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Solution with name " + solutionName + "doenst exist. Cant write data");
+			exit(0);
+		} else {
+			S = solutionNameToS[solutionName];
+		};
+
 		//Check if variable array lenght equals number of local cells
 		if (variable.size() != grid.nCellsLocal) {
 			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Number of field variebles doesn't equal to number of cells.");
@@ -240,11 +293,7 @@ public:
 		std::vector<double> AllVariables;
 		_parallelHelper->GathervDouble(variable, nCellsPerProcessor, AllVariables);
 
-		if (_parallelHelper->IsMaster()) {
-			//Write solution node first if it doesnt exist
-			int S;
-			CALL_CGNS(cg_sol_write(m_file.idx, m_base.idx, m_zone.idx, solutionName.c_str(), CellCenter, &S));
-
+		if (_parallelHelper->IsMaster()) {			
 			//Write flow field data
 			int F;
 			CALL_CGNS(cg_field_write(m_file.idx, m_base.idx, m_zone.idx, S, RealDouble, fieldName.c_str(), &AllVariables[0], &F));

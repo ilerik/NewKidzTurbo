@@ -4,6 +4,7 @@
 #include "datatypes.h"
 #include "basetypes.h"
 #include "grid.h"
+#include "GasModel.h"
 
 class Roe3DSolverPerfectGas {
 	//Required info
@@ -28,26 +29,34 @@ public:
 	};
 
 	//Numerical flux
-	std::vector<double> F(ConservativeVariables U, Vector n)
+	std::vector<double> F(GasModel::ConservativeVariables U, Vector n)
 	{		
 		std::vector<double> res(5,0);		
 		double ro = U.ro;
 		double vx = U.rou/ro;
 		double vy = U.rov/ro;
 		double vz = U.row/ro;
-		double roe = U.roE;	//ro*e
-		double p = (gamma-1.0)*(roe-ro*(vx*vx+vy*vy+vz*vz)/2.0) - opP;		
-		res[0] = n.x * (ro*vx) + n.y*(ro*vy) + n.z*(ro*vz);
+		double roE = U.roE;	//ro*e
+		double p = (gamma-1.0)*(roE-ro*(vx*vx+vy*vy+vz*vz)/2.0) - opP;		
 		double vn = vx*n.x + vy*n.y + vz*n.z;
+
+		/*res[0] = n.x * (ro*vx) + n.y*(ro*vy) + n.z*(ro*vz);		
 		res[1] = n.x * (ro*vx*vx+p) + n.y*(ro*vx*vy) + n.z*(ro*vx*vz);
 		res[2] = n.x * (ro*vy*vx) + n.y*(ro*vy*vy+p) + n.z*(ro*vy*vz);
 		res[3] = n.x * (ro*vz*vx) + n.y*(ro*vz*vy) + n.z*(ro*vz*vz+p);
-		res[4] = (n.x * vx + n.y * vy + n.z * vz)*(roe+p);		
+		res[4] = (n.x * vx + n.y * vy + n.z * vz)*(roe+p);		*/
+
+		res[0] = ro*vn;
+		res[1] = ro*vn*vx + n.x*p;
+		res[2] = ro*vn*vy + n.y*p;
+		res[3] = ro*vn*vz + n.z*p;
+		res[4] = vn*(roE + p);
 		return res;
 	};
 
 	//Solve riemann problem
-	std::vector<double> ComputeFlux(const ConservativeVariables& UL, const ConservativeVariables& UR, const Face& f) {
+	//std::vector<double> ComputeFlux(const ConservativeVariables& UL, const ConservativeVariables& UR, const Face& f) {
+	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		std::vector<double> res(5,0);
 					
 		//for (int i = 0; i<nv; i++) printf("%lg\n", res[i]);
