@@ -3,9 +3,18 @@
 
 #include "grid.h"
 #include "cgnslib.h"
+#include "parallelHelper.h"
+#include <assert.h>
 
-Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_y)
+Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
 {
+	double size_x = x_max - x_min;
+	double size_y = y_max - y_min;
+	int rank = pHelper->getRank();
+	int nProc = pHelper->getProcessorNumber();
+	int cartI;
+	int cartJ;
+
 	//Generate grid topology
 	Grid g;
 	N++;
@@ -31,19 +40,23 @@ Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_
 		};
 	};
 	y_p[0] = 0;
-	y_p[M-1] = size_y;	
-	for (int i = 0; i<N; i++) {
-		for (int j = 0; j<M; j++) {
+	y_p[M-1] = size_y;
+	g.localNodes.clear();	
+	for (int j = 0; j<M; j++) {
+		for (int i = 0; i<N; i++) {
 			Node new_node;
 			new_node.GlobalIndex = i + j * N;
-			new_node.P.x = x_p[i];//(size_x*i) / (N-1);
-			new_node.P.y = y_p[j];//(size_y*j) / (M-1);
+			new_node.P.x = x_p[i] + x_min;//(size_x*i) / (N-1);
+			new_node.P.y = y_p[j] + y_min;//(size_y*j) / (M-1);
 			new_node.P.z = 0;
-			g.nodes.add(new_node); 
+			g.localNodes.push_back(new_node); 
 		};
 	};	
-	for (int i = 0; i<(N-1); i++) {
-		for (int j = 0; j<(M-1); j++) {
+
+	//Create cells
+	g.nCells = (N-1)*(M-1);	
+	for (int j = 0; j<(M-1); j++) {
+		for (int i = 0; i<(N-1); i++) {
 			Cell c;
 			c.GlobalIndex = i + j*(N-1);
 			c.Nodes.resize(4);
@@ -53,114 +66,160 @@ Grid GenGrid2D(int N, int M, double size_x, double size_y, double q_x, double q_
 			c.Nodes[3] = (i+1) + j*N;			
 			c.CellCenter = Vector(0,0,0);
 			for (int k = 0; k<c.Nodes.size(); k++) {
-				c.CellCenter =  c.CellCenter + g.nodes[c.Nodes[k]].P;
+				c.CellCenter =  c.CellCenter + g.localNodes[c.Nodes[k]].P;
 			};
 			c.CellCenter = (1.0/c.Nodes.size()) * c.CellCenter;		
-			c.CellVolume = ((g.nodes[c.Nodes[1]].P-g.nodes[c.Nodes[0]].P).mod()) * ((g.nodes[c.Nodes[2]].P-g.nodes[c.Nodes[1]].P).mod());
-			c.Faces.resize(4);
-			c.Faces[0] = i*(M-1) + j;
-			c.Faces[1] = (i+1)*(M-1) + j;
-			c.Faces[2] = (i + j*(N-1)) + N*(M-1);
-			c.Faces[3] = (i + (j+1)*(N-1)) + N*(M-1);			
+			c.CellVolume = ((g.localNodes[c.Nodes[1]].P-g.localNodes[c.Nodes[0]].P).mod()) * ((g.localNodes[c.Nodes[2]].P-g.localNodes[c.Nodes[1]].P).mod());			
 			c.CellHSize = 0;
 			c.CGNSType = QUAD_4;
-			g.cells.add(c);
+			c.IsDummy = false;
+			g.Cells.push_back(c);
 		};
+	};
+	g.nProperCells = g.nCells;		
+
+	//Dummy cells and connectivity info	
+	for (int j = 0; j<(M-1); j++) {
+		for (int i = 0; i<(N-1); i++) {
+			int cIndex = i + j*(N-1);
+			//Left neighbour
+			int neighbour = -1;
+			if ((i == 0) && (!periodicX)) {				
+				//Create dummy cell
+				Cell dummyCell;
+				dummyCell.GlobalIndex = g.nCells++;
+				dummyCell.NeigbourCells.push_back(cIndex);
+				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + j * N);
+				dummyCell.Nodes.push_back(i + (j+1) * N);
+				dummyCell.BCMarker = 1;				
+				g.Cells.push_back(dummyCell);
+				neighbour = dummyCell.GlobalIndex;
+			};
+			if ((i == 0) && (periodicX)) neighbour = N-2 + j*(N-1);			
+			if (i != 0) neighbour = i-1 + j*(N-1);
+			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
+
+			//Right neighbour
+			if ((i == N-2) && (!periodicX)) {				
+				//Create dummy cell
+				Cell dummyCell;
+				dummyCell.GlobalIndex = g.nCells++;
+				dummyCell.NeigbourCells.push_back(cIndex);
+				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i+1 + j * N);
+				dummyCell.Nodes.push_back(i+1 + (j+1) * N);
+				dummyCell.BCMarker = 2;				
+				g.Cells.push_back(dummyCell);
+				neighbour = dummyCell.GlobalIndex;
+			};
+			if ((i == N-2) && (periodicX)) neighbour = 0 + j*(N-1);			
+			if (i != N-2) neighbour = i+1 + j*(N-1);
+			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
+
+			//Top neighbour
+			if ((j == 0) && (!periodicY)) {				
+				//Create dummy cell
+				Cell dummyCell;
+				dummyCell.GlobalIndex = g.nCells++;
+				dummyCell.NeigbourCells.push_back(cIndex);
+				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + j * N);
+				dummyCell.Nodes.push_back(i+1 + j * N);
+				dummyCell.BCMarker = 3;				
+				g.Cells.push_back(dummyCell);
+				neighbour = dummyCell.GlobalIndex;
+			};
+			if ((j == 0) && (periodicY)) neighbour = i + (M-2)*(N-1);			
+			if (j != 0) neighbour = i + (j-1)*(N-1);
+			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
+
+			//Bottom neighbour
+			if ((j == M-2) && (!periodicY)) {				
+				//Create dummy cell
+				Cell dummyCell;
+				dummyCell.GlobalIndex = g.nCells++;
+				dummyCell.NeigbourCells.push_back(cIndex);
+				dummyCell.IsDummy = true;
+				dummyCell.CGNSType = BAR_2;				
+				dummyCell.Nodes.clear();
+				dummyCell.Nodes.push_back(i + (j+1) * N);
+				dummyCell.Nodes.push_back(i+1 + (j+1) * N);				
+				dummyCell.BCMarker = 4;				
+				g.Cells.push_back(dummyCell);
+				neighbour = dummyCell.GlobalIndex;
+			};
+			if ((j == M-2) && (periodicY)) neighbour = i + 0*(N-1);			
+			if (j != M-2) neighbour = i+1 + (j+1)*(N-1);
+			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
+		}
+	}
+	
+	g.nDummyCells = g.Cells.size() - g.nProperCells;
+
+	//Fill in connectivity info
+	g.vdist.clear();
+	g.xadj.clear();
+	g.adjncy.clear();
+
+	//TO DO generalize
+	int nProcessors = pHelper->getProcessorNumber();
+	int vProc = g.nProperCells / nProcessors;
+	int vLeft = g.nProperCells % nProcessors;
+	g.vdist.resize(nProcessors + 1);
+	g.vdist[0] = 0;
+	for (int i = 0; i<nProcessors; i++) {
+		g.vdist[i+1] = g.vdist[i] + vProc;
+		if (vLeft > 0) {
+			g.vdist[i+1]++;
+			vLeft--;
+		};
+	};
+	g.vdist[nProcessors] = g.nProperCells;
+
+	/*assert(nProc == 1);
+	g.vdist.push_back(0);		
+	g.vdist.push_back(g.nProperCells);*/
+
+	int currentInd = 0;
+	g.xadj.push_back(currentInd);
+	for (int i = g.vdist[rank]; i < g.vdist[rank + 1]; i++)
+	{			
+		Cell& cell = g.Cells[i];				
+		for (int j = 0; j<cell.NeigbourCells.size(); j++) {
+			int nIndex = cell.NeigbourCells[j];
+			if (nIndex >= g.nProperCells) continue; //Skip dummy
+			g.adjncy.push_back(nIndex);
+			currentInd++;
+		};
+		g.xadj.push_back(currentInd);
 	};
 
-	//Vertical first
-	for (int i = 0; i<N; i++) {
-		for (int j = 0; j<M-1; j++) {
-			Face new_face;		
-			new_face.GlobalIndex = i*(M-1) + j;
-			new_face.FaceNodes.clear();
-			new_face.FaceNodes.push_back(i + j * N);
-			new_face.FaceNodes.push_back(i + (j+1) * N);
-			new_face.FaceSquare = (g.nodes[new_face.FaceNodes[1]].P - g.nodes[new_face.FaceNodes[0]].P).mod();
-			new_face.FaceCenter = Vector(0,0,0);
-			for (int k = 0; k<new_face.FaceNodes.size(); k++) {
-				new_face.FaceCenter = new_face.FaceCenter + g.nodes[new_face.FaceNodes[k]].P;
-			};
-			new_face.FaceCenter = (1.0/new_face.FaceNodes.size()) * new_face.FaceCenter;
-			if (i == 0) {
-				//Left border
-				new_face.FaceNormal = Vector(-1, 0, 0);
-				new_face.isExternal = true;
-				new_face.BCMarker = 1;
-				new_face.FaceCell_1 = i + j*(N-1);
-				new_face.FaceCell_2 = -1;
-			};
-			if (i == N-1) {
-				//Right border
-				new_face.FaceNormal = Vector(1, 0, 0);
-				new_face.isExternal = true;
-				new_face.BCMarker = 2;
-				new_face.FaceCell_1 = (i-1) + j*(N-1);
-				new_face.FaceCell_2 = -1;
-			};
-			if ((i!=0) && (i!=N-1)) {
-				//Inner face
-				new_face.FaceNormal = Vector(1, 0, 0);
-				new_face.isExternal = false;
-				new_face.BCMarker = -1;
-				new_face.FaceCell_1 = (i-1) + j*(N-1);
-				new_face.FaceCell_2 = i + j*(N-1);
-			};
-			//new_face.FaceNormal = new_face.FaceNormal * new_face.FaceSquare;
-			g.faces.add(new_face);
-		};
-	};
-	//Horisontal now
-	for (int i = 0; i<N-1; i++) {
-		for (int j = 0; j<M; j++) {
-			Face new_face;		
-			new_face.GlobalIndex = N*(M-1) + j * (N-1) + i;
-			new_face.FaceNodes.clear();
-			new_face.FaceNodes.push_back(i + j * N);
-			new_face.FaceNodes.push_back(i+1 + j * N);
-			new_face.FaceSquare = (g.nodes[new_face.FaceNodes[1]].P - g.nodes[new_face.FaceNodes[0]].P).mod();
-			new_face.FaceCenter = Vector(0,0,0);
-			for (int k = 0; k<new_face.FaceNodes.size(); k++) {
-				new_face.FaceCenter = new_face.FaceCenter + g.nodes[new_face.FaceNodes[k]].P;
-			};
-			new_face.FaceCenter = (1.0/new_face.FaceNodes.size()) * new_face.FaceCenter;
-			if (j == 0) {
-				//Bottom border
-				new_face.FaceNormal = Vector(0, -1, 0);
-				new_face.isExternal = true;
-				new_face.BCMarker = 3;
-				new_face.FaceCell_1 = i + j*(N-1);
-				new_face.FaceCell_2 = -1;
-			};
-			if (j == M-1) {
-				//Top border
-				new_face.FaceNormal = Vector(0, 1, 0);
-				new_face.isExternal = true;
-				new_face.BCMarker = 4;
-				new_face.FaceCell_1 = i + (j-1)*(N-1);
-				new_face.FaceCell_2 = -1;
-			};
-			if ((j!=0) && (j!=M-1)) {
-				//Inner face
-				new_face.FaceNormal = Vector(0, 1, 0);
-				new_face.isExternal = false;
-				new_face.BCMarker = -1;
-				new_face.FaceCell_1 = i + (j-1)*(N-1);
-				new_face.FaceCell_2 = i + j*(N-1);
-			};
-			//new_face.FaceNormal = new_face.FaceNormal * new_face.FaceSquare;
-			g.faces.add(new_face);
-		};
-	};		
+	//Eliminate non local cells		
+	g.nCellsLocal = -g.vdist[rank] + g.vdist[rank + 1];		
+	//g.Cells.erase(g.Cells.begin() + g.vdist[rank + 1], g.Cells.end());
+	//g.Cells.erase(g.Cells.begin(), g.Cells.begin() + g.vdist[rank]);	
 
 	//Fill in grid info
-
+	g.gridInfo.CellDimensions = 2;	
+	
 	//Add boundary names
-	g.addPatch("left", 1);
-	g.addPatch("right", 2);
-	g.addPatch("bottom", 3);
-	g.addPatch("top", 4);
-	g.ConstructAndCheckPatches();
+	if (!periodicX) {
+		g.addPatch("left", 1);
+		g.addPatch("right", 2);
+	};
+	if (!periodicY) {
+		g.addPatch("bottom", 3);
+		g.addPatch("top", 4);
+	};
+	//g.ConstructAndCheckPatches();
+	pHelper->Barrier();
 	
 	return g;
 };

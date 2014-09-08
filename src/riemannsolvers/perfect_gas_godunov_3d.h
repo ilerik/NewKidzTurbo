@@ -23,7 +23,7 @@ public:
 		eps = _eps;
 	};
 
-	double GetPressure(const ConservativeVariables& celldata) {
+	double GetPressure(const GasModel::ConservativeVariables& celldata) {
 		double ro = celldata.ro;
 		double vx = celldata.rou/celldata.ro;
 		double vy = celldata.rov/celldata.ro;
@@ -34,7 +34,7 @@ public:
 	};
 
 	//Numerical flux
-	std::vector<double> F(ConservativeVariables U, Vector n)
+	std::vector<double> F(GasModel::ConservativeVariables U, Vector n)
 	{		
 		std::vector<double> res(5,0);		
 		double ro = U.ro;
@@ -271,7 +271,7 @@ public:
 	  	
 
 	//Solve riemann problem
-	std::vector<double> ComputeFlux(const ConservativeVariables& UL, const ConservativeVariables& UR, const Face& f) {
+	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		std::vector<double> res(5,0);		
 		Vector velocityL = Vector(UL.rou, UL.rov, UL.row) / UL.ro;
 		Vector velocityR = Vector(UR.rou, UR.rov, UR.row) / UR.ro;
@@ -403,7 +403,7 @@ public:
 		};
 
 		//Compute flux given variables values at point S = 0
-		ConservativeVariables U;
+		GasModel::ConservativeVariables U;
 		U.ro = ro;
 		Vector V; 
 		if (starValues.uStar > S) {

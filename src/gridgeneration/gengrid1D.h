@@ -10,8 +10,7 @@ Grid GenGrid1D(int N, double lBegin, double lEnd, Vector direction)
 	//Normalize direction
 	direction = direction / direction.mod();
 
-	//Grid parameters
-	g.GridID = 1;
+	//Grid parameters	
 	g.gridInfo.GridDimensions = 1;
 	g.gridInfo.CellDimensions = 1;
 	g.gridInfo.nCoords = 3;
@@ -53,7 +52,7 @@ Grid GenGrid1D(int N, double lBegin, double lEnd, Vector direction)
 		c.Faces[1] = (i+1);		
 		c.CellHSize = 0;
 		c.CGNSType = BAR_2;
-		g.ComputeGeometricProperties(c);				
+		g.ComputeGeometricProperties(&c);				
 		//Add cell
 		g.cells.add(c);		
 	};
@@ -82,7 +81,7 @@ Grid GenGrid1D(int N, double lBegin, double lEnd, Vector direction)
 			new_face.FaceCell_2 = -1;
 		};		
 		new_face.CGNSType = NODE;
-		g.ComputeGeometricProperties(new_face);
+		g.ComputeGeometricProperties(&new_face);
 
 		//Adjust first cell facenormal
 		if (i == 0) {

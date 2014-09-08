@@ -82,12 +82,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cgns.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Debug;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\em64t\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cgns.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;msmpi.lib;parmetis.lib;metis.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Debug;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\em64t\lib;libs\MicrosoftMPI\Lib\amd64;libs\parmetis-4.0.3\lib</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -113,31 +116,50 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\linearsolvers;libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cgns.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Release;%(AdditionalLibraryDirectories);libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\em64t\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cgns.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;msmpi.lib;parmetis.lib;metis.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>libs\cgnslib_3.1.4\build\src\Release;%(AdditionalLibraryDirectories);libs\blas;C:\Program Files\Intel\MKL\10.2.6.037\em64t\lib;libs\MicrosoftMPI\Lib\amd64;libs\parmetis-4.0.3\lib</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="kernel.h" />
+    <ClInclude Include="src\boundaryconditions\BCSupersonicInlet.h" />
+    <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
+    <ClInclude Include="src\boundaryconditions\BCWallViscousIsothermal.h" />
+    <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
+    <ClInclude Include="src\boundaryconditions\BoundaryConditions.h" />
+    <ClInclude Include="src\gasmodels\GasModel.h" />
+    <ClInclude Include="src\gasmodels\PerfectGas.h" />
     <ClInclude Include="src\grid.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
     <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
+    <ClInclude Include="src\gridloading\CGNSReader.h" />
     <ClInclude Include="src\gridloading\triangleload.h" />
+    <ClInclude Include="src\initialConditions\InitialConditions.h" />
     <ClInclude Include="src\linearsolvers\bicgstab.h" />
     <ClInclude Include="src\linearsolvers\cgCUDA.h" />
     <ClInclude Include="src\linearsolvers\gmres.h" />
+    <ClInclude Include="src\mainsolver\configuration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
+    <ClInclude Include="src\mainsolver\kernel.h" />
+    <ClInclude Include="src\mainsolver\logger.h" />
+    <ClInclude Include="src\mainsolver\parallelHelper.h" />
     <ClInclude Include="src\model.h" />
     <ClInclude Include="src\patch.h" />
+    <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
@@ -146,10 +168,17 @@
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp" />
-    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibmisc.cpp" />
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibmisc.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\ap.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\dataanalysis.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\diffequations.cpp" />
@@ -161,7 +190,17 @@
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\solvers.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\specialfunctions.cpp" />
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\main.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="config.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

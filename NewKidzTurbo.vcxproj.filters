@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\TurbulenceModels">
-      <UniqueIdentifier>{32ba5afc-9e16-4675-8d62-7b6bb8346558}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Utility">
       <UniqueIdentifier>{254123d7-02e9-4660-8dbb-8f49379aee41}</UniqueIdentifier>
     </Filter>
@@ -36,6 +33,27 @@
     </Filter>
     <Filter Include="Header Files\LinearSolvers\CUDA">
       <UniqueIdentifier>{ffb8e916-a97d-47bc-bab5-9f380f453cb1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MainSolver">
+      <UniqueIdentifier>{58eba5fb-c366-4b34-ac72-0518b5dae301}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\TurbulenceModels">
+      <UniqueIdentifier>{32ba5afc-9e16-4675-8d62-7b6bb8346558}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\PostProcessing">
+      <UniqueIdentifier>{c1529263-09a6-4cf1-9b0d-5907e75a5617}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\BoundaryConditions">
+      <UniqueIdentifier>{39445cbe-c818-41b4-a15f-0e6fa09db068}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\InitialConditions">
+      <UniqueIdentifier>{2bb16e69-4061-431a-baec-c92337aa010c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MainSolver\Configuration">
+      <UniqueIdentifier>{a25b54e8-5715-4d6f-9d26-cc0c8a058435}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\GasModels">
+      <UniqueIdentifier>{4da2224d-8a78-406a-a5d8-084bf6b97158}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -99,8 +117,59 @@
     <ClInclude Include="src\gridloading\triangleload.h">
       <Filter>Header Files\GridLoading</Filter>
     </ClInclude>
-    <ClInclude Include="kernel.h">
+    <ClInclude Include="src\mainsolver\kernel.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\logger.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gridloading\CGNSReader.h">
+      <Filter>Header Files\GridLoading</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\parallelHelper.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BoundaryCondition.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\postprocessing\CGNSWriter.h">
+      <Filter>Header Files\PostProcessing</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\configuration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gasmodels\GasModel.h">
+      <Filter>Header Files\GasModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gasmodels\PerfectGas.h">
+      <Filter>Header Files\GasModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BoundaryConditions.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCSupersonicInlet.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCWallViscousIsothermal.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\initialConditions\InitialConditions.h">
+      <Filter>Header Files\InitialConditions</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -146,5 +215,13 @@
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp">
       <Filter>Header Files\Alglib</Filter>
     </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="config.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

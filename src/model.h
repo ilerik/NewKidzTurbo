@@ -19,6 +19,7 @@
 //Step info
 class StepInfo {
 public:
+	double Time;
 	double TimeStep;
 	std::vector<double> Residual;
 	ConservativeVariables ResidualNew;
@@ -2098,16 +2099,20 @@ public:
 			ofs<<"\"u\"\n";
 			ofs<<"\"P\"\n";
 			ofs<<"\"T\"\n";
+			ofs<<"\"e\"\n";
 			ofs<<"ZONE\n";
 
 			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
 			for (int i = 0; i<cells.size(); i++) {			
-				Cell& c = *cells[i];								
+				Cell& c = *cells[i];		
+				double ro = U[c.GlobalIndex].ro;
+				double V = GetVelocity(U[c.GlobalIndex]).mod();
 				ofs<<c.CellCenter.x<<"\n";
-				ofs<<U[c.GlobalIndex].ro<<"\n";
+				ofs<<ro<<"\n";
 				ofs<<GetVelocity(U[c.GlobalIndex]).x<<"\n";
 				ofs<<GetPressure(U[c.GlobalIndex])<<"\n";
 				ofs<<GetTemperature(U[c.GlobalIndex])<<"\n";
+				ofs<<(U[c.GlobalIndex].roE - ro*V*V/2.0) / ro<<"\n";
 				ofs<<"\n";
 			};		
 		};

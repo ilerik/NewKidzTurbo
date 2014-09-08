@@ -4,8 +4,9 @@
 #include "stdlib.h"
 #include "grid.h"
 #include "cgnslib.h"
+#include "parmetis.h"
 
-int GetElementDimensions(ElementType_t type) {
+int GetCGNSElementDimensions(ElementType_t type) {
 	int dim = -1;
 	switch (type) {
 	//0D Elements
@@ -17,13 +18,30 @@ int GetElementDimensions(ElementType_t type) {
 	//2D Elements
 	case QUAD_4:
 		return 2;
+	case TRI_3:
+		return 2;		
 	//3D Elements
 	case HEXA_8:
+		return 3;	
+	case PENTA_6:
 		return 3;
-	}
+	case TETRA_4:
+		return 3;
+	}	
 
 	if (dim == -1) std::cout<<"Unknown element type\n";
 	return dim;
+};
+
+bool IsSupprotedCGNSEelementType(ElementType_t type) {
+	if (type == NODE) return true;
+	if (type == BAR_2) return true;
+	if (type == QUAD_4) return true;
+	if (type == HEXA_8) return true;
+	if (type == TRI_3) return true;
+	if (type == TETRA_4) return true;
+	if (type == PENTA_6) return true;
+	return false;
 };
 
 
@@ -212,7 +230,7 @@ Grid LoadCGNSGrid(std::string fname) {
 		//Create cells if its main section (contains elements with dim = physDim)
 		//For now we assume that all volume elements are in one section so following condition must hold
 		bool isVolumeElementsSection = false;
-		if ((nVolElements == nElements) && (GetElementDimensions(type) == grid.gridInfo.CellDimensions)) {
+		if ((nVolElements == nElements) && (GetCGNSElementDimensions(type) == grid.gridInfo.CellDimensions)) {
 			isVolumeElementsSection = true;
 		};
 
@@ -227,10 +245,10 @@ Grid LoadCGNSGrid(std::string fname) {
 			counter++;
 			newCell.CGNSType = type;	
 			//Fill in geometric properties
-			grid.ComputeGeometricProperties(newCell);
+			grid.ComputeGeometricProperties(&newCell);
 
 			//Obtain faces based on cell type
-			std::vector<Face> newFaces = grid.ObtainFaces(newCell);
+			std::vector<Face> newFaces = grid.ObtainFaces(&newCell);
 			for (int i = 0; i<newFaces.size(); i++) {				
 				std::set<int> idx; for (int j = 0; j<newFaces[i].FaceNodes.size(); j++) idx.insert(newFaces[i].FaceNodes[j]);
 
@@ -247,7 +265,7 @@ Grid LoadCGNSGrid(std::string fname) {
 					face.GlobalIndex = faceGlobalIndex++;
 					face.FaceCell_1 = newCell.GlobalIndex;
 					face.isExternal = true;
-					grid.ComputeGeometricProperties(face);	
+					grid.ComputeGeometricProperties(&face);	
 
 					//Adjust face normal to point outside the cell
 					double df = face.FaceNormal * (newCell.CellCenter - face.FaceCenter);
@@ -325,6 +343,80 @@ Grid LoadCGNSGrid(std::string fname) {
 	cg_close (cgfile);
 
 	return grid;
+};
+
+void ReadGridInfo(Grid& grid, std::string fname) {
+	BCType_t bcType;
+	int cgfile, mode = CG_MODE_READ;
+
+	//Open CGNS file
+	//printf ("opening cgns file <%s> ...\n", fname.c_str());
+    //fflush (stdout);
+	if (cg_open (fname.c_str(), mode, &cgfile)) cg_error_exit();
+
+	/* Determine the of bases in the grid. This example assumes */
+	/* one base. However it is allowed to have multiple bases. */
+   
+	int nBases;
+	if(cg_nbases(cgfile, &nBases)!= CG_OK) cg_error_exit();
+	if(nBases != 1) {
+		std::cout<< "This CGNS loader assumes one base\n";
+		exit(1);
+	};
+	int base = 1;
+
+	/* Check the cell and physical dimensions of the base. */
+	
+	int physDim;
+	int cellDim;
+	char cgnsName[255];
+	if(cg_base_read(cgfile, base, cgnsName, &cellDim, &physDim) != CG_OK) cg_error_exit();
+
+	// grid info
+	grid.gridInfo.CellDimensions = cellDim;
+	grid.gridInfo.GridDimensions = physDim;
+
+
+	/* Read the number of zones in the grid. */
+	/* This example assumes one zone. */
+
+	int nZones;
+	if(cg_nzones(cgfile, base, &nZones) != CG_OK) cg_error_exit();     
+	if(nZones != 1) {
+		std::cout<< "This CGNS loader assumes one zone\n";
+		exit(1);
+	}
+	int zone = 1;
+
+	/* Check the zone type. This should be Unstructured. */
+
+	ZoneType_t zoneType;
+	if(cg_zone_type(cgfile, base, zone, &zoneType) != CG_OK) cg_error_exit(); 		
+	if(zoneType != Unstructured) {
+		std::cout<< "Unstructured zone expected\n";
+		exit(1);
+	};
+
+	/* Determine the number of vertices and volume elements in this */
+	/* zone (and thus in the grid, because one zone is assumed). */
+
+	char zoneName[255];
+	cgsize_t sizes[3];
+	if(cg_zone_read(cgfile, base, zone, zoneName, sizes) != CG_OK) cg_error_exit();		
+	int nVertices    = sizes[0];
+	int nVolElements = sizes[1];
+
+	/* Determine the number and names of the coordinates. */
+
+	int nCoords;
+	if(cg_ncoords(cgfile, base, zone, &nCoords) != CG_OK)
+		cg_error_exit();	
+
+	char name[255];
+	DataType_t dataType;
+	if(cg_coord_info(cgfile, base, zone, 1, &dataType, name) != CG_OK)
+		cg_error_exit();	
+
 };
 
 #endif

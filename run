@@ -1,0 +1,2 @@
+#!/bin/bash
+./mpiexec.exe -np 4 /cygdrive/c/Users/Erik/Dropbox/Science/!Projects/GitHub/NewKidzTurbo/x64/Debug/NewKidzTurbo.exe
