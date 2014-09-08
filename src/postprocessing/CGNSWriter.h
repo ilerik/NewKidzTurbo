@@ -165,8 +165,10 @@ public:
 				};
 			};			
 		};
-		_parallelHelper->Barrier();
 
+		_parallelHelper->Barrier();
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished reading solutions info.");	
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished opening file.");	
 	};	
 
 	//Write grid structure to file
@@ -185,7 +187,6 @@ public:
 			for (int j = 0; j<cell->Nodes.size(); j++) LocalElements.push_back(cell->Nodes[j] + 1); //Adjust by 1 for cgns proper numbering
 		};
 		
-
 		//Gather local elements arrays sizes
 		std::vector<int> nLocalElementsSize;
 		_parallelHelper->GatherCounts(LocalElements.size(), nLocalElementsSize);
@@ -260,23 +261,33 @@ public:
 
 	//Write new solution node to file
 	void WriteSolution(Grid& grid, std::string solutionName) {		
-		//Write solution node		
-		int S;
-		CALL_CGNS(cg_sol_write(m_file.idx, m_base.idx, m_zone.idx, solutionName.c_str(), CellCenter, &S));
-		solutionNameToS[ solutionName ] = S;
+		if (_parallelHelper->IsMaster()) {	
+			//Write solution node		
+			int S;
+			CALL_CGNS(cg_sol_write(m_file.idx, m_base.idx, m_zone.idx, solutionName.c_str(), CellCenter, &S));
+			solutionNameToS[ solutionName ] = S;
+		};
+
+		//Synchronize
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing solution node.");				
+		_parallelHelper->Barrier();
 	};
 
 	//Write physical field to file 
 	void WriteField(Grid& grid, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Started writing field " + fieldName + " to solution" + solutionName + ".");				
+
 		//Check if solution node was created
 		int S;
-		bool isExistingSolution = (solutionNameToS.find(solutionName) != solutionNameToS.end());		
-		if (!isExistingSolution) {
-			//Error trying to write solution that wasnt created
-			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Solution with name " + solutionName + "doenst exist. Cant write data");
-			exit(0);
-		} else {
-			S = solutionNameToS[solutionName];
+		if (_parallelHelper->IsMaster()) {				
+			bool isExistingSolution = (solutionNameToS.find(solutionName) != solutionNameToS.end());		
+			if (!isExistingSolution) {
+				//Error trying to write solution that wasnt created
+				_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Solution with name " + solutionName + " doesn't exist. Cant write data");
+				exit(0);
+			} else {
+				S = solutionNameToS[solutionName];
+			};
 		};
 
 		//Check if variable array lenght equals number of local cells
@@ -299,7 +310,9 @@ public:
 			CALL_CGNS(cg_field_write(m_file.idx, m_base.idx, m_zone.idx, S, RealDouble, fieldName.c_str(), &AllVariables[0], &F));
 		};
 
-		_parallelHelper->Barrier();
+		//Synchronize
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing field " + fieldName + " to solution" + solutionName + ".");				
+		_parallelHelper->Barrier();		
 	};
 
 	//Close file

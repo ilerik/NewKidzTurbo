@@ -230,7 +230,7 @@ public:
 	//Nodes
 	std::vector<Node> localNodes; // all grid nodes
 
-	//Cells
+	//Cells	
 	int nCells; //total number of cells
 	int nCellsLocal; //number of local cells (without dummy)
 	int nProperCells; //number of non dummy cells
