@@ -345,9 +345,9 @@ public:
 		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
 
 		//Debug partitioning
-		for (int i = 0; i<_nProcessors; i++) {
+		/*for (int i = 0; i<_nProcessors; i++) {
 			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
-		};		
+		};		*/
 		//for (int i = 0; i<51; i++) _grid.cellsPartitioning[i] = 0;
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
@@ -941,25 +941,28 @@ public:
 			GasModel::ConservativeVariables UL;
 			GasModel::ConservativeVariables UR;
 			//TO DO check for indexes LOCAL vs GLOBAL for cells
-			UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
-			if (!f.isExternal) {			 
-				//If it is local face and both cells local				
-				if (cRight.IsDummy) {
-					//Dummy cell
-					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
-					std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
-					UR = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
-				} else {
-					//Ordinary cell
-					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
-					UR = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
-				};
-			} else {
-				//If it is interprocessor face obtain values from parallel helper
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
-				int globalIndex = cRight.GlobalIndex;
-				UR = _parallelHelper.RequestedValues[globalIndex];
-			};
+			//UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
+			UL = GasModel::ConservativeVariables(GetCellValues(cLeft.GlobalIndex, cellIndexLeft));
+			UR = GasModel::ConservativeVariables(GetCellValues(cRight.GlobalIndex));
+			//if (!f.isExternal) {			 
+			//	//If it is local face and both cells local				
+			//	if (cRight.IsDummy) {
+			//		//Dummy cell
+
+			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
+			//		std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
+			//		UR = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
+			//	} else {
+			//		//Ordinary cell
+			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
+			//		UR = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
+			//	};
+			//} else {
+			//	//If it is interprocessor face obtain values from parallel helper
+			//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
+			//	int globalIndex = cRight.GlobalIndex;
+			//	UR = _parallelHelper.RequestedValues[globalIndex];
+			//};
 
 			//Compute flux
 			flux = rSolver.ComputeFlux( UL,  UR, f);							
@@ -1199,8 +1202,89 @@ public:
 	//Implicit time step
 	void ImplicitTimeStep() {
 	};
-
 	
+	//Compute scalar function gradient in each cell	
+	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {
+	//	//Allocate memory for gradients
+	//	grads.resize(_grid.nCellsLocal);		
+
+	//	//For each cell compute gradient of given function
+	//	std::vector<Vector> nPoints;
+	//	std::vector<double> nValues;
+	//	for (int i = 0; i<_grid.nCellsLocal; i++) {			
+	//		Cell& cell = *_grid.localCells[i];			
+
+	//		//Determine required set of point and values
+	//		nPoints.clear();			
+	//		nValues.clear();			
+
+	//		//Add all neighbours
+	//		for (int j = 0; j<cell.NeigbourCells.size(); j++) {				
+	//			Cell& nCell = _grid.Cells[cell.NeigbourCells[j]];
+	//			std::vector<double> nU;
+	//			if (nCell.
+	//			if (nCell.IsDummy) {
+	//			};
+	//			if (face.isExternal) {
+	//				nU = GetDummyCellValues(values[cell.GlobalIndex], face);
+	//			} else {
+	//				if (face.FaceCell_1 == cell.GlobalIndex) {
+	//					nU = values[face.FaceCell_2];
+	//				} else {
+	//					nU = values[face.FaceCell_1];
+	//				};
+	//			};
+	//			Vector nPoint;
+	//			if (face.isExternal) {
+	//				nPoint = 2 * (face.FaceCenter - cell.CellCenter) + cell.CellCenter;
+	//			} else {
+	//				if (face.FaceCell_1 == cell.GlobalIndex) {
+	//					nPoint = _grid.cells[face.FaceCell_2].CellCenter;
+	//				} else {
+	//					nPoint = _grid.cells[face.FaceCell_1].CellCenter;
+	//				};
+	//			};
+	//			double nValue = (this->*func)(nU);
+	//			nPoints.push_back(nPoint);
+	//			nValues.push_back(nValue);
+	//		};
+
+	//		double cellValue =  (this->*func)(U[cell.GlobalIndex]);
+	//		grads[cell.GlobalIndex] = ComputeGradientByPoints(cell.CellCenter, cellValue, nPoints, nValues);
+	//	};	
+
+	//	return;
+	//};
+
+	inline bool IsLocalCell(int globalIndex) {
+		return _grid.cellsPartitioning[globalIndex] == _parallelHelper.getRank();
+	};
+
+	inline bool IsDummyCell(int globalIndex) {
+		return _grid.Cells[globalIndex].IsDummy;
+	};
+
+	//Get cell values
+	inline std::vector<double> GetCellValues(int globalIndex, int localIndex = -1) {
+		if (IsLocalCell(globalIndex)) {
+			if (IsDummyCell(globalIndex)) {
+				//If dummy cell compute on the go
+				Cell& cell = _grid.Cells[globalIndex];
+				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
+			} else {
+				//If proper cell return part of Values array				
+				if (localIndex == -1) {
+					//If local index is unknown determine it
+					//Lower perfomance WARNING
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];
+				};
+				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
+			};
+		} else {
+			//Return result of interprocessor exchange
+			return _parallelHelper.RequestedValues[globalIndex];
+		};
+	};
 };
 
 #endif

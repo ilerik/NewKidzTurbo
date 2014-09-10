@@ -3,11 +3,11 @@
 
 #include "BoundaryCondition.h"
 
-class BCSupersonicInlet : public BoundaryCondition {
+class BCSupersonicInlet : public BoundaryConditions::BoundaryCondition {
 public:
 	Vector Velocity;
 
-	std::vector<double> getDummyValues(std::vector<double> inV, const Face& face) {
+	std::vector<double> getDummyValues(std::vector<double> inV, , const Cell& dummyCell) {
 		std::vector<double> res = inV;
 		/*Vector V_in(inV.rou, inV.rov, inV.row);
 		V_in = (1.0/inV.ro)*V_in;

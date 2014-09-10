@@ -1232,7 +1232,7 @@ void runSodTest(int argc, char *argv[]) {
 	Kernel _kernel;
 	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 10, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
 	_kernel.BindGrid(_grid);
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
@@ -1262,7 +1262,26 @@ int main(int argc, char *argv[]) {
 	//std::cout<<size<<"\n";		
 	//std::cout<<sizeof(double)<<"\n";
 	//MPI_Finalize();
+	
+	////Gradients unit test
+	//Vector point(0,0,0);
+	//std::vector<Vector> points;
+	//double value = 0;
+	//std::vector<double> values;
 
+	//points.push_back(Vector(0,1,0));
+	//points.push_back(Vector(1,0,0));
+	//points.push_back(Vector(0,-1,0));
+	//points.push_back(Vector(-1,0,0));
+	//points.push_back(Vector(1,0,1));
+	//for (Vector p : points) {
+	//	double val = 2 * p.x + 3 * (p.y * p.y) + 5 * p.z; 
+	//	values.push_back(val);
+	//};
+
+
+	//Vector grad = ComputeGradientByPoints(point, value, points, values);
+	//return 0;
 
 	//SimpleChannelTest(); return 0;
 	//ImplicitSolverTestOneCell(); return 0;
