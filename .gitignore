@@ -13,8 +13,13 @@
 *.sln.docstates
 
 # Build results
+# All debug folder files
+# [Dd]ebug/
+*.idb
+*.unsuccessfulbuild
+*.lastbuildstate
+*.tlog
 
-[Dd]ebug/
 [Rr]elease/
 x64/
 build/
