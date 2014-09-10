@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <set>
+#include <map>
 #include "alglibmisc.h"
 #include "cgnslib.h"
 
@@ -25,6 +26,9 @@ public:
 	//Patch faces and nodes
 	std::set<int> faces_idx;
 	std::set<int> nodes_idx;
+
+	//connectivity list for periodic condition
+	std::map<int, int> periodic_face;
 
 	//KDTree structure and related operations	
 	alglib::kdtree kdt;

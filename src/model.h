@@ -414,6 +414,9 @@ public:
 	MediumProperties medium;
 	double SoartingAngle;
 
+	//external forces
+	Vector g;	//uniform acceleration
+
 	//Properties
 	StepInfo stepInfo;
 	double totalTime;
@@ -448,6 +451,10 @@ public:
 	void SetHartenEps(double eps)
 	{
 		rSolver.SetHartenEps(eps);
+	};
+
+	void SetUniformAcceleration(Vector _g) {
+		g = _g;
 	};
 
 	//TO DO
@@ -754,6 +761,15 @@ public:
 			U[c.GlobalIndex].row += sumFlux[3];
 			U[c.GlobalIndex].roE += sumFlux[4];
 
+			//uniform external field (RT instability)
+			double ro = U[c.GlobalIndex].ro;
+			double vx = U[c.GlobalIndex].rou/ro;
+			double vy = U[c.GlobalIndex].rov/ro;
+			double vz = U[c.GlobalIndex].row/ro;
+			U[c.GlobalIndex].rou += g.x*ro*stepInfo.TimeStep;
+			U[c.GlobalIndex].rov += g.y*ro*stepInfo.TimeStep;
+			U[c.GlobalIndex].row += g.z*ro*stepInfo.TimeStep;
+			U[c.GlobalIndex].roE += (g.x*vx + g.y*vy + g.z*vz)*ro*stepInfo.TimeStep;
 		};
 		
 		for (int i = 0; i<5; i++) stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);	
@@ -902,10 +918,7 @@ public:
 	};
 	virtual double GetTurbHeatConductivity(int FaceInd)
 	{
-		//TO DO use bool parameter of turbulent or laminar model
-		double turbulentPrandtl = 0.677;
-		double KTurb = medium.Cv * medium.Gamma * GetTurbViscosity(FaceInd) / turbulentPrandtl;
-		return KTurb;
+		return 0;
 	};
 	virtual Matrix GetAdditionalStresses(int FaceInd)
 	{
@@ -946,23 +959,18 @@ public:
 			double viscosityTurb = GetTurbViscosity(f.GlobalIndex);
 			double KTurb = GetTurbHeatConductivity(f.GlobalIndex);
 			Matrix Stresses = GetAdditionalStresses(f.GlobalIndex);
-			//TO DO remove runtime check WID
-			//if (Stresses.table.size() != 3) throw Exception("");
-			if (Stresses[0].size() != 3) throw Exception("");	//WID
-			if (Stresses[1].size() != 3) throw Exception("");
-			if (Stresses[2].size() != 3) throw Exception("");
-
-
-			double viscosity = (medium.Viscosity + viscosityTurb);
-			double s_viscosity = -2.0/3.0 * viscosity;		//second viscosity
+			
+			//double viscosity = medium.Viscosity;	
+			double viscosity = medium.Viscosity;
+			double s_viscosity = -2.0/3.0 * viscosity;		//second viscosity STOKES LAW
+			viscosity += viscosityTurb;			//for bussinesk hypothesis
 	
-
 			//required variables on face	
 			ConservativeVariables UAvg;
 			//for (int k = 0; k<5; k++) UAvg[k] = 0.5*(UL[k] + UR[k]);
 			double dL = abs(f.FaceNormal * (CL - f.FaceCenter));		//WID
 			double dR = abs(f.FaceNormal * (CR - f.FaceCenter));				
-			for (int k = 0; k<5; k++) UAvg[k] = (UL[k] * dR + UR[k] * dL) / (dL + dR);	//я тут исправил!!!		
+			for (int k = 0; k<5; k++) UAvg[k] = (UL[k] * dR + UR[k] * dL) / (dL + dR);		
 			double rho = GetDensity(UAvg);
 			double u = GetVelocityX(UAvg);
 			double v = GetVelocityY(UAvg);
@@ -1306,7 +1314,6 @@ public:
 			_wallInfo[cells[i]->GlobalIndex] = CellWallInfo();		
 			_wallInfo[cells[i]->GlobalIndex].wallFaceIndex = faceIndex;
 			_wallInfo[cells[i]->GlobalIndex].distance = radiusVector.mod();
-			_wallInfo[cells[i]->GlobalIndex].angle = radiusVector.mod();		//WID
 			_wallFaces[faceIndex].layerCells.push_back(cells[i]->GlobalIndex);
 		};
 
@@ -1316,7 +1323,6 @@ public:
 			Face f = _grid.faces[_wallInfo[cells[i]->GlobalIndex].wallFaceIndex];
 			Vector FaceCell = cells[i]->CellCenter - f.FaceCenter;
 			double Cos = abs(FaceCell*f.FaceNormal)/(f.FaceNormal.mod()*FaceCell.mod());
-			if(Cos>1) Cos=1;
 			_wallInfo[cells[i]->GlobalIndex].angle  = acos(Cos);
 		};
 
@@ -1381,7 +1387,7 @@ public:
 		{			
 			std::sort(it->second.layerCells.begin(), it->second.layerCells.end(), cmp);
 			for (int j = 1; j<it->second.layerCells.size(); j++) {
-				if (_wallInfo[it->second.layerCells[j-1]].distance > _wallInfo[it->second.layerCells[j]].distance) std::cout<<"Sort fail\n";
+				if (_wallInfo[it->second.layerCells[j-1]].distance > _wallInfo[it->second.layerCells[j]].distance) std::cout<<"Sort fail\n";	//WID - лишняя проверка
 			};
 		};	
 	};
@@ -1717,6 +1723,7 @@ public:
 				ofs<<"\n";
 			};		
 		};
+
 		if (_grid.gridInfo.GridDimensions == 2) {
 			//TO DO unify		
 			//Header
@@ -1919,6 +1926,230 @@ public:
 				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
 					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+			};
+		};
+
+		//3D case
+		if (_grid.gridInfo.GridDimensions == 3) {
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+			ofs<<"VARIABLES= \"X\", \"Y\", \"Z\", \"Rho\", \"u\", \"v\", \"w\"";//, \"E\", \"T\", \"P\"";
+			/*ofs<<", \"PStagnation\"";
+			ofs<<", \"distance\"";
+			ofs<<", \"rouResidual\"";
+			ofs<<", \"rovResidual\"";
+			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
+			ofs<<", \"dU_dx\"";
+			ofs<<", \"dU_dy\"";*/
+			ofs<<"\n";
+			
+			ofs<<"ZONE T=\"D\"\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
+			if (cells[0]->CGNSType == HEXA_8) {
+				ofs<<"ET=BRICK\n";
+			};
+
+			ofs<<"VARLOCATION = (NODAL, NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED)\n";//, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			/*ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<")\n";*/
+
+			//Map all node global indexes to natural numbers
+			std::map<int,int> toNaturalIndex;
+			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+			int counter = 1;
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+			//Nodes coordinates
+			//X
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.x<<"\n";
+			};
+
+			//Y
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.y<<"\n";
+			};
+
+			//Z
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.z<<"\n";
+			};
+
+			////Solution data
+			////Rho
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].ro<<"\n";
+			};
+				
+			//u
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou/U[idx].ro<<"\n";
+			};
+			//v
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov/U[idx].ro<<"\n";		
+			};
+			//w
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].row/U[idx].ro<<"\n";
+			};
+			/*
+			//E
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].roE/U[idx].ro<<"\n";
+			};
+			//T
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+				ofs<<T<<"\n";
+			};
+			//P
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
+				ofs<<P<<"\n";
+			};	
+
+			//PStagnation
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
+				ofs<<PStagnation<<"\n";
+			};	
+
+			//distance
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				if (_wallInfo.size() != 0) {
+					ofs<<_wallInfo[idx].distance<<"\n";
+				} else {
+					ofs<<0<<"\n";
+				};
+			};
+
+			//rouResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rouResidual[idx]<<"\n";			
+			};
+
+			//rovResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rovResidual[idx]<<"\n";			
+			};
+
+			//rowResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rowResidual[idx]<<"\n";			
+			};
+
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
+			};
+
+			//dU_dx
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].x<<"\n";			
+			};
+
+			//dU_dy
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].y<<"\n";			
+			};*/
+
+			//Connectivity list for each cell			
+			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+				if (cells[i]->CGNSType == HEXA_8) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[4]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[5]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[6]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[7]]<<"\n";					
 				};
 			};
 		};

@@ -111,7 +111,7 @@ private:
 
 		//wall face for this cells layer
 		double Delta = ComputeDisplacementThickness(velosity);
-		double tau_wall = medium.Viscosity*velosity.value[1]/velosity.x[1];
+		double tau_wall = medium.Viscosity*velosity.value[1]/velosity.x[1];		//first order
 		double U_fr = sqrt(tau_wall/U[CellSequence[0]].ro);
 		
 		for(int i=1; i<res.size; i++)
@@ -146,7 +146,7 @@ private:
 		for(int i=1; i<tau_un.length() - 1; i++)
 		{
 			tau_un[i] = (-1.0)*BM_FUN_t_visc.value[i]*BM_FUN_vel_der.value[i];
-			//tau_un[i] = -1.0; //flternative initial approach
+			//tau_un[i] = -1.0; //alternative initial approach
 		};
 		tau_un[tau_un.length() - 1] = 0;
 		
@@ -240,22 +240,19 @@ private:
 		//layer of cells
 		std::vector<int>& layerCells = _wallFaces[wallFaceInd].layerCells;
 
-		//fill in CellSequence and velocity function
+		//fill CellSequence and velocity function
 		for(int i=0; i<layerCells.size(); i++)
 		{
 			CellWallInfo& wInfo = _wallInfo[layerCells[i]];
 			if(wInfo.angle<SoartingAngle) {
 				int c_Ind = layerCells[i];
 				//tangential velocity in a cell
-				Vector V = Vector(U[c_Ind].rou, U[c_Ind].rov, U[c_Ind].row);
-				V /= U[c_Ind].ro;
-				//double U_tan = (V - (V*norm)*norm).x;	//TO DO FIX correct only for one direction WID
-				double U_tan = GetVelocityX(U[c_Ind]);
-				if(U_tan > U_inf)
+				double U_tan = GetVelocityX(U[c_Ind]);	//only for Plate!
+				if(U_tan > U_inf)	//condition for height of the boundary layer
 				{
 					CellSequence.push_back(c_Ind);
 					v.value.push_back(U_tan);
-					v.x.push_back(wInfo.distance);
+					v.x.push_back(wInfo.distance*cos(wInfo.angle));
 					rho.value.push_back(U[c_Ind].ro);
 					rho.x.push_back(wInfo.distance);
 					U_inf = U_tan;
@@ -277,15 +274,16 @@ private:
 
 		//laminar flow condition
 		if(BM_PAR_eps>BM_PAR_c/sqrt(BM_PAR_alpha)) return;
-		if(v.size<3) throw Exception("Turbulent boundary layer has not enough grid nodes\n");
+		//if(v.size<3) throw Exception("Turbulent boundary layer has not enough grid nodes\n");
+		if(v.size<3) return;	//WID заглушка н аслучай вылета в строчке выше
 
 		//compute usefull functions on general grid
 		BM_FUN_t_visc = ComputeTurbViscosity(CellSequence, v);
-		if(wallFaceInd==114) BM_FUN_t_visc.WriteData("t_visc_srez_BM.dat");
+		//if(wallFaceInd==114) BM_FUN_t_visc.WriteData("t_visc_srez_BM.dat");
 		BM_FUN_t_dif = BM_FUN_t_visc;	// !!! only if t_dif = t_visc !!!
 		BM_FUN_t_dif_der = BM_FUN_t_dif.Derivate();
 		BM_FUN_vel_der = v.Derivate();
-		BM_FUN_lh_vel_der = BM_FUN_vel_der;	// !!! only if t_dif = t_visc !!!
+		BM_FUN_lh_vel_der = BM_FUN_vel_der;	// !!! only if LeeHersha Velocity = Velocity !!!
 		//BM_FUN_t_visc.WriteData("T_visc.dat"); //TO DO DELETE
 		
 		//transform to dimensionless variables
@@ -335,7 +333,7 @@ private:
 	};
 
 public:
-	double Re_cr;	//inlet flow velosity, critical Reinolds number and x coordinate of plate border
+	double Re_cr;	//critical Reinolds number
 
 	//Compute Reinolds stresses
 	void AditionalStepComputations()
@@ -343,6 +341,13 @@ public:
 		ComputeTurbStresses();
 	};
 
+	//get stresses on the face
+	double GetTurbViscosity(int FaceInd)
+	{
+		return xy_turb_stressesF[FaceInd];
+	};
+
+	//compute turbulent heat conductivity coefficient
 	double GetTurbHeatConductivity(int FaceInd)
 	{
 		return 0;
@@ -500,6 +505,7 @@ public:
 		};
 		ofs.close();
 	};
+	//??? what is the function?
 	void SaveToTecplot25D(std::string fname) {
 		std::ofstream ofs(fname);
 		ofs<<std::scientific;

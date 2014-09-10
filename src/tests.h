@@ -775,14 +775,16 @@ void RunSAFlatPlate() {
 
 	return;
 };
-void RunBiffFlatPlate() {
-	std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineSA.cgns";
-	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\!Grants\\TSAGI\\FlatPlate\\FlatPlateFluent\\solutionSuperFineLam.cgns";
-	//std::string solutionFile = "C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns";	
+void RunBiffFlatPlane() {
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solutionSuperFineSA.cgns";
+	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solutionSuperFineLam.cgns";
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";	
 	Grid grid = LoadCGNSGrid(solutionFile);
 
 	// Initialize medium model and place boundary conditions
-	BiffTurbulentPlateModel<Roe3DSolverPerfectGas> model(320000.0, 8337150864.0, 2.0);
+	//BiffTurbulentPlateModel<Roe3DSolverPerfectGas> model(320000.0, 8337150864.0, 2.0);
+	//BiffTurbulentPlateModel<Roe3DSolverPerfectGas> model(3300.0, 41.7, 2.0);		//new try Re_x_cr = 3330 Re*_cr = 4.57 alpha = 41.7 - !!!MISTAKE Re_x_cr = Re*_cr^2 / 25!!!
+	BiffTurbulentPlateModel<Roe3DSolverPerfectGas> model(3300.0, 33e4, 2.0);		//new try Re_x_cr = 3330 Re*_cr = 287 alpha = 25*c^2*Re_x_cr
 
 	//Set fluid properties
 	//Air
@@ -790,7 +792,7 @@ void RunBiffFlatPlate() {
 	model.SetCv(1006.43 / 1.4);
 	model.SetMolecularWeight(28.966);
 
-	model.SetViscosity(1.7894e-05);	
+	model.SetViscosity(1.7894e-03);	
 	model.SetThermalConductivity(0.0242);
 
 	//Set computational settings
@@ -803,11 +805,11 @@ void RunBiffFlatPlate() {
 	////Initial conditions
 	//Read solution from CGNS
 	model.ReadSolutionFromCGNS(solutionFile);	
-	model.LoadSolution("C:\\Users\\Erik\\Dropbox\\Science\\!Projects\\solution.txt");
+	//model.LoadSolution("D:\\Projects\\NewKidzTurbo\\NewKidzTurbo\\solution.txt");
 
 	//Boundary conditions
 	//Inlet boundary
-	Vector velocity(70,0,0);
+	Vector velocity(10,0,0);
 	double pressure = 101579;
 	double temperature = 300.214;	
 	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
@@ -834,18 +836,22 @@ void RunBiffFlatPlate() {
 	//Set wall boundaries		
 	model.SetWallBoundary("plate", true);
 	model.ComputeWallDistances();
-	model.DistanceSorting();
+	//model.DistanceSorting();
+	model.SoartingAngle = 1e-10;
 	model.EnableViscous();	
+	model.SchemeOrder = 2;
+	model.EnableLimiter();
+
+	//model.LoadSolution("solution2order.txt");
 
 	//Save initial solution
 	model.ComputeGradients();
-	model.SaveToTechPlot("init2.dat");
+	model.SaveToTechPlot("init.dat");
 
 	//Output dimensionless profile for point around x = 1.0
-	model.ComputeWallVariables();
-	
+	//model.ComputeWallVariables();	
 
-	std::string outputSolutionFile = "solution2";	
+	std::string outputSolutionFile = "solution";	
 
 	//Run simulation
 	bool isSave = true;	
@@ -860,8 +866,6 @@ void RunBiffFlatPlate() {
 		if ((i % 100 == 0) && (isSave)) {
 			model.SaveSolution(outputSolutionFile+".txt");
 			model.SaveToTechPlot(outputSolutionFile+".dat");
-			model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-			model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
 		};
 		if (model.totalTime > 10000) break;
 	};
@@ -870,8 +874,105 @@ void RunBiffFlatPlate() {
 	if (isSave) {
 		model.SaveSolution(outputSolutionFile+".txt");
 		model.SaveToTechPlot(outputSolutionFile+".dat");
-		model.SaveSliceToTechPlot("u1_0.dat", 0.2, 10.5, 0.96, 1.01, 0, 0.06);
-		model.SaveSliceToTechPlot("u0_8.dat", 0.2, 10.5, 0.76, 0.8, 0, 0.06);
+	};
+};
+void RunGLSFlatPlane() {
+	
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solutionSuperFineLam.cgns";
+	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
+	Grid grid = LoadCGNSGrid(solutionFile);
+
+	// Initialize medium model and place boundary conditions
+	GarbarukTurbulentPlateModel<Roe3DSolverPerfectGas> model(10.0, 0.2);	// velocity and plane border position
+
+	//Set fluid properties
+	//Air
+	model.SetGamma(1.4);
+	model.SetCv(1006.43 / 1.4);
+	model.SetMolecularWeight(28.966);
+
+	model.SetViscosity(1.7894e-03);	
+	model.SetThermalConductivity(0.0242);
+
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.000);
+
+	////Bind computational grid
+	model.BindGrid(grid);			
+
+	////Initial conditions
+	//Read solution from CGNS
+	model.ReadSolutionFromCGNS(solutionFile);	
+	
+
+	//Boundary conditions
+	//Inlet boundary
+	Vector velocity(10,0,0);
+	double pressure = 101579;
+	double temperature = 300.214;	
+	Model<Roe3DSolverPerfectGas>::InletBoundaryCondition InletBC(model);
+	InletBC.setParams(pressure, temperature, velocity);
+
+	//Outlet boundary
+	Model<Roe3DSolverPerfectGas>::SubsonicOutletBoundaryCondition OutletBC(model);
+	OutletBC.setParams(pressure);
+
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("inlet", InletBC);
+	model.SetBoundaryCondition("outlet", OutletBC);
+	model.SetBoundaryCondition("plate", NoSlipBC);	
+	model.SetBoundaryCondition("symmetry", SymmetryBC);
+	model.SetBoundaryCondition("top_left", SymmetryBC);
+	model.SetBoundaryCondition("top_right", SymmetryBC);
+
+	//method and model settings		
+	model.SetWallBoundary("plate", true);
+	model.ComputeWallDistances();
+	model.DistanceSorting();
+	model.SoartingAngle = 1e-10;
+	model.EnableViscous();	
+	model.SchemeOrder = 2;
+	model.EnableLimiter();
+	model.SetA(12.0);
+	model.SetKarman(0.41);
+
+	//model.LoadSolution("solution2order.txt");
+
+	//Save initial solution and loading
+	model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");	
+	//model.WriteWallVarSolutionToTecPlotFromFile("solutionGLS10.txt");
+
+	std::string outputSolutionFile = "solution";	
+
+	//Run simulation
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Interation = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
 	};
 };
 
@@ -1162,14 +1263,15 @@ void RunBlasiusFlowAnsysGridTest() {
 
 	return;
 }
+
 /*Blasius flow tests with arbitrary Velocity and size of area on y direction
 Compress the grid from RunBlasiusFlowAnsysGridTest by k times and run the calculation for AIR VISCOSITY
 The original grid corresponds to 10 m/s velocity, size of area in X direction stays the same - 1 meter for plate*/
 void RunBlasiusFlowAnsysGridTest(double X_Velocity, double k_y) {
 
 	//Load cgns grid			
-	//std::string solutionFile = "D:\\BlasiusAir 150 k=40\\solution.cgns";
-	std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
+	std::string solutionFile = "D:\\BlasiusAir 150 k=40\\solution.cgns";
+	//std::string solutionFile = "D:\\Projects\\NewKidzTurbo\\Solutions\\solution.cgns";
 	Grid grid = LoadCGNSGrid(solutionFile);
 	grid = GripGridToX(grid, k_y);
 	//check_grid(grid);
@@ -1622,3 +1724,495 @@ void RunVoronka()
 		model.SaveToTechPlot(outputSolutionFile+".dat");;
 	};
 };
+
+////Releigh-Taylor Instability 2D////
+
+//domain sizes and perturbation factor 
+struct Rectangle_Area_RT {
+	//coordinates of rectangle nodes
+	double x_min;
+	double x_max;
+	double y_min;
+	double y_max;
+	double z_min;
+	double z_max;
+	//amplitude of perturbation
+	double A;
+	//acceleration of field directed in -Y
+	double g;
+	//specific heat ratio
+	double gamma;
+	//zero altitude pressure
+	double P0;
+	//density bottom
+	double ro_bot;
+	//density top
+	double ro_top;
+};
+
+//2D initializing of init conditions
+ConservativeVariables ReleighTaylorInit2D(Vector CellPos, void* params) {
+	Rectangle_Area_RT info = *(Rectangle_Area_RT*)params;
+	
+	//define density pressure and velocity in the cell
+	double ro, p;
+	Vector v;
+
+	//density
+	if(CellPos.y<=0) ro = info.ro_bot;
+	else ro = info.ro_top;
+
+	//pressure
+	p = info.P0 - ro*info.g*CellPos.y;
+
+	//velocity
+	v.x = 0;
+	v.z = 0;
+	v.y = 0.25*info.A*(1.0 + cos(2.0*PI*CellPos.x/(info.x_max - info.x_min)))*(1.0 + cos(2.0*PI*CellPos.y/(info.y_max - info.y_min)));
+
+	ConservativeVariables U;
+	U.ro = ro;
+	U.rou = ro * v.x;
+	U.rov = ro * v.y;
+	U.row = ro * v.z;
+	U.roE = p/(info.gamma - 1.0) + ro * v.mod() * v.mod() / 2.0;
+	
+	return U;	
+};
+//2D discrete perturbation
+ConservativeVariables ReleighTaylorInit2D_discrete_perturbations(Vector CellPos, void* params) {
+	Rectangle_Area_RT info = *(Rectangle_Area_RT*)params;
+	
+	//define density pressure and velocity in the cell
+	double ro, p;
+	Vector v;
+
+	//density
+	if(CellPos.y<=0) ro = info.ro_bot;
+	else ro = info.ro_top;
+
+	//pressure
+	p = info.P0 - ro*info.g*CellPos.y;
+
+	//velocity
+	v.x = 0;
+	v.z = 0;
+	v.y = 0;
+	if((abs(CellPos.x)<0.2*info.x_max)&&(abs(CellPos.y)<0.05*info.y_max)) v.y = info.A*info.x_max;
+
+	ConservativeVariables U;
+	U.ro = ro;
+	U.rou = ro * v.x;
+	U.rov = ro * v.y;
+	U.row = ro * v.z;
+	U.roE = p/(info.gamma - 1.0) + ro * v.mod() * v.mod() / 2.0;
+	
+	return U;	
+};
+
+//3D discrete perturbation
+ConservativeVariables ReleighTaylorInit3D_discrete_perturbations(Vector CellPos, void* params) {
+	Rectangle_Area_RT info = *(Rectangle_Area_RT*)params;
+	
+	//define density pressure and velocity in the cell
+	double ro, p;
+	Vector v;
+
+	//density
+	if(CellPos.y<=0) ro = info.ro_bot;
+	else ro = info.ro_top;
+
+	//pressure
+	p = info.P0 - ro*info.g*CellPos.y;
+
+	//velocity
+	v.x = 0;
+	v.z = 0;
+	v.y = 0;
+	if((abs(CellPos.x)<0.2*info.x_max)&&(abs(CellPos.z)<0.2*info.z_max)&&(abs(CellPos.y)<0.1*info.y_max)) v.y = info.A*info.x_max;
+
+	ConservativeVariables U;
+	U.ro = ro;
+	U.rou = ro * v.x;
+	U.rov = ro * v.y;
+	U.row = ro * v.z;
+	U.roE = p/(info.gamma - 1.0) + ro * v.mod() * v.mod() / 2.0;
+	
+	return U;	
+};
+//3D smooth perturbation
+ConservativeVariables ReleighTaylorInit3D(Vector CellPos, void* params) {
+	Rectangle_Area_RT info = *(Rectangle_Area_RT*)params;
+	
+	//define density pressure and velocity in the cell
+	double ro, p;
+	Vector v;
+
+	//density
+	if(CellPos.y<=0) ro = info.ro_bot;
+	else ro = info.ro_top;
+
+	//pressure
+	p = info.P0 - ro*info.g*CellPos.y;
+
+	//velocity
+	v.x = 0;
+	v.z = 0;
+	v.y = 0.125*info.A*(1.0 + cos(2.0*PI*CellPos.x/(info.x_max - info.x_min)))*(1.0 + cos(2.0*PI*CellPos.y/(info.y_max - info.y_min)))*(1.0 + cos(2.0*PI*CellPos.z/(info.z_max - info.z_min)));
+
+	ConservativeVariables U;
+	U.ro = ro;
+	U.rou = ro * v.x;
+	U.rov = ro * v.y;
+	U.row = ro * v.z;
+	U.roE = p/(info.gamma - 1.0) + ro * v.mod() * v.mod() / 2.0;
+	
+	return U;	
+};
+
+//2D classic test
+void RunReleighTaylor2D(int N_x, int N_y)
+{
+	//set task parameters
+	Rectangle_Area_RT info;
+
+	//classic settings
+	/*info.A = 0.01;	//perturbation amplitude
+	info.g = 0.25;	//acceleration
+	info.P0 = 2.5;	//zero altitude pressure
+	info.ro_bot = 1.0;	//bottom density
+	info.ro_top = 2.0;	//top pressure
+	info.gamma = 1.4;	//constant of adiabat
+	info.x_min = -0.25;
+	info.x_max = (-1)*info.x_min;
+	info.y_min = -0.75;
+	info.y_max = (-1)*info.y_min;*/
+
+	//Fe Pl sinusoidal perturbations
+	/*info.A = 5.0e2;
+	info.g = 5.0e8;
+	info.gamma = 1.4;
+	info.P0 = 2.0e12;
+	info.ro_bot = 7.9e3;
+	info.ro_top = 11.34e3;
+	info.x_max = 0.01;
+	info.x_min = -0.01;
+	info.y_min = -0.03;
+	info.y_max = 0.03;*/
+
+	//Fe Pe discrete perturbation
+	info.A = 5.0e4;
+	info.g = 5.0e8;
+	info.gamma = 1.4;
+	info.P0 = 2.0e12;
+	info.ro_bot = 7.9e3;
+	info.ro_top = 11.34e3;
+	info.x_max = 0.01;
+	info.x_min = -0.01;
+	info.y_min = -0.03;
+	info.y_max = 0.03;
+
+	Model<Roe3DSolverPerfectGas> model;
+	Grid grid = GenGrid2D(N_x, N_y, info.x_min, info.x_max, info.y_min, info.y_max, 1.0, 1.0);
+
+	//Set fluid properties
+	model.SetGamma(info.gamma);
+	model.SetCv(1006.43 / info.gamma);
+	model.SetMolecularWeight(28.966);
+	model.SetThermalConductivity(0.0);
+	model.DisableViscous();
+
+	Vector g(0, -info.g, 0);
+	model.SetUniformAcceleration(g);
+
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.0);
+	model.SchemeOrder = 2;
+	model.EnableLimiter();
+	//model.DisableLimiter();
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Set initial conditions
+	model.SetInitialConditions(ReleighTaylorInit2D_discrete_perturbations, &info);
+		
+	//Boundary conditions
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", SymmetryBC);
+	model.SetBoundaryCondition("right", SymmetryBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Save initial solution
+	model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "Releigh-Taylor";
+	model.LoadSolution("solution_to_load.txt");
+
+	//Run simulation
+	double delta_t = 1e-6;
+	double TimeToSave = delta_t;
+	
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		if((model.totalTime >= TimeToSave)&&(i==0)) {
+			TimeToSave = ((int)(model.totalTime/delta_t) + 1)*delta_t;
+		};
+		model.Step();	
+		if (i % 1 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+		//save solutions during computation
+		if(model.totalTime > TimeToSave) {
+			std::stringstream ss;
+			ss << TimeToSave;
+			std::string timer = ss.str();
+			model.SaveToTechPlot(outputSolutionFile+timer+".dat");
+			TimeToSave += delta_t;
+		};
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	return;
+};
+
+//3D test for Releigh-Taylor Instability with accelaration along y axis
+void RunReleighTaylor3D(int N_x, int N_y, int N_z)
+{
+	//set task parameters
+	Rectangle_Area_RT info;
+
+	//Fe Pe discrete perturbation
+	/*info.A = 5.0e4;
+	info.g = 5.0e8;
+	info.gamma = 1.4;
+	info.P0 = 2.0e12;
+	info.ro_bot = 7.9e3;
+	info.ro_top = 11.34e3;
+	info.x_max = 0.01;
+	info.x_min = -0.01;
+	info.y_min = -0.03;
+	info.y_max = 0.03;
+	info.z_min = info.x_min;
+	info.z_max = info.x_max;*/
+
+	info.A = 5.0e2;
+	info.g = 5.0e8;
+	info.gamma = 1.4;
+	info.P0 = 2.0e12;
+	info.ro_bot = 7.9e3;
+	info.ro_top = 11.34e3;
+	info.x_max = 0.01;
+	info.x_min = -0.01;
+	info.y_min = -0.03;
+	info.y_max = 0.03;
+	info.z_min = info.x_min;
+	info.z_max = info.x_max;
+
+	Model<Roe3DSolverPerfectGas> model;
+	Grid grid = GenGrid3D(N_x, N_y, N_z, info.x_min, info.x_max, info.y_min, info.y_max, info.z_min, info.z_max);
+
+	//Set fluid properties
+	model.SetGamma(info.gamma);
+	model.SetCv(1006.43 / info.gamma);
+	model.SetMolecularWeight(28.966);
+	model.SetThermalConductivity(0.0);
+	model.DisableViscous();
+
+	Vector g(0, -info.g, 0);
+	model.SetUniformAcceleration(g);
+
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.1);
+	model.SchemeOrder = 2;
+	model.EnableLimiter();
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Set initial conditions
+	model.SetInitialConditions(ReleighTaylorInit3D_discrete_perturbations, &info);
+		
+	//Boundary conditions
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", SymmetryBC);
+	model.SetBoundaryCondition("right", SymmetryBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+	model.SetBoundaryCondition("back", SymmetryBC);
+	model.SetBoundaryCondition("front", SymmetryBC);
+
+	//Save initial solution
+	model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "Releigh-Taylor";
+	//model.LoadSolution("solution_to_load.txt");
+
+	//Run simulation
+	double delta_t = 1e-6;
+	double TimeToSave = delta_t;
+	
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		if((model.totalTime >= TimeToSave)&&(i==0)) {
+			TimeToSave = ((int)(model.totalTime/delta_t) + 1)*delta_t;
+		};
+		model.Step();	
+		if (i % 1 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+			//std::stringstream ss;
+			//ss << i;
+			//std::string iter = ss.str();
+			//model.SaveToTechPlot(outputSolutionFile+iter+".dat");
+		};
+		if (model.totalTime > 10000) break;
+		//save solutions during computation
+		if(model.totalTime > TimeToSave) {
+			std::stringstream ss;
+			ss << TimeToSave;
+			std::string timer = ss.str();
+			model.SaveToTechPlot(outputSolutionFile+timer+".dat");
+			TimeToSave += delta_t;
+		};
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	return;
+};
+
+/*
+////Turbulent Shear Flow////
+struct TurbulentShearFlow {
+	double size_x, size_y, size_z;
+}
+
+//run turbuletn flow task
+void RunTurbulentShearFlow(int N_x, N_y, N_z)
+{
+	//set task parameters
+	TurbulentShearFlow info;
+	info.size_x = PI;
+	info.size_y = PI;
+	info.size_z = PI;
+	
+	Model<Roe3DSolverPerfectGas> model;
+	Grid grid = GenGrid2D(N_x, N_y, info.x_min, info.x_max, info.y_min, info.y_max, 1.0, 1.0);
+
+	//Set fluid properties
+	model.SetGamma(info.gamma);
+	model.SetCv(1006.43 / info.gamma);
+	model.SetMolecularWeight(28.966);
+	model.SetThermalConductivity(0.0);
+	model.DisableViscous();
+
+	Vector g(0, -info.g, 0);
+	model.SetUniformAcceleration(g);
+
+	//Set computational settings
+	model.SetCFLNumber(0.35);
+	model.SetHartenEps(0.00);
+	model.SchemeOrder = 2;
+	model.EnableLimiter();
+
+	//Bind computational grid
+	model.BindGrid(grid);	
+
+	//Set initial conditions
+	model.SetInitialConditions(ReleighTaylorInit2D, &info);
+		
+	//Boundary conditions
+	//Symmetry boundary
+	Model<Roe3DSolverPerfectGas>::SymmetryBoundaryCondition SymmetryBC(model);
+	//No slip boundary
+	Model<Roe3DSolverPerfectGas>::NoSlipBoundaryCondition NoSlipBC(model);
+
+	//Set boundary conditions
+	model.SetBoundaryCondition("left", SymmetryBC);
+	model.SetBoundaryCondition("right", SymmetryBC);
+	model.SetBoundaryCondition("bottom", SymmetryBC);
+	model.SetBoundaryCondition("top", SymmetryBC);
+
+	//Save initial solution
+	model.ComputeGradients();
+	model.SaveToTechPlot("init.dat");
+
+	//Load solution
+	std::string outputSolutionFile = "Releigh-Taylor";
+	//model.LoadSolution("solution.txt");
+
+	//Run simulation
+	double TimeToSave = 1.0;
+	bool isSave = true;	
+	for (int i = 0; i < 1000000; i++) {
+		model.Step();	
+		if (i % 10 == 0) {
+			std::cout<<"Iteration = "<<i<<"\n";
+			std::cout<<"TimeStep = "<<model.stepInfo.TimeStep<<"\n";
+			for (int k = 0; k<5; k++) std::cout<<"Residual["<<k<<"] = "<<model.stepInfo.Residual[k]<<"\n";
+			std::cout<<"TotalTime = "<<model.totalTime<<"\n";
+		};
+		if ((i % 100 == 0) && (isSave)) {
+			model.SaveSolution(outputSolutionFile+".txt");
+			model.SaveToTechPlot(outputSolutionFile+".dat");
+		};
+		if (model.totalTime > 10000) break;
+		//save solutions during computation
+		if(model.totalTime > TimeToSave) {
+			std::stringstream ss;
+			ss << TimeToSave;
+			std::string timer = ss.str();
+			model.SaveToTechPlot(outputSolutionFile+timer+".dat");
+			TimeToSave += 1.0;
+		};
+	};
+
+	//Save result to techplot
+	if (isSave) {
+		model.SaveSolution(outputSolutionFile+".txt");
+		model.SaveToTechPlot(outputSolutionFile+".dat");
+	};
+
+	return;
+
+};
+*/

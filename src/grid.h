@@ -189,9 +189,9 @@ public:
 	//Construct patches (fill in nodes and faces)
 	bool ConstructAndCheckPatches();
 
+	//write grid to TecPlot file
+	void ToTecPlotGrid(char *fname);
 };
-
-
 
 /// Implementation part
 
@@ -563,6 +563,69 @@ void Grid::ComputeGeometryToAxisymmetric(double alpha, int Periodic_BC_Marker)
 		if(c.CellVolume<=0) std::cout << "Negative Volume" << '\n';
 		
 	};
+	return;
+};
+
+void Grid::ToTecPlotGrid(char *filename = "grid.dat")
+{	
+	std::set<std::pair<int,int>> l_faces;	//set of edges (linesegments)
+	std::vector<Face*> fcs = faces.getLocalNodes();
+	//fill set of all edges (linesegments)
+	for(int i=0; i<fcs.size(); i++)
+	{
+		std::pair<int,int> line;
+		Face* f = fcs[i];
+		for(int j=1; j<f->FaceNodes.size(); j++)
+		{
+			line.first = f->FaceNodes[j];
+			line.second = f->FaceNodes[j-1];
+			if(l_faces.find(line)!=l_faces.cend()) continue;
+			line.first = f->FaceNodes[j-1];
+			line.second = f->FaceNodes[j];
+			if(l_faces.find(line)!=l_faces.cend()) continue;
+			l_faces.insert(line);
+		};
+		line.first = f->FaceNodes[0];
+		line.second = f->FaceNodes[f->FaceNodes.size()-1];
+		if(l_faces.find(line)!=l_faces.cend()) continue;
+		line.first = f->FaceNodes[f->FaceNodes.size()-1];
+		line.second = f->FaceNodes[0];
+		if(l_faces.find(line)!=l_faces.cend()) continue;
+		l_faces.insert(line);
+	};
+	//write grid in tecplot format
+	std::ofstream ofs(filename);
+	ofs<<"VARIABLES= \"X\", \"Y\", \"Z\"\n";
+	ofs<<"ZONE T=\"D\"\n";
+	ofs<<"N=" << nodes.size() << ", E=" << l_faces.size() <<", F=FEBLOCK," << " ET=LINESEG\n";
+	ofs<<"VARLOCATION = (NODAL, NODAL, NODAL)\n";
+
+	//Map all node global indexes to natural numbers
+	std::map<int,int> toNaturalIndex;
+	std::set<int> nodeIndexes = nodes.getAllIndexes();
+	int counter = 1;
+	for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;
+	std::vector<Node*> nds = nodes.getLocalNodes();
+
+	//X
+	for (int i = 0; i<nodes.size(); i++) {
+		ofs<<nds[i]->P.x<<"\n";
+	};
+	//Y
+	for (int i = 0; i<nodes.size(); i++) {
+		ofs<<nds[i]->P.y<<"\n";
+	};
+	//Z
+	for (int i = 0; i<nodes.size(); i++) {
+		ofs<<nds[i]->P.z<<"\n";
+	};
+	
+	//Connectivity list
+	for (std::set<std::pair<int, int>>::iterator it = l_faces.begin(); it!= l_faces.end(); it++) {
+		ofs << toNaturalIndex[it->first] << " " << toNaturalIndex[it->second] << '\n';
+	};
+	ofs.close();
+
 	return;
 };
 

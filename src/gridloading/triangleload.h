@@ -83,4 +83,71 @@ Grid Load2DTriangleGrid(std::string fname) {
 	return grid;
 };
 
+//convert cgns grid to full format
+void ConvertGrid(char* file_name)
+{
+	std::string gridFile = "D:\\Projects\\NewKidzTurbo\\Grids\\SimpleCircle.cgns";
+	Grid grid = LoadCGNSGrid(gridFile);
+
+	//write full info about grid
+	std::ofstream ofs(file_name);
+	std::vector<Node*> nodes = grid.nodes.getLocalNodes();
+	std::vector<Cell*> cells = grid.cells.getLocalNodes();
+	std::vector<Face*> faces = grid.faces.getLocalNodes();
+
+	//write nodes info
+	ofs << nodes.size() << '\n';
+	for(int i=0; i<nodes.size(); i++)
+	{
+		ofs << nodes[i]->GlobalIndex << '\n';
+		ofs << nodes[i]->P.x << ' ';
+		ofs << nodes[i]->P.y << ' ';
+		ofs << nodes[i]->P.z << '\n';
+	};
+
+	//write cells info
+	ofs << cells.size() << '\n';
+	for(int i=0; i<cells.size(); i++)
+	{
+		ofs << cells[i]->GlobalIndex << '\n';
+		ofs << cells[i]->CellCenter.x << ' ';
+		ofs << cells[i]->CellCenter.y << ' ';
+		ofs << cells[i]->CellCenter.z << '\n';
+		ofs << cells[i]->CellVolume << '\n';
+		int faces_size = cells[i]->Faces.size();
+		ofs << faces_size;
+		for(int j=0; j<faces_size; j++) ofs << ' ' << cells[i]->Faces[j];
+		ofs << '\n';
+		int nodes_size = cells[i]->Nodes.size();
+		ofs << nodes_size;
+		for(int j=0; j<nodes_size; j++) ofs << ' ' << cells[i]->Nodes[j];
+		ofs << '\n';
+	};
+
+	//write faces info
+	ofs << faces.size() << '\n';
+	for(int i=0; i<faces.size(); i++)
+	{
+		ofs << faces[i]->GlobalIndex << '\n';
+		ofs << faces[i]->FaceCenter.x << ' ';
+		ofs << faces[i]->FaceCenter.y << ' ';
+		ofs << faces[i]->FaceCenter.z << '\n';
+		ofs << faces[i]->isExternal << '\n';
+		ofs << faces[i]->BCMarker << '\n';
+		ofs << faces[i]->FaceSquare << '\n';
+		ofs << faces[i]->FaceNormal.x << ' ';
+		ofs << faces[i]->FaceNormal.y << ' ';
+		ofs << faces[i]->FaceNormal.z << '\n';
+		ofs << faces[i]->FaceCell_1 << ' ';
+		ofs << faces[i]->FaceCell_2 << '\n';
+		int nodes_size = faces[i]->FaceNodes.size();
+		ofs << nodes_size;
+		for(int j=0; j<nodes_size; j++) ofs << ' ' << faces[i]->FaceNodes[j];
+		ofs << '\n';
+	};
+	ofs.close();
+
+	return;
+};
+
 #endif
