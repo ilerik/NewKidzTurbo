@@ -124,7 +124,6 @@ public:
 		double C2 = 1.0/(c*c);
 		double DN2= 1.0/(dn*dn);
 
-
 		std::vector<double> ul(5,0);
 		ul[0] = UL.ro;
 		ul[1] = UL.rou;

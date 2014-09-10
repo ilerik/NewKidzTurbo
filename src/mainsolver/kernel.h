@@ -705,7 +705,7 @@ public:
 		//Solver settings
 		CFL = 0.5;
 		RungeKuttaOrder = 1;
-		MaxIteration = 20;
+		MaxIteration = 10000;
 		MaxTime = 0.2;
 
 		//Initialize start moment
@@ -944,6 +944,9 @@ public:
 			//UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
 			UL = GasModel::ConservativeVariables(GetCellValues(cLeft.GlobalIndex, cellIndexLeft));
 			UR = GasModel::ConservativeVariables(GetCellValues(cRight.GlobalIndex));
+
+			//GasModel::ConservativeVariables UL_ = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
+			//GasModel::ConservativeVariables UR_;
 			//if (!f.isExternal) {			 
 			//	//If it is local face and both cells local				
 			//	if (cRight.IsDummy) {
@@ -951,17 +954,17 @@ public:
 
 			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
 			//		std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
-			//		UR = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
+			//		UR_ = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
 			//	} else {
 			//		//Ordinary cell
 			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
-			//		UR = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
+			//		UR_ = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
 			//	};
 			//} else {
 			//	//If it is interprocessor face obtain values from parallel helper
 			//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
 			//	int globalIndex = cRight.GlobalIndex;
-			//	UR = _parallelHelper.RequestedValues[globalIndex];
+			//	UR_ = _parallelHelper.RequestedValues[globalIndex];
 			//};
 
 			//Compute flux
@@ -1269,7 +1272,7 @@ public:
 		if (IsLocalCell(globalIndex)) {
 			if (IsDummyCell(globalIndex)) {
 				//If dummy cell compute on the go
-				Cell& cell = _grid.Cells[globalIndex];
+				Cell& cell = _grid.Cells[globalIndex];				
 				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
 			} else {
 				//If proper cell return part of Values array				

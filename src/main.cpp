@@ -1232,7 +1232,7 @@ void runSodTest(int argc, char *argv[]) {
 	Kernel _kernel;
 	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 20, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
 	_kernel.BindGrid(_grid);
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
@@ -1254,7 +1254,7 @@ void runSodTest(int argc, char *argv[]) {
 };
 
 //Main program ))
-int main(int argc, char *argv[]) {		
+ int main(int argc, char *argv[]) {		
 	//MPI_Init(&argc, &argv);
 	//std::cout<<sizeof(MPI_LONG_DOUBLE)<<"\n";
 	//int size;
