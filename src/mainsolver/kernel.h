@@ -690,6 +690,96 @@ public:
 		return TURBO_OK;
 	};
 
+		turbo_errt ParallelExchangeGradients() {
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Started : Exchange gradients.");	
+
+		//Debug info
+		std::stringstream msg;
+		msg.clear();
+		msg<<"toSendValuesNumberByProc :";
+		for (int p : _parallelHelper.toSendValuesNumberByProc) msg<<"("<<p<<") ";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		//Allocate memory and fill datastructures
+		int s = 0;
+		int r = 0;
+		std::vector<int> sdispl;
+		std::vector<int> rdispl;
+		std::vector<double> recvbuf;
+		std::vector<double> sendbuf;		
+		std::vector<int> sendcounts;
+		std::vector<int> recvcounts;
+		for (int i = 0; i<_nProcessors; i++) {
+			sdispl.push_back(s);
+			rdispl.push_back(r);
+			//From current proc to i-th proc send values that proc requested			
+			for (int j = 0; j<_parallelHelper.toSendValuesNumberByProc[i]; j++) {
+				//Cell index
+				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
+				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
+				//Write values from cell to send buffer
+				for (int k = 0; k < nVariables; k++) {
+					sendbuf.push_back(Values[cellLocalIndex * nVariables + k]);
+				};
+			};
+			sendcounts.push_back(_parallelHelper.toSendValuesNumberByProc[i] * nVariables);
+			recvcounts.push_back(_parallelHelper.toRecvValuesNumberByProc[i] * nVariables);			
+			s += _parallelHelper.toSendValuesNumberByProc[i] * nVariables;
+			r += _parallelHelper.toRecvValuesNumberByProc[i] * nVariables;			
+		};
+
+		//Debug		
+		msg.clear();
+		msg.clear();
+		msg<<"Sendbuf values : ";
+		for (double p : sendbuf) {
+			msg<<p<<" ";
+		};
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Info : Exchange values 1.");	
+
+		//Make sure that sendbuf isnt empty
+		sendbuf.push_back(0);
+
+		//Allocate recieve buffer
+		recvbuf.resize(r + 1);		
+
+		//Exchange values
+		MPI_Alltoallv(&sendbuf[0], &sendcounts[0], &sdispl[0], MPI_LONG_DOUBLE, &recvbuf[0], &recvcounts[0], &rdispl[0], MPI_LONG_DOUBLE, _parallelHelper.getComm());		
+
+		//Debug		
+		msg.clear();
+		msg<<"Recvbuf values : ";
+		for (double p : recvbuf) {
+			msg<<p<<" ";
+		};
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		//Write recieved values to appropriate data structure
+		int pointer = 0;
+		for (int i = 0; i<_nProcessors; i++) {								
+			for (int j = 0; j<_parallelHelper.toRecvValuesNumberByProc[i]; j++) {			
+				//Cell index
+				int cellGlobalIndex = _parallelHelper.toRecvValuesByProc[i][j];
+				//Store values
+				_parallelHelper.RequestedValues[cellGlobalIndex] = std::vector<double>(nVariables, 0);
+				for (int k = 0; k < nVariables; k++) {
+					_parallelHelper.RequestedValues[cellGlobalIndex][k] = recvbuf[pointer+k];
+				};				
+				//Increment pointer
+				pointer += nVariables;
+			};			
+		};			
+
+		//Synchronize
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Finished : Exchange gradients.");	
+		return TURBO_OK;
+	};
+
 	turbo_errt ReadConfiguration(std::string fname) {
 		//Hardcode configuration for now
 		_configuration.InputCGNSFile = "";
