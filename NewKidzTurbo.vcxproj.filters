@@ -55,6 +55,12 @@
     <Filter Include="Header Files\GasModels">
       <UniqueIdentifier>{4da2224d-8a78-406a-a5d8-084bf6b97158}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Tests">
+      <UniqueIdentifier>{f0247f70-9000-47b0-a4aa-6e04f49f2b01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Tests\RiemannProblemsTest">
+      <UniqueIdentifier>{a41c2124-7544-4c7a-83e5-7e47688f02b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -170,6 +176,12 @@
     </ClInclude>
     <ClInclude Include="src\initialConditions\InitialConditions.h">
       <Filter>Header Files\InitialConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tests\testcase.h">
+      <Filter>Header Files\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tests\RiemannProblemTests\SODtest.h">
+      <Filter>Header Files\Tests\RiemannProblemsTest</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
