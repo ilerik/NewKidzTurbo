@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
 
 	//test SODtest class
 	SodTest test(argc, argv);
+	bool testResult = test.RunTest();
 	return 0;
 
 	//SimpleChannelTest(); return 0;

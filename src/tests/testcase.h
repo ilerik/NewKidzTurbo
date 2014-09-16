@@ -3,23 +3,30 @@
 
 #include "kernel.h"
 
+//Base class for test cases
 class TestCase {
 public:
-	//main variables
-	int argc; char** argv;
+	//Main variables
+	int argc; 
+	char** argv;
 
-	//constructor
+	//Test description info
+	std::string TestInfo;
+
+	//Test results report
+	std::string TestReport;
+
+	//Constructor
 	/*TestCase(int _argc, char *_argv[]) {
 		argc = _argc;
 		argv = _argv;
 	};*/
 
-	//destructor
-	~TestCase();
+	//Destructor
+	virtual ~TestCase() { /* Empty implementation */ };
 
-	virtual bool RunTest() {
-	return false;
-	};
+	//Main test code function
+	virtual bool RunTest() = 0; 
 };
 
 #endif

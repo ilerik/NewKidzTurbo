@@ -111,6 +111,16 @@ public:
 		return TURBO_OK;
 	};
 
+	//Set configuration
+	turbo_errt SetConfiguration(Configuration configuration) {
+		_configuration = configuration;
+
+		//Synchronize
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Configuration set");	
+		return TURBO_OK;
+	};
+
 	turbo_errt InitCalculation() {
 		//Gas model parameters
 		//_gasModel.loadConfiguration(_configuration);
@@ -130,10 +140,19 @@ public:
 		_gasModel = GasModel();
 		_gasModel.loadConfiguration(_configuration);
 
-		//Solver settings
+		//Solver and method settings
 		rSolver.SetGamma(_gasModel.Gamma);
-		rSolver.SetHartenEps(0.0);
+		rSolver.SetHartenEps(0.0);		
 		//rSolver.SetOperatingPressure(0.0);
+		CFL = _configuration.CFL;
+		RungeKuttaOrder = _configuration.RungeKuttaOrder;
+
+		//Simulation parameters
+		MaxIteration = _configuration.MaxIteration;
+		MaxTime = _configuration.MaxTime;	
+
+		//Initialize start moment
+		stepInfo.Time = 0.0;		
 
 		//Initial conditions
 		InitialConditions::InitialConditions ic;
@@ -703,7 +722,7 @@ public:
 		_configuration.SpecificHeatPressure = 1006.43;
 
 		//Solver settings
-		CFL = 0.5;
+		CFL = _configuration.CFL = 0.5;
 		RungeKuttaOrder = 1;
 		MaxIteration = 20;
 		MaxTime = 0.2;

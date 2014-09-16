@@ -23,6 +23,11 @@ public:
 	double SpecificHeatVolume;
 	double SpecificHeatPressure;
 
+	//Solver settings configuration for now
+	double CFL;
+	int RungeKuttaOrder;
+	int MaxIteration;
+	double MaxTime;
 
 	//Boundary conditions		
 	std::map<std::string, BoundaryConditionConfiguration> BoundaryConditions;
