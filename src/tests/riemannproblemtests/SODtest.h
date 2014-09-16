@@ -61,40 +61,82 @@ public:
 class SodTest : public TestCase
 {
 public:
-	Kernel _kernel;
-	Grid _grid;
-	SodTestInitialConditions ic;
-
-	//constructor
+	//Constructor
 	//void SodTest(int _arg, char *_argv[]) : TestCase(int _arg, char *_argv[]) {};
 	SodTest(int _argc, char *_argv[]) {
 		argc = _argc;
 		argv = _argv;
 	};
 
-	//destructor
+	//Destructor
 	~SodTest() {};
 
 	//run test function
-	bool runSodTest() {
-	
-		_kernel.Initilize(&argc, &argv);
-		_grid = GenGrid2D(_kernel.getParallelHelper(), 10, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
-
-		_kernel.BindGrid(_grid);
+	bool RunTest() {		
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
 		//_kernel.ReadInitialConditions("FlowSolution.E:1");
-		_kernel.ReadConfiguration("");	
+		//_kernel.ReadConfiguration("");
+
+		//Test case description
+		TestInfo = "Sod schock tube classical test case.";
+
+		//Test case configuration
+		Configuration conf;
+		conf.InputCGNSFile = "";
+		conf.OutputCGNSFile = "result.cgns";
+
+		//Ideal gas model parameters
+		conf.GasModel = CaloricallyPerfect;
+		conf.IdealGasConstant = 8.3144621;
+		conf.SpecificHeatRatio = 1.4;
+		conf.SpecificHeatVolume = 1006.43 / 1.4;
+		conf.SpecificHeatPressure = 1006.43;
+
+		//Solver settings
+		conf.CFL = 0.5;
+		conf.RungeKuttaOrder = 1;
+
+		//Simulation parameters
+		conf.MaxIteration = 2000;
+		conf.MaxTime = 0.2;
+
+		//Boundary conditions		
+		conf.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		conf.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		conf.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		conf.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+
+		//Initialize kernel
+		Kernel _kernel;	
+		_kernel.Initilize(&argc, &argv);
+
+		//Generate grid
+		const int nCells = 100;
+		const double xMin = 0.0;
+		const double xMax = 1.0;
+		Grid _grid = GenGrid2D(_kernel.getParallelHelper(), nCells, 1, xMin, xMax, 0.0, 1.0, 1.0, 1.0);
+		_kernel.BindGrid(_grid);
+
+		//Set configuration
+		_kernel.SetConfiguration(conf);
+
+		//Init calculation
 		_kernel.InitCalculation();
 
-		//Initial conditions
+		//Set initial conditions 
+		SodTestInitialConditions ic;
 		_kernel.GenerateInitialConditions(ic);	
 
+		//Run calculation
 		_kernel.RunCalculation();
+
+		//Finalize
 		_kernel.FinalizeCalculation();	
-		_kernel.SaveGrid("result.cgns");
-		_kernel.SaveSolution("result.cgns", "Solution");
+
+		//Check result and generate report
+		//_kernel.SaveGrid("result.cgns");
+		//_kernel.SaveSolution("result.cgns", "Solution");
 		//_kernel.SaveSolution();
 		//_kernel.SaveGrid("grid.cgns");
 		_kernel.Finalize();	
