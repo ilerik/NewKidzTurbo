@@ -61,6 +61,10 @@ public:
 class SodTest : public TestCase
 {
 public:
+	Kernel _kernel;
+	Grid _grid;
+	SodTestInitialConditions ic;
+
 	//constructor
 	//void SodTest(int _arg, char *_argv[]) : TestCase(int _arg, char *_argv[]) {};
 	SodTest(int _argc, char *_argv[]) {
@@ -68,12 +72,15 @@ public:
 		argv = _argv;
 	};
 
+	//destructor
+	~SodTest() {};
+
 	//run test function
 	bool runSodTest() {
-		Kernel _kernel;
 	
 		_kernel.Initilize(&argc, &argv);
-		Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 10, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+		_grid = GenGrid2D(_kernel.getParallelHelper(), 10, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+
 		_kernel.BindGrid(_grid);
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
@@ -82,7 +89,6 @@ public:
 		_kernel.InitCalculation();
 
 		//Initial conditions
-		SodTestInitialConditions ic;
 		_kernel.GenerateInitialConditions(ic);	
 
 		_kernel.RunCalculation();

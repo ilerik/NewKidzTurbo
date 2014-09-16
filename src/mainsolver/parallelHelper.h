@@ -257,7 +257,7 @@ public:
 
 	//Exchange values
 	void ExchangeValues(Grid& grid, std::vector<double>& values) {
-		printf("00");
+		printf("00");	//WID
 		//Allocate memory and fill datastructures
 		int s = 0;
 		int r = 0;
@@ -284,7 +284,7 @@ public:
 
 		//Allocate recieve buffer
 		recvbuf.resize(r);
-		printf("11");
+		printf("11");	//WID
 
 		//Exchange values
 		MPI_Alltoallv(&sendbuf[0], &toSendValuesNumberByProc[0], &sdispl[0], MPI_LONG_DOUBLE, &recvbuf[0], &toRecvValuesNumberByProc[0], &rdispl[0], MPI_LONG_DOUBLE, _comm);		

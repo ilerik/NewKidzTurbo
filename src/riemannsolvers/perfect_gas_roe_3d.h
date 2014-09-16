@@ -158,9 +158,7 @@ public:
 		MaxEigenvalue = eig_max;	
 		return res;
 	};
-
 	
-
 	//fabs() and Harten's entropy correction procedure
 	double Harten(double z, double eps) 
 	{
@@ -168,8 +166,7 @@ public:
 		if (z<eps) z = ((z*z)/eps + eps)*0.5;
 		return z;
 	};
-
-
+	
 	//Public properties
 	double MaxEigenvalue;
 };

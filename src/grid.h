@@ -332,7 +332,6 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	alglib::kdtreebuild(a, nx, ny, normtype, patch.kdt);		
 };
 
-
 //Generate local cells given partitioning and processor rank
 void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
 	localCells.clear();
@@ -413,7 +412,6 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 	for (int i = 0; i<cell->Nodes.size(); i++) cell->CellCenter += localNodes[cell->Nodes[i]].P;
 	cell->CellCenter /= cell->Nodes.size();
 };
-
 
 void Grid::ComputeGeometricProperties(Face* face) {
 	//Check cell type and compute face square and normal

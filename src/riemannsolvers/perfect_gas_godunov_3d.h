@@ -62,6 +62,7 @@ public:
 		double deltaU;		
 	} params;
 
+	//left state function
 	double f1(double roL, double uL, double pL, double pStar) 
 	{
 		double res = 0;
@@ -81,6 +82,7 @@ public:
 		return res;
 	};
 
+	//right state function
 	double f2(double roR, double uR, double pR, double pStar) 
 	{
 		double res = 0;
@@ -268,8 +270,7 @@ public:
 				
 		return result;
 	};
-	  	
-
+	
 	//Solve riemann problem
 	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		std::vector<double> res(5,0);		
@@ -421,9 +422,7 @@ public:
 		
 		return F(U, f.FaceNormal);
 	};
-
 	
-
 	//fabs() and Harten's entropy correction procedure
 	double Harten(double z, double eps) 
 	{
@@ -431,8 +430,7 @@ public:
 		if (z<eps) z = ((z*z)/eps + eps)*0.5;
 		return z;
 	};
-
-
+	
 	//Public properties
 	double MaxEigenvalue;
 };
