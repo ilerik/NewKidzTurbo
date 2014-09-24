@@ -84,7 +84,7 @@ public:
 			_rank = _parallelHelper.getRank();
 			_nProcessors = _parallelHelper.getProcessorNumber();
 
-			//Initialize loggin subsistem
+			//Initialize loggin subsystem
 			_logfilename = "kernel.log"; //TO DO
 			_logger.InitLogging(_parallelHelper, _logfilename);
 
@@ -362,14 +362,6 @@ public:
 
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
 		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
-
-		//Debug partitioning
-		for (int i = 0; i<_nProcessors; i++) {
-			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
-		};		
-		//for (int i = 0; i<51; i++) _grid.cellsPartitioning[i] = 0;
-
-		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Otput result information		
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Partitioning edgecut = ", edgecut);		

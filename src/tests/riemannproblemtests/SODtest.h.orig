@@ -61,18 +61,39 @@ public:
 class SodTest : public TestCase
 {
 public:
+<<<<<<< HEAD
+	Kernel _kernel;
+	Grid _grid;
+	SodTestInitialConditions ic;
+
+	//constructor
+=======
 	//Constructor
+>>>>>>> dd1ed62b5a56a8377f8ded2fc665733917012e6b
 	//void SodTest(int _arg, char *_argv[]) : TestCase(int _arg, char *_argv[]) {};
 	SodTest(int _argc, char *_argv[]) {
 		argc = _argc;
 		argv = _argv;
 	};
 
+<<<<<<< HEAD
+	//destructor
+	~SodTest() {};
+
+	//run test function
+	bool runSodTest() {
+	
+		_kernel.Initilize(&argc, &argv);
+		_grid = GenGrid2D(_kernel.getParallelHelper(), 10, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+
+		_kernel.BindGrid(_grid);
+=======
 	//Destructor
 	~SodTest() {};
 
 	//run test function
 	bool RunTest() {		
+>>>>>>> dd1ed62b5a56a8377f8ded2fc665733917012e6b
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 		//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
 		//_kernel.ReadInitialConditions("FlowSolution.E:1");
@@ -124,8 +145,12 @@ public:
 		//Init calculation
 		_kernel.InitCalculation();
 
+<<<<<<< HEAD
+		//Initial conditions
+=======
 		//Set initial conditions 
 		SodTestInitialConditions ic;
+>>>>>>> dd1ed62b5a56a8377f8ded2fc665733917012e6b
 		_kernel.GenerateInitialConditions(ic);	
 
 		//Run calculation
@@ -136,7 +161,7 @@ public:
 
 		//Check result and generate report
 		//_kernel.SaveGrid("result.cgns");
-		_kernel.SaveSolution("result.cgns", "Solution");
+		//_kernel.SaveSolution("result.cgns", "Solution");
 		//_kernel.SaveSolution();
 		//_kernel.SaveGrid("grid.cgns");
 		_kernel.Finalize();	

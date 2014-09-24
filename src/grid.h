@@ -132,6 +132,7 @@ public:
 //Parallel data node manager
 //Class that handles distributed collection of arbitrary data nodes
 //DataNode must posess public property int GlobalIndex
+//WID
 template<class DataNode> 
 class DistributedEntityManager {
 	std::set<int> node_idx;

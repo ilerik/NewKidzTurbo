@@ -16,12 +16,6 @@ public:
 	//Test results report
 	std::string TestReport;
 
-	//Constructor
-	/*TestCase(int _argc, char *_argv[]) {
-		argc = _argc;
-		argv = _argv;
-	};*/
-
 	//Destructor
 	virtual ~TestCase() { /* Empty implementation */ };
 
