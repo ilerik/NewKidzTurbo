@@ -20,7 +20,8 @@
 class StepInfo {
 public:
 	double Time;
-	double TimeStep;
+	double TimeStep;	
+	int Iteration;
 	std::vector<double> Residual;
 	ConservativeVariables ResidualNew;
 };

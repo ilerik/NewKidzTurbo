@@ -1237,7 +1237,7 @@ void runSodTest(int argc, char *argv[]) {
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
 	//_kernel.ReadInitialConditions("FlowSolution.E:1");
-	_kernel.ReadConfiguration("");	
+	_kernel.ReadConfiguration("");		
 	_kernel.InitCalculation();
 
 	//Initial conditions

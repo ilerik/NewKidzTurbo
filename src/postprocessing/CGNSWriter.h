@@ -259,6 +259,28 @@ public:
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing grid.");				
 	};
 
+	//Write iterative data to base in file
+	void WriteIterativeData(double time, int iteration) {
+		if (_parallelHelper->IsMaster()) {	
+			//Write iterative data node	with one iteration info				
+			cgsize_t nSteps = 1;			
+			char solutionName[32] = "Solution";
+			CALL_CGNS(cg_biter_write(m_file.idx, m_base.idx, "IterativeData", nSteps));
+			CALL_CGNS(cg_goto(m_file.idx, m_base.idx, "IterativeData", 0, "end"));
+			CALL_CGNS(cg_array_write("TimeValues", DataType_t::RealDouble, 1, &nSteps, &time));			
+			CALL_CGNS(cg_ziter_write(m_file.idx, m_base.idx, m_zone.idx, "IterativeData"));
+			CALL_CGNS(cg_goto(m_file.idx, m_base.idx, "Zone", 0, "IterativeData", 0, "end"));
+			int dimensionVector[2];
+			dimensionVector[0] = 32;
+			dimensionVector[1] = nSteps;
+			CALL_CGNS(cg_array_write("FlowSolutionPointers", DataType_t::Character, 2, dimensionVector, solutionName));			
+		};
+
+		//Synchronize
+		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished writing iterative data node.");				
+		_parallelHelper->Barrier();
+	};
+
 	//Write new solution node to file
 	void WriteSolution(Grid& grid, std::string solutionName) {		
 		if (_parallelHelper->IsMaster()) {	

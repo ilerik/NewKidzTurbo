@@ -38,14 +38,17 @@ private:
 	Configuration _configuration;	
 
 	//Gas model
-	GasModel _gasModel;	
+	GasModel _gasModel;		
 
-	//Solver (TO DO)
+	//Solver (TO DO)		
+	SimulationType_t _simulationType; //Simulation type
 	double CFL;
 	double RungeKuttaOrder;
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
+	double SaveSolutionSnapshotTime;
+	int SaveSolutionSnapshotIterations;
 	//Roe3DSolverPerfectGas rSolver;
 	Godunov3DSolverPerfectGas rSolver;
 	StepInfo stepInfo;
@@ -161,14 +164,14 @@ public:
 		//Calc loop
 		std::stringstream msg;	
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation started!");
-		for (int iteration = 0; iteration < MaxIteration; iteration++) {
+		for (stepInfo.Iteration = 0; stepInfo.Iteration <= MaxIteration; stepInfo.Iteration++) {
 			ExplicitTimeStep();
 
 			//Output step information
 			//if (_parallelHelper.IsMaster()) {
 			msg.clear();
 			msg.str(std::string());
-			msg<<"Iteration = "<<iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
+			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 			//};
 
@@ -185,8 +188,19 @@ public:
 			};
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
+			//Solution snapshots
+			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
+				//Save snapshot
+				std::stringstream snapshotFileName;
+				snapshotFileName.str(std::string());
+				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".cgns";
+				SaveGrid(snapshotFileName.str());				
+				SaveSolution(snapshotFileName.str(), "Solution");
+			};
+
+
 			//Convergence criteria
-			if (iteration == MaxIteration - 1) {
+			if (stepInfo.Iteration == MaxIteration) {
 				msg.clear();
 				msg.str(std::string());
 				msg<<"Maximal number of iterations reached.";
@@ -795,10 +809,12 @@ public:
 		_configuration.SpecificHeatPressure = 1006.43;
 
 		//Solver settings
+		_simulationType = TimeAccurate;
 		CFL = 0.5;
 		RungeKuttaOrder = 1;
 		MaxIteration = 10000;
 		MaxTime = 0.2;
+		SaveSolutionSnapshotIterations = 1;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
@@ -910,14 +926,23 @@ public:
 		int nv = _gasModel.nConservativeVariables;
 		std::vector<std::string> storedFields = _gasModel.GetStoredFieldsNames();
 
+		//Write simulation type
+
+		//Write iterative data
+		double iter = stepInfo.Iteration;
+		double time = stepInfo.Time;		
+		if (_simulationType == TimeAccurate) {
+			_cgnsWriter.WriteIterativeData(time, iter);
+		};
+
 		//Write solution node		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "1");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "1");	
 		_cgnsWriter.WriteSolution(_grid, solutionName);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
 
 		//Write physical quantities
 		std::vector<double> buffer(_grid.nCellsLocal);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 
 		//Stored fields
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "storedFields.size() = ", storedFields.size());	
@@ -931,9 +956,9 @@ public:
 				std::vector<double> storedValues = _gasModel.GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
 			_cgnsWriter.WriteField(_grid, solutionName, fieldName, buffer);		
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 		};
 
 		//Additional fields (TO DO) generalize
