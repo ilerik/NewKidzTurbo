@@ -174,7 +174,7 @@ public:
 
 			//Debug
 			//Output values
-			msg.clear();
+			/*msg.clear();
 			msg.str(std::string());
 			msg<<"Values:\n";
 			for (int i = 0; i<_grid.nCellsLocal; i++) {
@@ -183,7 +183,7 @@ public:
 				for (int j = 0; j<_gasModel.nConservativeVariables; j++) msg<<Values[i * _gasModel.nConservativeVariables + j]<<" ";
 				msg<<"\n";
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Convergence criteria
 			if (iteration == MaxIteration - 1) {
@@ -194,7 +194,7 @@ public:
 				break;
 			};
 
-			if (stepInfo.Time > MaxTime) {
+			if (stepInfo.Time >= MaxTime) {
 				msg.clear();
 				msg.str(std::string());
 				msg<<"Maximal time reached.";
@@ -1007,13 +1007,13 @@ public:
 		//Exchange requested cell values
 		ParallelExchangeValues();
 		std::stringstream msg;
-		msg.clear();		
+		/*msg.clear();		
 		msg<<"Obtained values : ";
 		for (std::pair<int, std::vector<double>> p : _parallelHelper.RequestedValues) {
 			msg<<"cell="<<p.first<<"values=("<<p.second[0]<<","<<p.second[1]<<","
 				<<p.second[2]<<","<<p.second[3]<<","<<p.second[4]<<")";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/	
 
 
 		//Compute convective flux for each cell face and apply boundary conditions								
@@ -1039,9 +1039,9 @@ public:
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 			UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
 			UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
 
 			//GasModel::ConservativeVariables UL_ = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
 			//GasModel::ConservativeVariables UR_;
@@ -1066,11 +1066,11 @@ public:
 
 			//Compute flux
 			flux = rSolver.ComputeFlux( UL,  UR, f);	
-			msg.str("");		
+			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
 				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
 				<<f.FaceNormal.x<<","<<f.FaceNormal.y<<","<<f.FaceNormal.z<<")";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = rSolver.MaxEigenvalue;
@@ -1202,14 +1202,14 @@ public:
 		std::map<int, double> spectralRadius;
 		ComputeSpectralRadius(spectralRadius, MaxWaveSpeed, Values);
 
-		msg.clear();
+		/*msg.clear();
 		msg.str(std::string());
 		msg<<"MaxWaveSpeed :\n";
 		int ind = 0;
 		for (auto p : MaxWaveSpeed) {
 			msg<<"Face = "<<ind++<<" MaxWaveSpeed = "<<p<<"\n";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1217,18 +1217,18 @@ public:
 		std::map<int, double> localTimeStep;
 		ComputeLocalTimeStep(localTimeStep, spectralRadius);
 		
-		msg.clear();
+		/*msg.clear();
 		msg.str(std::string());
 		msg<<"Local time step :\n";
 		for (auto p : localTimeStep) {
 			msg<<"cell= "<<p.first<<" timeStep= "<<p.second<<"\n";
-		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		};*/
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Synchronize
 		_parallelHelper.Barrier();
 
-		stepInfo.TimeStep = std::numeric_limits<double>::max();
+		stepInfo.TimeStep = MaxTime - stepInfo.Time; 
 		for (std::pair<int, double> p : localTimeStep)
 		{
 			double& timeStep = p.second;
@@ -1372,10 +1372,10 @@ public:
 
 	//Get cell values
 	inline std::vector<double> GetCellValues(int globalIndex, int localIndex = -1) {
-		std::stringstream msg;
+		/*std::stringstream msg;
 		msg.str("");
 		msg<<"Global Index = "<<globalIndex;
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 		if (IsLocalCell(globalIndex)) {
 			if (IsDummyCell(globalIndex)) {
 				//If dummy cell compute on the go
@@ -1383,7 +1383,7 @@ public:
 				msg<<"Cells = "<<globalIndex;
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 				Cell& cell = _grid.Cells[globalIndex];				
-				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );
 				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
 			} else {
 				//If proper cell return part of Values array				
@@ -1391,9 +1391,9 @@ public:
 					//If local index is unknown determine it
 					//Lower perfomance WARNING
 					localIndex = _grid.cellsGlobalToLocal[globalIndex];					
-					msg.str("");					
-					msg<<"Local Index = "<<localIndex;
-					_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
+					//msg.str("");					
+					//msg<<"Local Index = "<<localIndex;
+					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 				};
 				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
 			};
