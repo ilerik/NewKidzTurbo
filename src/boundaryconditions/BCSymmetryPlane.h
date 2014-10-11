@@ -12,7 +12,7 @@ public:
 		if (dummyCell.Faces.size() != 1) throw new Exception("Dummy cell has more than one face");
 		Face& face = _grid->localFaces[dummyCell.Faces[0]];
 		//Obtain neighbour cell
-		int nCellIndex = face.FaceCell_1;
+		int nCellIndex = _grid->cellsGlobalToLocal[face.FaceCell_1];
 		int nVariables = _gasModel->nConservativeVariables;
 		//Obtain interrior values
 		std::vector<double> inV(&values[nCellIndex * nVariables], &values[nVariables * nCellIndex] + nVariables);

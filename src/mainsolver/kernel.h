@@ -46,8 +46,8 @@ private:
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
-	Roe3DSolverPerfectGas rSolver;
-	//Godunov3DSolverPerfectGas rSolver;
+	//Roe3DSolverPerfectGas rSolver;
+	Godunov3DSolverPerfectGas rSolver;
 	StepInfo stepInfo;
 
 	//Parallel run information		
@@ -348,7 +348,7 @@ public:
 		/*for (int i = 0; i<_nProcessors; i++) {
 			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
 		};		*/
-		//for (int i = 0; i<51; i++) _grid.cellsPartitioning[i] = 0;
+		//for (int i = 10; i<51; i++) _grid.cellsPartitioning[i] = 0;
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
@@ -453,7 +453,8 @@ public:
 					result.first->second = face.GlobalIndex;
 					_grid.localFaces.push_back(face);
 					_grid.localFaces[faceIndex].isExternal = true;
-					_grid.localFaces[faceIndex].FaceCell_1 = i;
+					//_grid.localFaces[faceIndex].FaceCell_1 = i;
+					_grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
 					_grid.localCells[i]->Faces.push_back(face.GlobalIndex);
 					faceIndex++;
 				} else {					
@@ -465,7 +466,8 @@ public:
 					if (cell->IsDummy) {
 						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					} else {
-						_grid.localFaces[fIndex].FaceCell_2 = i;
+						//_grid.localFaces[faceIndex].FaceCell_2 = i;
+						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					};
 					_grid.localCells[i]->Faces.push_back(fIndex);
 				};
@@ -482,8 +484,8 @@ public:
 			nExternal++;
 			int faceNodes = face.FaceNodes.size();
 			msg<<"faceNodes = "<<faceNodes<<"\n";
-			Cell* cell = _grid.localCells[face.FaceCell_1];
-			for (int nCellID : cell->NeigbourCells) {
+			Cell& cell = _grid.Cells[face.FaceCell_1];
+			for (int nCellID : cell.NeigbourCells) {
 				msg<<"nCellID = "<<faceNodes<<"\n";
 				Cell& nCell = _grid.Cells[nCellID];
 				int nCommonNodes = 0;
@@ -523,7 +525,7 @@ public:
 			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
 
 			//Orient normal
-			Vector cellCenter = _grid.localCells[_grid.localFaces[index].FaceCell_1]->CellCenter;
+			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
 			Vector faceCenter = _grid.localFaces[index].FaceCenter;
 			if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
 				_grid.localFaces[index].FaceNormal *= -1;
@@ -690,7 +692,7 @@ public:
 		return TURBO_OK;
 	};
 
-		turbo_errt ParallelExchangeGradients() {
+	turbo_errt ParallelExchangeGradients() {
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Started : Exchange gradients.");	
 
 		//Debug info
@@ -1017,23 +1019,29 @@ public:
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
 		for (int i = 0; i<_grid.localFaces.size(); i++) {
-			Face& f = _grid.localFaces[i];
-			int cellIndexLeft = f.FaceCell_1;			
-			Cell& cLeft = _grid.Cells[cellIndexLeft];		
-			int cellIndexRight = f.FaceCell_2;
+			Face& f = _grid.localFaces[i];			
+			
 			//Debug
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceID = ", f.GlobalIndex);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceCell1 = ", cellIndexLeft);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceCell2 = ", cellIndexRight);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "isExternal = ", f.isExternal);
-			Cell& cRight = _grid.Cells[cellIndexRight];
+			
 			std::vector<double> flux;
 			GasModel::ConservativeVariables UL;
 			GasModel::ConservativeVariables UR;
 			//TO DO check for indexes LOCAL vs GLOBAL for cells
 			//UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
-			UL = GasModel::ConservativeVariables(GetCellValues(cLeft.GlobalIndex, cellIndexLeft));
-			UR = GasModel::ConservativeVariables(GetCellValues(cRight.GlobalIndex));
+			/*msg.str("Reconstruct cell values.");
+			msg<<"cLeft.GlobalIndex = "<< cLeftGlobalIndex << "\n";
+			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
+			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
+			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
+			UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
+			UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
 
 			//GasModel::ConservativeVariables UL_ = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
 			//GasModel::ConservativeVariables UR_;
@@ -1041,7 +1049,6 @@ public:
 			//	//If it is local face and both cells local				
 			//	if (cRight.IsDummy) {
 			//		//Dummy cell
-
 			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
 			//		std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
 			//		UR_ = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
@@ -1058,7 +1065,12 @@ public:
 			//};
 
 			//Compute flux
-			flux = rSolver.ComputeFlux( UL,  UR, f);							
+			flux = rSolver.ComputeFlux( UL,  UR, f);	
+			msg.str("");		
+			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
+				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
+				<<f.FaceNormal.x<<","<<f.FaceNormal.y<<","<<f.FaceNormal.z<<")";
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = rSolver.MaxEigenvalue;
@@ -1118,6 +1130,7 @@ public:
 			for (double& v : flux) v = 0;
 		};
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
 		////Compute gradients
 		//if (IsGradientRequired) ComputeGradients();
@@ -1134,7 +1147,7 @@ public:
 			for (int nFaceIndex : nFaces)
 			{
 				Face& face = _grid.localFaces[nFaceIndex];
-				int fluxDirection = (face.FaceCell_1 == cellIndex) ? 1 : -1;		
+				int fluxDirection = (face.FaceCell_1 == cell->GlobalIndex) ? 1 : -1;		
 				std::vector<double> fluxc = FaceFluxes[nFaceIndex];
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
@@ -1359,17 +1372,28 @@ public:
 
 	//Get cell values
 	inline std::vector<double> GetCellValues(int globalIndex, int localIndex = -1) {
+		std::stringstream msg;
+		msg.str("");
+		msg<<"Global Index = "<<globalIndex;
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 		if (IsLocalCell(globalIndex)) {
 			if (IsDummyCell(globalIndex)) {
 				//If dummy cell compute on the go
+				/*msg.str("");
+				msg<<"Cells = "<<globalIndex;
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 				Cell& cell = _grid.Cells[globalIndex];				
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );
 				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
 			} else {
 				//If proper cell return part of Values array				
 				if (localIndex == -1) {
 					//If local index is unknown determine it
 					//Lower perfomance WARNING
-					localIndex = _grid.cellsGlobalToLocal[globalIndex];
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];					
+					msg.str("");					
+					msg<<"Local Index = "<<localIndex;
+					_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 				};
 				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
 			};
