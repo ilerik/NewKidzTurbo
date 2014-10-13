@@ -1232,11 +1232,8 @@ void runSodTest(int argc, char *argv[]) {
 	Kernel _kernel;
 	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, true, true);
 	_kernel.BindGrid(_grid);
-	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
-	//_kernel.LoadGrid("C:\\Users\\Erik\\Dropbox\\Science\\ValidationCFD\\LaminarFlatPlate\\Mesh80\\solution.cgns");	
-	//_kernel.ReadInitialConditions("FlowSolution.E:1");
 	_kernel.ReadConfiguration("");		
 	_kernel.InitCalculation();
 
@@ -1244,62 +1241,78 @@ void runSodTest(int argc, char *argv[]) {
 	SodTestInitialConditions ic;
 	_kernel.GenerateInitialConditions(ic);	
 
+	//Run test
 	_kernel.RunCalculation();
-	_kernel.FinalizeCalculation();	
+	_kernel.FinalizeCalculation();
+
+	//Output result
 	_kernel.SaveGrid("result.cgns");
 	_kernel.SaveSolution("result.cgns", "Solution");
-	//_kernel.SaveSolution();
-	//_kernel.SaveGrid("grid.cgns");
 	_kernel.Finalize();	
 };
 
+//Periodic boundary test
+class PeriodicTestInitialConditions : public InitialConditions::InitialConditions
+{
+public:
+	virtual std::vector<double> getInitialValues(const Cell& cell) {
+		std::vector<double> initValues;
+			//Other velocities
+			double ro = 1.0;
+			double u = 1;
+			double v = 1;
+			double w = 1;
+			double P = 1.0;
+
+			//Cell center
+			double x = cell.CellCenter.x;
+			double y = cell.CellCenter.y;
+			double z = cell.CellCenter.z;
+				
+			//Values
+			double roE = P/(_gasModel->Gamma - 1.0);;
+			
+			//Convert to conservative variables
+			initValues.resize(_gasModel->nConservativeVariables);
+			initValues[0] = ro;
+			initValues[1] = ro * u;
+			initValues[2] = ro * v;
+			initValues[3] = ro * w;
+			initValues[4] = roE;// + (u*u + v*v + w*w) / 2.0);
+
+			return initValues;		
+	};
+};
+
+void runPeriodicTest(int argc, char *argv[]) {
+	Kernel _kernel;
+	
+	_kernel.Initilize(&argc, &argv);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 20, 20, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, true, true);
+	_kernel.BindGrid(_grid);
+	_kernel.ReadConfiguration("");		
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	PeriodicTestInitialConditions ic;
+	_kernel.GenerateInitialConditions(ic);	
+
+	//Run test
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
+
+	//Output result
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	_kernel.Finalize();	
+};
+
+
 //Main program ))
  int main(int argc, char *argv[]) {		
-	//MPI_Init(&argc, &argv);
-	//std::cout<<sizeof(MPI_LONG_DOUBLE)<<"\n";
-	//int size;
-	//MPI_Type_size( MPI_DOUBLE, &size );
-	//std::cout<<size<<"\n";		
-	//std::cout<<sizeof(double)<<"\n";
-	//MPI_Finalize();
-	
-	////Gradients unit test
-	//Vector point(0,0,0);
-	//std::vector<Vector> points;
-	//double value = 0;
-	//std::vector<double> values;
 
-	//points.push_back(Vector(0,1,0));
-	//points.push_back(Vector(1,0,0));
-	//points.push_back(Vector(0,-1,0));
-	//points.push_back(Vector(-1,0,0));
-	//points.push_back(Vector(1,0,1));
-	//for (Vector p : points) {
-	//	double val = 2 * p.x + 3 * (p.y * p.y) + 5 * p.z; 
-	//	values.push_back(val);
-	//};
-
-
-	//Vector grad = ComputeGradientByPoints(point, value, points, values);
-	//return 0;
-
-	//SimpleChannelTest(); return 0;
-	//ImplicitSolverTestOneCell(); return 0;
-	//BlasiusTest(); return 0;
-	//BumpFlowTestExplicit(); return 0;
-	//ImplicitSolverTest(); return 0;
-	//LinearSolverTests(); return 0;
-	//GodunovTests();
-	//RunSAFlatPlate();
-	//RunGAWCalculation();
-	//RunPoiseuilleTest();
-	//RunSODTest();
-	//RunBiffFlatPlate();
-    
-	//RunSODTest();
-	//return 0;
-
-	runSodTest(argc, argv);
+	runPeriodicTest(argc, argv);
+	//runSodTest(argc, argv);
 	return 0;
 	
 	Kernel _kernel;	

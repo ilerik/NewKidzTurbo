@@ -171,6 +171,9 @@
     <ClInclude Include="src\initialConditions\InitialConditions.h">
       <Filter>Header Files\InitialConditions</Filter>
     </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

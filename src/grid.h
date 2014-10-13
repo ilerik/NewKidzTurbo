@@ -238,7 +238,8 @@ public:
 	std::vector<Cell> Cells; // all cells
 	std::vector<Cell*> localCells; // only local cells (including dummy cells)
 	std::unordered_set<int> dummyLocalCells; // dummy cells created for each boundary face element	
-	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index	
+	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index
+	std::map<int, std::set<int>> periodicNodesIdentityList; // for each node list of nodes identifyed with it via periodic boundary
 
 	//Faces
 	int nFaces; //number of local faces

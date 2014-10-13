@@ -154,6 +154,7 @@
     <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h" />
     <ClInclude Include="src\mainsolver\kernel.h" />
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />

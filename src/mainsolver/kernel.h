@@ -320,14 +320,23 @@ public:
 		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
 		std::vector<idx_t> part(_grid.nCellsLocal);
 		std::ostringstream msg;
+		msg.str(std::string());
 		msg<<"vdist[] = \n";
 		for (int i = 0; i<=_nProcessors; i++) msg<<_grid.vdist[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
+		msg.str(std::string());
 		msg<<"xadj[] = \n";
 		for (int i = 0; i<_grid.xadj.size(); i++) msg<<_grid.xadj[i]<<" ";
+		msg<<"\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		msg.clear();
+		msg.str(std::string());
+		msg<<"adjncy[] = \n";
+		for (int i = 0; i<_grid.adjncy.size(); i++) msg<<_grid.adjncy[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
@@ -473,9 +482,6 @@ public:
 					faceIndex++;
 				} else {					
 					int fIndex = result.first->second;
-					if (cell->GlobalIndex == 98) {
-						_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cell 98 found, face index = ",fIndex);
-					};
 					_grid.localFaces[fIndex].isExternal = false;
 					if (cell->IsDummy) {
 						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
@@ -495,7 +501,6 @@ public:
 		for (Face& face : _grid.localFaces) if (face.isExternal) {
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
-			nExternal++;
 			int faceNodes = face.FaceNodes.size();
 			msg<<"faceNodes = "<<faceNodes<<"\n";
 			Cell& cell = _grid.Cells[face.FaceCell_1];
@@ -506,6 +511,10 @@ public:
 				std::set<int> cellNodes;
 				for (int cellNodeID : nCell.Nodes) {
 					cellNodes.insert(cellNodeID);
+					//Handle periodic
+					if (_grid.periodicNodesIdentityList.find(cellNodeID) != _grid.periodicNodesIdentityList.end()) {
+						cellNodes.insert(_grid.periodicNodesIdentityList[cellNodeID].begin(), _grid.periodicNodesIdentityList[cellNodeID].end());
+					};
 					msg<<"cellNodeID = "<<cellNodeID<<"\n";
 				};
 				for (int nodeID : face.FaceNodes) {
@@ -514,6 +523,11 @@ public:
 				};
 				if (nCommonNodes == faceNodes) {
 					//We found second cell
+					if (IsLocalCell(nCellID)) {
+						face.isExternal = false;
+					} else {
+						face.isExternal = true; nExternal++;
+					};
 					face.FaceCell_2 = nCellID;
 					break;
 				};
@@ -814,7 +828,7 @@ public:
 		RungeKuttaOrder = 1;
 		MaxIteration = 10000;
 		MaxTime = 0.2;
-		SaveSolutionSnapshotIterations = 1;
+		SaveSolutionSnapshotIterations = 10;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
