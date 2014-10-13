@@ -366,7 +366,7 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 		Vector rOrigin = localNodes[cell->Nodes[0]].P;
 		for (int i = 0; i<cell->Faces.size(); i++) {
 			//Get face
-			Face& face = faces[cell->Faces[i]];
+			Face& face = localFaces[cell->Faces[i]];
 			//Consider normal direction
 			double direction = 1;
 			if (cell->GlobalIndex != face.FaceCell_1) direction = -1;

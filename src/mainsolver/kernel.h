@@ -538,19 +538,24 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);	
-
-		//Update cells geometric properties
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
-			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
 		//Generate face geometric properties		
 		_grid.nFaces = faceIndex;		
 		for (Face& face : _grid.localFaces) {
 			int index = face.GlobalIndex;						
 			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		};
+
+		//Update cells geometric properties
+		for (int i = 0; i < _grid.nCellsLocal; i++) {
+			_grid.ComputeGeometricProperties(_grid.localCells[i]);
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		};	
+
+		//Orient face normals			
+		for (Face& face : _grid.localFaces) {
+			int index = face.GlobalIndex;									
 
 			//Orient normal
 			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;

@@ -1284,11 +1284,43 @@ public:
 	};
 };
 
-void runPeriodicTest(int argc, char *argv[]) {
+void runPeriodicTest2D(int argc, char *argv[]) {
 	Kernel _kernel;
 	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 20, 20, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, true, true);
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 20, 20, 
+		0.0, 1.0,
+		0.0, 1.0,
+		1.0, 1.0,
+		true, true);
+	_kernel.BindGrid(_grid);
+	_kernel.ReadConfiguration("");		
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	PeriodicTestInitialConditions ic;
+	_kernel.GenerateInitialConditions(ic);	
+
+	//Run test
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
+
+	//Output result
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	_kernel.Finalize();	
+};
+
+void runPeriodicTest3D(int argc, char *argv[]) {
+	Kernel _kernel;
+	
+	_kernel.Initilize(&argc, &argv);
+	Grid _grid = GenGrid3D(_kernel.getParallelHelper(), 10, 10, 10, 
+		0.0, 1.0, 
+		0.0, 1.0, 
+		0.0, 1.0,
+		1.0, 1.0, 1.0, 
+		true, true, true);
 	_kernel.BindGrid(_grid);
 	_kernel.ReadConfiguration("");		
 	_kernel.InitCalculation();
@@ -1311,7 +1343,7 @@ void runPeriodicTest(int argc, char *argv[]) {
 //Main program ))
  int main(int argc, char *argv[]) {		
 
-	runPeriodicTest(argc, argv);
+	//runPeriodicTest2D(argc, argv);
 	//runSodTest(argc, argv);
 	return 0;
 	

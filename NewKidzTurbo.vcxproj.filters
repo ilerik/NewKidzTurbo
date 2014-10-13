@@ -174,6 +174,9 @@
     <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h">
       <Filter>Header Files\MainSolver\Configuration</Filter>
     </ClInclude>
+    <ClInclude Include="src\gridgeneration\gengrid3D.h">
+      <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
