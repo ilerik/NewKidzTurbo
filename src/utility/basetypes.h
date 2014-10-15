@@ -770,7 +770,7 @@ void mult( const SparseRowMatrix &A, const double *v, double *w ) {
     /* ... your implementation of the multiplication ...    */
 	for (int i = 0; i<A.nRow; i++) {
 		w[i] = 0;		
-		for each (std::pair<int, double> pair in A.A[i])
+		for (std::pair<int, double> pair : A.A[i])
 		{
 			w[i] += v[pair.first] * pair.second;
 		}

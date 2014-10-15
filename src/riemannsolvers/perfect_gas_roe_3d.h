@@ -62,6 +62,10 @@ public:
 	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		std::vector<double> res(5,0);						
 
+		//Calculate symmetric flux part	
+		std::vector<double> symFluxPart = 1.0*(F(UL, (1.0)*f.FaceNormal) + F(UR, (1.0)*f.FaceNormal)); //is 1.0 or 0.5 TODO	
+		res += symFluxPart;
+
 		//for (int i = 0; i<nv; i++) printf("%lg\n", res[i]);
 		//Calculates stabilization term which is a part of numerical
 		//flux vector i.e. |A|(Q{R}-Q{L})
@@ -153,10 +157,7 @@ public:
 		double dro_dT =  - ro / T;
 		double Ur = uw;		
 		double teta = (1.0/(Ur*Ur) - dro_dT/(ro*Cp));*/		
-
-		//Calculate symmetric flux part	
-		std::vector<double> symFluxPart = 1.0*(F(UL, (1.0)*f.FaceNormal) + F(UR, (1.0)*f.FaceNormal)); //is 1.0 or 0.5 TODO	
-		res += symFluxPart;
+	
 
 		MaxEigenvalue = eig_max;	
 		return res;

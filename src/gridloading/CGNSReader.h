@@ -27,6 +27,48 @@ private:
 	Logger* _logger;
 	ParallelHelper* _parallelHelper;
 protected:
+
+	//Check if it's suppoted element type
+	bool IsSupprotedCGNSEelementType(ElementType_t type) {
+		if (type == NODE) return true;
+		if (type == BAR_2) return true;
+		if (type == QUAD_4) return true;
+		if (type == HEXA_8) return true;
+		if (type == TRI_3) return true;
+		if (type == TETRA_4) return true;
+		if (type == PENTA_6) return true;
+		return false;
+	};
+
+	//And get it's dimensions
+	int GetCGNSElementDimensions(ElementType_t type) {
+		int dim = -1;
+		switch (type) {
+		//0D Elements
+		case NODE:
+			return 0;
+		//1D Elements
+		case BAR_2:
+			return 1;
+		//2D Elements
+		case QUAD_4:
+			return 2;
+		case TRI_3:
+			return 2;		
+		//3D Elements
+		case HEXA_8:
+			return 3;	
+		case PENTA_6:
+			return 3;
+		case TETRA_4:
+			return 3;
+	}	
+
+	if (dim == -1) std::cout<<"Unknown element type\n";
+	return dim;
+};
+
+
 	struct CGNS_Size
 	{
 		int nbCoords;
@@ -102,30 +144,45 @@ protected:
 		int nDataSet;
 	} m_boco; 	
 
+	////Internal numbering mapping from CGNS index to ElementType_t and list of element nodes
+	//std::unordered_map<int, ElementType_t> elementType;
+	//std::unordered_map<int, std::vector<int> > elementNodes;
+
+	////Cells information
+	//int nCells; //Total number of cells in grid
+	//std::unordered_set<int> cells;//CGNS indexes of cell elements
+	//std::unordered_map<int, int> _cellCToG; // CGNS index to global index
+	//std::unordered_map<int, int> _cellGToC; // global index to CGNS index
+
+	////Faces information
+	//std::unordered_set<int> faces;//CGNS indexes of face elements	
+	//std::unordered_map<int, int> _faceCToG; // CGNS index to global index
+	//std::unordered_map<int, int> _faceGToC; // global index to CGNS index
+
 	//Internal numbering mapping from CGNS index to ElementType_t and list of element nodes
-	std::unordered_map<int, ElementType_t> elementType;
-	std::unordered_map<int, std::vector<int> > elementNodes;
+	std::map<int, ElementType_t> elementType;
+	std::map<int, std::vector<int> > elementNodes;
 
 	//Cells information
 	int nCells; //Total number of cells in grid
-	std::unordered_set<int> cells;//CGNS indexes of cell elements
-	std::unordered_map<int, int> _cellCToG; // CGNS index to global index
-	std::unordered_map<int, int> _cellGToC; // global index to CGNS index
+	std::set<int> cells;//CGNS indexes of cell elements
+	std::map<int, int> _cellCToG; // CGNS index to global index
+	std::map<int, int> _cellGToC; // global index to CGNS index
 
 	//Faces information
-	std::unordered_set<int> faces;//CGNS indexes of face elements	
-	std::unordered_map<int, int> _faceCToG; // CGNS index to global index
-	std::unordered_map<int, int> _faceGToC; // global index to CGNS index
+	std::set<int> faces;//CGNS indexes of face elements	
+	std::map<int, int> _faceCToG; // CGNS index to global index
+	std::map<int, int> _faceGToC; // global index to CGNS index
 
 	//Boundary conditions
 	int nbBCs;
 	std::vector<std::string> bcNames;
-	std::vector<std::unordered_set<int>> bcElements;
+	std::vector<std::set<int>> bcElements;
 
 	//Grid vertices information
 	int nNodes; //Total number of nodes in grid
-	std::unordered_map<int, int> _nodeCToG; // CGNS index to global index
-	std::unordered_map<int, int> _nodeGToC; // global index to CGNS index
+	std::map<int, int> _nodeCToG; // CGNS index to global index
+	std::map<int, int> _nodeGToC; // global index to CGNS index
 	std::vector<Node> nodes; //List of nodes 
 
 private:
@@ -295,7 +352,7 @@ private:
 		case ElementRange : // all bc elements are within a range given by 2 global element numbers
 		{			
 			bcNames.push_back(m_boco.name);
-			bcElements.push_back(std::unordered_set<int>());
+			bcElements.push_back(std::set<int>());
 			for (int ind=boco_elems[0]; ind<=boco_elems[1]; ind++)
 			{
 				bcElements[nbBCs].insert(ind);
@@ -306,7 +363,7 @@ private:
 		case ElementList : // all bc elements are listed as global element numbers
 		{
 			bcNames.push_back(m_boco.name);
-			bcElements.push_back(std::unordered_set<int>());						
+			bcElements.push_back(std::set<int>());						
 			for (int i=0; i<m_boco.nBC_elem; ++i)
 			{
 				int ind = boco_elems[i];        			
@@ -380,15 +437,17 @@ private:
 				read_boco();		
 
 			// check that each face element has BC attached
-			std::unordered_set<int> boundaryFaces;
+			//std::unordered_set<int> boundaryFaces;
+			std::set<int> boundaryFaces;
 			for (int i = 0; i<nbBCs; i++) {
-				for (std::unordered_set<int>::iterator it = bcElements[i].begin(); it != bcElements[i].end(); it++) {
+				for (std::set<int>::iterator it = bcElements[i].begin(); it != bcElements[i].end(); it++) {
 					boundaryFaces.insert(*it);
 				};
 			};
 
 			bool isConsistent = true;			
-			std::unordered_set<int>::iterator itbf = boundaryFaces.begin();
+			//std::unordered_set<int>::iterator itbf = boundaryFaces.begin();
+			std::set<int>::iterator itbf = boundaryFaces.begin();
 			if (faces.size() != boundaryFaces.size()) isConsistent = false;
 			while (isConsistent) {
 				if (itbf == boundaryFaces.end()) break;					

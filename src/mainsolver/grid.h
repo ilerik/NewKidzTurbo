@@ -8,8 +8,8 @@
 #include "parmetis.h"
 #include <map>
 #include <set>
-#include <unordered_set>
-#include <unordered_map>
+//#include <unordered_set>
+//#include <unordered_map>
 #include <algorithm>
 
 //Specify supported element types
@@ -129,60 +129,6 @@ public:
 };
 
 
-//Parallel data node manager
-//Class that handles distributed collection of arbitrary data nodes
-//DataNode must posess public property int GlobalIndex
-template<class DataNode> 
-class DistributedEntityManager {
-	std::set<int> node_idx;
-	std::map<int, DataNode> localNodes;
-
-public:
-	DataNode& operator[](int index) {
-		//Check if index is ok
-		if (node_idx.find(index) == node_idx.cend()) throw Exception("Invalid node global index");
-		//Check if its local first
-		std::map<int, DataNode>::iterator it = localNodes.find(index);
-		if (it != localNodes.end()) return it->second;	//Its local and it exists		
-	};
-
-	std::vector<DataNode*> getLocalNodes() {
-		std::vector<DataNode*> nodes;
-		for (std::map<int, DataNode>::iterator it = localNodes.begin(); it!=localNodes.end(); it++) {
-			nodes.push_back(&(it->second));
-		};
-		return nodes;
-	};
-
-	std::map<int, DataNode>& getLocalNodesWithIndex() {		
-		return localNodes;
-	};
-
-	int size() {
-		return node_idx.size();
-	};	
-
-	std::set<int> getAllIndexes() {
-		return node_idx;
-	};
-
-	void add(DataNode n) {
-		node_idx.insert(n.GlobalIndex);
-		localNodes[n.GlobalIndex] = n;
-	};
-
-	void removeAt(int index) {
-		if (node_idx.find(index) != node_idx.cend()) {
-			node_idx.erase(index);
-			localNodes.erase(index);
-		};
-	};
-
-	bool exist(int index) {
-		return node_idx.find(index) != node_idx.cend();
-	};
-};
-
 
 //general info
 class GridInfo {
@@ -204,8 +150,8 @@ public:
 	std::vector<int> BoundarySections; // boundary elements sections (possible many)	
 
 	//raw cgns connectivity info
-	std::unordered_map<int, std::set<int> > cgnsIndexToElementNodes;	
-	std::unordered_map<int, ElementType_t > cgnsIndexToElementType;
+	std::map<int, std::set<int> > cgnsIndexToElementNodes;	
+	std::map<int, ElementType_t > cgnsIndexToElementType;
 	std::vector<int> boundaryElements;  //Boundary faces
 	std::vector<int> volumeElements;	//Cells
 
@@ -237,8 +183,8 @@ public:
 	int nDummyCells;  //number of dummy cells
 	std::vector<Cell> Cells; // all cells
 	std::vector<Cell*> localCells; // only local cells (including dummy cells)
-	std::unordered_set<int> dummyLocalCells; // dummy cells created for each boundary face element	
-	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index
+	std::set<int> dummyLocalCells; // dummy cells created for each boundary face element	
+	std::map<int, int> cellsGlobalToLocal; // cells global index map to local index
 	std::map<int, std::set<int>> periodicNodesIdentityList; // for each node list of nodes identifyed with it via periodic boundary
 
 	//Faces
@@ -261,15 +207,13 @@ public:
 
 	//Refresh list of boundary nodes
 	void RefreshBoundaryNodes()
-	{
-		std::vector<Face*> f = faces.getLocalNodes();
-		for (int i = 0; i<f.size(); i++) {
-			if (f[i]->isExternal) {
-				for (int j = 0; j < f[i]->FaceNodes.size(); j++) {
-					int index = f[i]->FaceNodes[j];
-					if (boundaryNodes.find(index) != boundaryNodes.end()) continue;
-					boundaryNodes.insert(index);
-				};
+	{		
+		for (int i = nCellsLocal; i<localCells.size(); i++) {
+			Cell* dummyCell = localCells[i];			
+			for (int j = 0; j < dummyCell->Nodes.size(); j++) {
+				int index = dummyCell->Nodes[j];
+				if (boundaryNodes.find(index) != boundaryNodes.end()) continue;
+				boundaryNodes.insert(index);
 			};			
 		};					
 	};
@@ -279,11 +223,7 @@ public:
 	};
 
 	~Grid(void){
-	};
-
-	DistributedEntityManager<Node> nodes;
-	DistributedEntityManager<Cell> cells;
-	DistributedEntityManager<Face> faces;
+	};	
 
 	//Geometric properties computation
 	std::vector<Face> Grid::ObtainFaces(Cell* cell);
@@ -322,10 +262,10 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	a.setlength(nx + ny, patch.nodes_idx.size());
 	int i = 0;
 	for (std::set<int>::iterator it = patch.nodes_idx.begin(); it != patch.nodes_idx.end(); it++) {			
-		a[0][i] = nodes[*it].P.x;
-		a[1][i] = nodes[*it].P.y;
-		a[2][i] = nodes[*it].P.z;
-		a[3][i] = nodes[*it].GlobalIndex;
+		a[0][i] = localNodes[*it].P.x;
+		a[1][i] = localNodes[*it].P.y;
+		a[2][i] = localNodes[*it].P.z;
+		a[3][i] = localNodes[*it].GlobalIndex;
 		i++;
 	};
 	
@@ -456,7 +396,7 @@ void Grid::ComputeGeometricProperties(Face* face) {
 		face->FaceSquare = 1.0;
 
 		//Compute normal		
-		face->FaceNormal = (cells[face->FaceCell_1].CellCenter - face->FaceCenter);		
+		face->FaceNormal = (Cells[face->FaceCell_1].CellCenter - face->FaceCenter);		
 		face->FaceNormal = face->FaceNormal / face->FaceNormal.mod();		
 	};
 
@@ -589,12 +529,11 @@ std::vector<Face> Grid::ObtainFaces(Cell* cell) {
 //And fill in information about nodes and faces
 bool Grid::ConstructAndCheckPatches() {
 	bool checkResult = true;
-	std::vector<std::string> reasons;
-	std::vector<Face*> fcs = faces.getLocalNodes();
-	for (int i = 0; i<fcs.size(); i++) {
-		if (!fcs[i]->isExternal) continue;
-		int bcMarker = fcs[i]->BCMarker;
-		int globalIndex = fcs[i]->GlobalIndex;
+	std::vector<std::string> reasons;	
+	for (int i = nCellsLocal; i<localCells.size(); i++) {
+		Cell* dummyCell = localCells[i];		
+		int bcMarker = dummyCell->BCMarker;
+		int globalIndex = dummyCell->GlobalIndex;
 		if (patches.find(bcMarker) == patches.end()) {
 			std::string msg;			
 			std::cout<<"Not found patch for boundary marker ";
@@ -605,8 +544,8 @@ bool Grid::ConstructAndCheckPatches() {
 			checkResult = false;
 		} else {
 			//Add nodes and faces
-			patches[fcs[i]->BCMarker].addFace(fcs[i]->GlobalIndex);
-			for (int j = 0; j<fcs[i]->FaceNodes.size(); j++) patches[fcs[i]->BCMarker].addNode(fcs[i]->FaceNodes[j]);
+			patches[dummyCell->BCMarker].addFace(dummyCell->GlobalIndex);
+			for (int j = 0; j<dummyCell->Nodes.size(); j++) patches[dummyCell->BCMarker].addNode(dummyCell->Nodes[j]);
 		};
 	};
 	return checkResult;

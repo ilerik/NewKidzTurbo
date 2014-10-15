@@ -12,8 +12,8 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 	double size_y = y_max - y_min;
 	int rank = pHelper->getRank();
 	int nProc = pHelper->getProcessorNumber();
-	int cartI;
-	int cartJ;
+	//int cartI;
+	//int cartJ;
 
 	//Generate grid topology
 	Grid g;

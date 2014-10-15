@@ -93,15 +93,6 @@
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h">
       <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
-    <ClInclude Include="src\grid.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\model.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\patch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
@@ -131,9 +122,6 @@
     </ClInclude>
     <ClInclude Include="src\boundaryconditions\BoundaryCondition.h">
       <Filter>Header Files\BoundaryConditions</Filter>
-    </ClInclude>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\postprocessing\CGNSWriter.h">
       <Filter>Header Files\PostProcessing</Filter>
@@ -176,6 +164,15 @@
     </ClInclude>
     <ClInclude Include="src\gridgeneration\gengrid3D.h">
       <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\grid.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\patch.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stdafx.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -221,7 +218,7 @@
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\statistics.cpp">
       <Filter>Header Files\Alglib</Filter>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="src\stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include "parallelHelper.h"
 
 //All possible logger mesage types
 enum class LoggerMessageType {

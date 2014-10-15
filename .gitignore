@@ -24,6 +24,7 @@
 *.tlog
 
 [Rr]elease/
+CMakeFiles/
 x64/
 build/
 [Bb]in/

@@ -13,11 +13,22 @@
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
+#include "riemannsolvers.h"
+
 
 //Define error types
 enum turbo_errt {
 	TURBO_OK = 0,
 	TURBO_ERROR = 1
+};
+
+//Step info
+class StepInfo {
+public:
+	double Time;
+	double TimeStep;	
+	int Iteration;
+	std::vector<double> Residual;	
 };
 
 //Calculation kernel
@@ -499,13 +510,13 @@ public:
 		msg.clear();
 		int nExternal = 0;
 		for (Face& face : _grid.localFaces) if (face.isExternal) {
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
 			int faceNodes = face.FaceNodes.size();
-			msg<<"faceNodes = "<<faceNodes<<"\n";
+			//msg<<"faceNodes = "<<faceNodes<<"\n";
 			Cell& cell = _grid.Cells[face.FaceCell_1];
 			for (int nCellID : cell.NeigbourCells) {
-				msg<<"nCellID = "<<faceNodes<<"\n";
+				//msg<<"nCellID = "<<faceNodes<<"\n";
 				Cell& nCell = _grid.Cells[nCellID];
 				int nCommonNodes = 0;
 				std::set<int> cellNodes;
@@ -515,10 +526,10 @@ public:
 					if (_grid.periodicNodesIdentityList.find(cellNodeID) != _grid.periodicNodesIdentityList.end()) {
 						cellNodes.insert(_grid.periodicNodesIdentityList[cellNodeID].begin(), _grid.periodicNodesIdentityList[cellNodeID].end());
 					};
-					msg<<"cellNodeID = "<<cellNodeID<<"\n";
+					//msg<<"cellNodeID = "<<cellNodeID<<"\n";
 				};
 				for (int nodeID : face.FaceNodes) {
-					msg<<"nodeID = "<<nodeID<<"\n";
+					//msg<<"nodeID = "<<nodeID<<"\n";
 					if (cellNodes.find(nodeID) != cellNodes.end()) nCommonNodes++;
 				};
 				if (nCommonNodes == faceNodes) {
@@ -532,13 +543,13 @@ public:
 					break;
 				};
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
 		//Generate face geometric properties		
 		_grid.nFaces = faceIndex;		
@@ -661,9 +672,9 @@ public:
 			for (int j = 0; j<_parallelHelper.toSendValuesNumberByProc[i]; j++) {
 				//Cell index
 				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
-				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
 				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
-				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
 				//Write values from cell to send buffer
 				for (int k = 0; k < nVariables; k++) {
 					sendbuf.push_back(Values[cellLocalIndex * nVariables + k]);
@@ -676,15 +687,15 @@ public:
 		};
 
 		//Debug		
-		msg.clear();
+		/*msg.clear();
 		msg.clear();
 		msg<<"Sendbuf values : ";
 		for (double p : sendbuf) {
 			msg<<p<<" ";
-		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		};*/
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Info : Exchange values 1.");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Info : Exchange values 1.");	
 
 		//Make sure that sendbuf isnt empty
 		sendbuf.push_back(0);
@@ -696,12 +707,12 @@ public:
 		MPI_Alltoallv(&sendbuf[0], &sendcounts[0], &sdispl[0], MPI_LONG_DOUBLE, &recvbuf[0], &recvcounts[0], &rdispl[0], MPI_LONG_DOUBLE, _parallelHelper.getComm());		
 
 		//Debug		
-		msg.clear();
+	/*	msg.clear();
 		msg<<"Recvbuf values : ";
 		for (double p : recvbuf) {
 			msg<<p<<" ";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
 
 		//Write recieved values to appropriate data structure
 		int pointer = 0;
@@ -832,8 +843,8 @@ public:
 		CFL = 0.5;
 		RungeKuttaOrder = 1;
 		MaxIteration = 10000;
-		MaxTime = 0.2;
-		SaveSolutionSnapshotIterations = 10;
+		MaxTime = 10;
+		SaveSolutionSnapshotIterations = 1000;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
@@ -845,6 +856,8 @@ public:
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 
 		//Synchronize
 		_parallelHelper.Barrier();
