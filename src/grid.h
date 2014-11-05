@@ -74,11 +74,18 @@ template<class DataNode>
 class DistributedEntityManager {
 	std::set<int> node_idx;
 	std::map<int, DataNode> localNodes;
-
+	
 public:
+	bool CarryOutNodeIdxControl;	//to check all nodes index exist in operator []
+
+	DistributedEntityManager() {
+		CarryOutNodeIdxControl = true;
+	};
+
 	DataNode& operator[](int index) {
 		//Check if index is ok
-		if (node_idx.find(index) == node_idx.cend()) throw Exception("Invalid node global index");
+		if(CarryOutNodeIdxControl == true)
+			if (node_idx.find(index) == node_idx.cend()) throw Exception("Invalid node global index");
 		//Check if its local first
 		std::map<int, DataNode>::iterator it = localNodes.find(index);
 		if (it != localNodes.end()) return it->second;	//Its local and it exists		
@@ -168,6 +175,13 @@ public:
 	DistributedEntityManager<Node> nodes;
 	DistributedEntityManager<Cell> cells;
 	DistributedEntityManager<Face> faces;
+
+	//fast working operator [] for DistributedEntityManager
+	void SetFastGridOperations() {
+		nodes.CarryOutNodeIdxControl = false;
+		cells.CarryOutNodeIdxControl = false;
+		faces.CarryOutNodeIdxControl = false;
+	};
 
 	//Geometric properties computation
 	std::vector<Face> Grid::ObtainFaces(Cell& cell);

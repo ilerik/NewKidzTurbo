@@ -505,6 +505,7 @@ public:
 		totalTime = 0; //Init simulation time
 		IsAxySymmetric = false;	//default value
 		IsLimiterRequired = false;
+		g = Vector(0, 0, 0);
 	};
 
 	void BindGrid(Grid& grid) {
@@ -741,8 +742,6 @@ public:
 					sumFlux += (flux - vflux) * f.FaceSquare;
 				};
 			};
-
-			//if(ExtCell==true) for(int i=0; i<5; i++) sumFlux[i] = 0;
 			
 			//Add residual
 			for (int i = 0; i<5; i++) stepInfo.Residual[i] += sumFlux[i] * sumFlux[i];	
@@ -1700,7 +1699,7 @@ public:
 	};
 
 	//Save current model state to techplot file
-	virtual void SaveToTechPlot(std::string fname) {
+	virtual void SaveToTechPlotWithGrad(std::string fname) {
 		std::ofstream ofs(fname);
 		ofs<<std::scientific;
 		if (_grid.gridInfo.GridDimensions == 1) {
@@ -1912,6 +1911,458 @@ public:
 			for (int i = 0; i<cells.size(); i++) {
 				int idx = cells[i]->GlobalIndex;
 				ofs<<gradCellsU[idx].y<<"\n";			
+			};
+
+			//Connectivity list for each cell			
+			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+			};
+		};
+
+		//3D case
+		if (_grid.gridInfo.GridDimensions == 3) {
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+			ofs<<"VARIABLES= \"X\", \"Y\", \"Z\", \"Rho\", \"u\", \"v\", \"w\"";//, \"E\", \"T\", \"P\"";
+			/*ofs<<", \"PStagnation\"";
+			ofs<<", \"distance\"";
+			ofs<<", \"rouResidual\"";
+			ofs<<", \"rovResidual\"";
+			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
+			ofs<<", \"dU_dx\"";
+			ofs<<", \"dU_dy\"";*/
+			ofs<<"\n";
+			
+			ofs<<"ZONE T=\"D\"\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
+			if (cells[0]->CGNSType == HEXA_8) {
+				ofs<<"ET=BRICK\n";
+			};
+
+			ofs<<"VARLOCATION = (NODAL, NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED)\n";//, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			/*ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<")\n";*/
+
+			//Map all node global indexes to natural numbers
+			std::map<int,int> toNaturalIndex;
+			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+			int counter = 1;
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+			//Nodes coordinates
+			//X
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.x<<"\n";
+			};
+
+			//Y
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.y<<"\n";
+			};
+
+			//Z
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.z<<"\n";
+			};
+
+			////Solution data
+			////Rho
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].ro<<"\n";
+			};
+				
+			//u
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou/U[idx].ro<<"\n";
+			};
+			//v
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov/U[idx].ro<<"\n";		
+			};
+			//w
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].row/U[idx].ro<<"\n";
+			};
+			/*
+			//E
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].roE/U[idx].ro<<"\n";
+			};
+			//T
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+				ofs<<T<<"\n";
+			};
+			//P
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
+				ofs<<P<<"\n";
+			};	
+
+			//PStagnation
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
+				ofs<<PStagnation<<"\n";
+			};	
+
+			//distance
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				if (_wallInfo.size() != 0) {
+					ofs<<_wallInfo[idx].distance<<"\n";
+				} else {
+					ofs<<0<<"\n";
+				};
+			};
+
+			//rouResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rouResidual[idx]<<"\n";			
+			};
+
+			//rovResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rovResidual[idx]<<"\n";			
+			};
+
+			//rowResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rowResidual[idx]<<"\n";			
+			};
+
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
+			};
+
+			//dU_dx
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].x<<"\n";			
+			};
+
+			//dU_dy
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<gradCellsU[idx].y<<"\n";			
+			};*/
+
+			//Connectivity list for each cell			
+			for (int i = 0; i<cells.size(); i++) {
+				if (cells[i]->CGNSType == QUAD_4) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<"\n";
+				};
+				if (cells[i]->CGNSType == TRI_3) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<"\n";					
+				};
+				if (cells[i]->CGNSType == HEXA_8) {
+				ofs<<toNaturalIndex[cells[i]->Nodes[0]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[1]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[2]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[3]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[4]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[5]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[6]]<<" "
+					<<toNaturalIndex[cells[i]->Nodes[7]]<<"\n";					
+				};
+			};
+		};
+
+		ofs.close();
+		return;
+
+	};
+	virtual void SaveToTechPlot(std::string fname) {
+		std::ofstream ofs(fname);
+		ofs<<std::scientific;
+		if (_grid.gridInfo.GridDimensions == 1) {
+			//Header
+			ofs<<"VARIABLES= \"x\"\n";
+			ofs<<"\"y\"\n";
+			ofs<<"\"z\"\n";
+			ofs<<"\"ro\"\n";
+			ofs<<"\"u\"\n";
+			ofs<<"\"v\"\n";
+			ofs<<"\"w\"\n";
+			ofs<<"\"P\"\n";
+			ofs<<"\"E\"\n";
+			ofs<<"\"T\"\n";
+			ofs<<"ZONE\n";
+
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			for (int i = 0; i<cells.size(); i++) {			
+				Cell& c = *cells[i];								
+				ofs<<c.CellCenter.x<<"\n";
+				ofs<<c.CellCenter.y<<"\n";
+				ofs<<c.CellCenter.z<<"\n";
+				ofs<<U[c.GlobalIndex].ro<<"\n";
+				ofs<<GetVelocity(U[c.GlobalIndex]).x<<"\n";
+				ofs<<GetVelocity(U[c.GlobalIndex]).y<<"\n";
+				ofs<<GetVelocity(U[c.GlobalIndex]).z<<"\n";
+				ofs<<GetPressure(U[c.GlobalIndex])<<"\n";
+				ofs<<U[c.GlobalIndex].roE/U[c.GlobalIndex].ro<<"\n";
+				ofs<<GetTemperature(U[c.GlobalIndex])<<"\n";
+				ofs<<"\n";
+			};		
+		};
+
+		if (_grid.gridInfo.GridDimensions == 2) {
+			//TO DO unify		
+			//Header
+
+			//Access local nodes, faces, cells and flow data
+			std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+			std::vector<Face*> faces = _grid.faces.getLocalNodes();
+			std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+			std::vector<ConservativeVariables*> data = U.getLocalNodes();
+
+			ofs<<"VARIABLES= \"X\", \"Y\", \"Rho\", \"u\", \"v\", \"w\", \"E\", \"T\", \"P\"";
+			ofs<<", \"PStagnation\"";
+			ofs<<", \"distance\"";
+			ofs<<", \"rouResidual\"";
+			ofs<<", \"rovResidual\"";
+			ofs<<", \"rowResidual\"";
+			ofs<<", \"roResidual\"";
+			ofs<<", \"roEResidual\"";
+			ofs<<", \"roU\"";
+			ofs<<", \"roV\"";
+			ofs<<"\n";
+			
+			ofs<<"ZONE T=\"D\"\n";
+			ofs<<"N=" << _grid.nodes.size() << ", E=" << _grid.cells.size() <<", F=FEBLOCK, ";
+			if (cells[0]->CGNSType == QUAD_4) {
+				ofs<<"ET=QUADRILATERAL\n";
+			};
+			if (cells[0]->CGNSType == TRI_3) {
+				ofs<<"ET=TRIANGLE\n";
+			};
+
+			ofs<<"VARLOCATION = (NODAL, NODAL, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED, CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<", CELLCENTERED";
+			ofs<<")\n";
+
+			//Map all node global indexes to natural numbers
+			std::map<int,int> toNaturalIndex;
+			std::set<int> nodeIndexes = _grid.nodes.getAllIndexes();
+			int counter = 1;
+			for (std::set<int>::iterator it = nodeIndexes.begin(); it != nodeIndexes.end(); it++) toNaturalIndex[*it] = counter++;			
+
+			//Nodes coordinates
+			//X
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.x<<"\n";
+			};
+
+			//Y
+			for (int i = 0; i<nodes.size(); i++) {
+				ofs<<nodes[i]->P.y<<"\n";
+			};
+
+			////Solution data
+			////Rho
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].ro<<"\n";
+			};
+				
+			//u
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou/U[idx].ro<<"\n";
+			};
+			//v
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov/U[idx].ro<<"\n";		
+			};
+			//w
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].row/U[idx].ro<<"\n";
+			};
+			//E
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].roE/U[idx].ro<<"\n";
+			};
+			//T
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double T = (E - (vx*vx+vy*vy+vz*vz)/2.0) / (medium.Cv);
+				ofs<<T<<"\n";
+			};
+			//P
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double P = (medium.Gamma-1.0) * ro * (E - (vx*vx+vy*vy+vz*vz)/2.0);
+				ofs<<P<<"\n";
+			};	
+
+			//PStagnation
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				double ro = U[idx].ro;
+				double vx = U[idx].rou/U[idx].ro;
+				double vy = U[idx].rov/U[idx].ro;
+				double vz = U[idx].row/U[idx].ro;
+				double E = U[idx].roE/U[idx].ro;
+				double PStagnation = (medium.Gamma-1.0) * U[idx].roE;
+				ofs<<PStagnation<<"\n";
+			};	
+
+			//distance
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				if (_wallInfo.size() != 0) {
+					ofs<<_wallInfo[idx].distance<<"\n";
+				} else {
+					ofs<<0<<"\n";
+				};
+			};
+
+			//rouResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rouResidual[idx]<<"\n";			
+			};
+
+			//rovResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rovResidual[idx]<<"\n";			
+			};
+
+			//rowResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<rowResidual[idx]<<"\n";			
+			};
+
+			//roResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roResidual[idx]<<"\n";			
+			};
+
+			//roEResidual
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<roEResidual[idx]<<"\n";			
+			};
+
+			//roU
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rou<<"\n";
+			};
+
+			//roV
+			for (int i = 0; i<cells.size(); i++) {
+				int idx = cells[i]->GlobalIndex;
+				ofs<<U[idx].rov<<"\n";		
 			};
 
 			//Connectivity list for each cell			
@@ -2597,6 +3048,62 @@ public:
 			ofs << _boundaryLayerHeight[FaceInd] << '\n';
 		};
 		ofs.close();
+	};
+
+	//Load solution from TecPlot
+	void LoadSolutionFromTecPlot2D(std::string fname) {
+		std::ifstream ifs(fname);
+
+		//variables for reading the file
+		std::string str;
+		double read;
+
+		//start read
+		std::getline(ifs, str);	//get first line with variables list
+		std::getline(ifs, str); //get second line with Zone name
+		std::getline(ifs, str);	//get third line with grid info
+		std::getline(ifs, str); //get fours line with variables locations
+
+		std::vector<Node*> nodes = _grid.nodes.getLocalNodes();
+		std::vector<Cell*> cells = _grid.cells.getLocalNodes();
+
+		//read x and y coordinates of nodes
+		for(int i=0; i<2*nodes.size(); i++) {
+			ifs >> read;
+		};
+
+		//read density in all cells
+		for(int i=0; i<cells.size(); i++) {
+			ifs >> read;
+			int idx = cells[i]->GlobalIndex;
+			U[idx].ro = read;
+		};
+		//read u velocity component in all cells
+		for(int i=0; i<cells.size(); i++) {
+			ifs >> read;
+			int idx = cells[i]->GlobalIndex;
+			U[idx].rou = U[idx].ro*read;
+		};
+		//read v velocity component in all cells
+		for(int i=0; i<cells.size(); i++) {
+			ifs >> read;
+			int idx = cells[i]->GlobalIndex;
+			U[idx].rov = U[idx].ro*read;
+		};
+		//read w velocity component in all cells
+		for(int i=0; i<cells.size(); i++) {
+			ifs >> read;
+			int idx = cells[i]->GlobalIndex;
+			U[idx].row = U[idx].ro*read;
+		};
+		//read full energy in all cells
+		for(int i=0; i<cells.size(); i++) {
+			ifs >> read;
+			int idx = cells[i]->GlobalIndex;
+			U[idx].roE = U[idx].ro*read;
+		};
+
+		ifs.close();
 	};
 
 	//Save solution in a file

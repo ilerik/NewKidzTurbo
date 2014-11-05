@@ -34,11 +34,6 @@ public:
 		double p = (gamma - 1.0)*(roE - ro*(vx*vx + vy*vy + vz*vz)/2.0);
 		double vn = vx*n.x + vy*n.y + vz*n.z;
 
-		//res[0] = n.x * (ro*vx) + n.y*(ro*vy) + n.z*(ro*vz);	//WID vn is not used ro*vx = U.rou
-		//res[1] = n.x * (ro*vx*vx+p) + n.y*(ro*vx*vy) + n.z*(ro*vx*vz);
-		//res[2] = n.x * (ro*vy*vx) + n.y*(ro*vy*vy+p) + n.z*(ro*vy*vz);
-		//res[3] = n.x * (ro*vz*vx) + n.y*(ro*vz*vy) + n.z*(ro*vz*vz+p);
-		//res[4] = (n.x * vx + n.y * vy + n.z * vz)*(roe+p);	//WID		
 		res[0] = ro*vn;
 		res[1] = ro*vn*vx + n.x*p;
 		res[2] = ro*vn*vy + n.y*p;

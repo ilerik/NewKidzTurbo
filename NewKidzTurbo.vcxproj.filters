@@ -31,6 +31,9 @@
     <Filter Include="Header Files\Alglib">
       <UniqueIdentifier>{01bc6e70-fc46-42a5-8361-e7dfcad034f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\RTI">
+      <UniqueIdentifier>{3ba1673a-7ae7-4d25-af16-9a7380af1bee}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -86,6 +89,12 @@
     </ClInclude>
     <ClInclude Include="src\tests.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\releigh-taylor_comp.h">
+      <Filter>Header Files\RTI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RTI_solution_processor.h">
+      <Filter>Header Files\RTI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
