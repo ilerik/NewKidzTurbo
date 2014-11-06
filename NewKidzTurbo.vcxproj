@@ -137,6 +137,7 @@
     <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryConditions.h" />
     <ClInclude Include="src\gasmodels\GasModel.h" />
+    <ClInclude Include="src\gasmodels\LomonosovFortovGasModel.h" />
     <ClInclude Include="src\gasmodels\PerfectGas.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
@@ -163,6 +164,7 @@
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
+    <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
     <ClInclude Include="src\stdafx.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
@@ -170,6 +172,7 @@
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp">
@@ -194,6 +197,7 @@
     <ClCompile Include="src\main.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="src\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
