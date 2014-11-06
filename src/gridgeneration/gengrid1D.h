@@ -6,33 +6,25 @@
 #include "parallelHelper.h"
 #include <assert.h>
 
-Grid GenGrid1D(ParallelHelper* pHelper, int N, double lBegin, double lEnd, Vector direction, bool IsPeriodic = false)
+Grid GenGrid1D(ParallelHelper* pHelper, int N, double x_begin, double x_end, bool IsPeriodic = false)
 {
 	Grid g;
 	int rank = pHelper->getRank();
-	int nProc = pHelper->getProcessorNumber();
-
-	//Normalize direction
-	direction = direction / direction.mod();
+	int nProc = pHelper->getProcessorNumber();	
 
 	//Grid parameters	
 	g.gridInfo.GridDimensions = 1;
 	g.gridInfo.CellDimensions = 1;
-	g.gridInfo.nCoords = 3;
+	g.gridInfo.nCoords = 1;
 
 	//Generate grid topology	
 	N++;
 	std::vector<double> x_p(N);
-	std::vector<double> y_p(N);
-	std::vector<double> z_p(N);
 	g.periodicNodesIdentityList.clear();
-	double L = lEnd - lBegin;	
+	double L = x_end - x_begin;	
 	for (int i = 0; i<N; i++) {
-		double curL = lBegin + L * i / (N-1);
-		Vector r = curL * direction;
-		x_p[i] = r.x;
-		y_p[i] = r.y;
-		z_p[i] = r.z;
+		double x = x_begin + L * i / (N-1);		
+		x_p[i] = x;		
 	};
 		
 	//Fill in nodes
@@ -41,8 +33,8 @@ Grid GenGrid1D(ParallelHelper* pHelper, int N, double lBegin, double lEnd, Vecto
 		Node new_node;
 		new_node.GlobalIndex = i;
 		new_node.P.x = x_p[i];
-		new_node.P.y = y_p[i];
-		new_node.P.z = z_p[i];		
+		new_node.P.y = 0;
+		new_node.P.z = 0;
 		//Add node
 		g.localNodes.push_back(new_node);  		
 	};		
