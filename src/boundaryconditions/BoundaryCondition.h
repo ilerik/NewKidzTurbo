@@ -17,16 +17,17 @@ namespace BoundaryConditions {
 
 	//Base class for all boundary conditions
 	class BoundaryCondition {
+	public:	
 		Grid* _grid;
 		GasModel* _gasModel;	
-	public:	
+	
 		//Result types
 		std::vector<BoundaryConditionResultType> bcResultTypes;
 
 		virtual ~BoundaryCondition() {};
 
 		//Interface functions
-		virtual std::vector<double> getDummyValues(std::vector<double> values, const Face& face) = 0;	
+		virtual std::vector<double> getDummyValues(std::vector<double> values, const Cell& dummyCell) = 0;	
 
 		virtual void setGrid(Grid& grid) {
 			_grid = &grid;

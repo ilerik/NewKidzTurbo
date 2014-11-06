@@ -13,7 +13,10 @@ class Roe3DSolverPerfectGas {
 	double opP;
 public:	
 	Roe3DSolverPerfectGas(){
+		//Defaults
 		eps = 0.05;
+		gamma = 0;
+		opP = 0;
 	};
 
 	void SetGamma(double _g) {
@@ -57,8 +60,12 @@ public:
 	//Solve riemann problem
 	//std::vector<double> ComputeFlux(const ConservativeVariables& UL, const ConservativeVariables& UR, const Face& f) {
 	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
-		std::vector<double> res(5,0);
-					
+		std::vector<double> res(5,0);						
+
+		//Calculate symmetric flux part	
+		std::vector<double> symFluxPart = 1.0*(F(UL, (1.0)*f.FaceNormal) + F(UR, (1.0)*f.FaceNormal)); //is 1.0 or 0.5 TODO	
+		res += symFluxPart;
+
 		//for (int i = 0; i<nv; i++) printf("%lg\n", res[i]);
 		//Calculates stabilization term which is a part of numerical
 		//flux vector i.e. |A|(Q{R}-Q{L})
@@ -121,7 +128,6 @@ public:
 		double C2 = 1.0/(c*c);
 		double DN2= 1.0/(dn*dn);
 
-
 		std::vector<double> ul(5,0);
 		ul[0] = UL.ro;
 		ul[1] = UL.rou;
@@ -150,10 +156,8 @@ public:
 		double P = ro * R * T;
 		double dro_dT =  - ro / T;
 		double Ur = uw;		
-		double teta = (1.0/(Ur*Ur) - dro_dT/(ro*Cp));*/
-
-		//Calculate symmetric flux part		
-		res += 1.0*(F(UL, (1.0)*f.FaceNormal) + F(UR, (1.0)*f.FaceNormal)); //is 1.0 or 0.5 TODO	
+		double teta = (1.0/(Ur*Ur) - dro_dT/(ro*Cp));*/		
+	
 
 		MaxEigenvalue = eig_max;	
 		return res;

@@ -8,9 +8,12 @@
 #include "parmetis.h"
 #include <map>
 #include <set>
-#include <unordered_set>
-#include <unordered_map>
+//#include <unordered_set>
+//#include <unordered_map>
 #include <algorithm>
+#include <assert.h>
+
+#define DEBUG_GRID true
 
 //Specify supported element types
 
@@ -129,60 +132,6 @@ public:
 };
 
 
-//Parallel data node manager
-//Class that handles distributed collection of arbitrary data nodes
-//DataNode must posess public property int GlobalIndex
-template<class DataNode> 
-class DistributedEntityManager {
-	std::set<int> node_idx;
-	std::map<int, DataNode> localNodes;
-
-public:
-	DataNode& operator[](int index) {
-		//Check if index is ok
-		if (node_idx.find(index) == node_idx.cend()) throw Exception("Invalid node global index");
-		//Check if its local first
-		std::map<int, DataNode>::iterator it = localNodes.find(index);
-		if (it != localNodes.end()) return it->second;	//Its local and it exists		
-	};
-
-	std::vector<DataNode*> getLocalNodes() {
-		std::vector<DataNode*> nodes;
-		for (std::map<int, DataNode>::iterator it = localNodes.begin(); it!=localNodes.end(); it++) {
-			nodes.push_back(&(it->second));
-		};
-		return nodes;
-	};
-
-	std::map<int, DataNode>& getLocalNodesWithIndex() {		
-		return localNodes;
-	};
-
-	int size() {
-		return node_idx.size();
-	};	
-
-	std::set<int> getAllIndexes() {
-		return node_idx;
-	};
-
-	void add(DataNode n) {
-		node_idx.insert(n.GlobalIndex);
-		localNodes[n.GlobalIndex] = n;
-	};
-
-	void removeAt(int index) {
-		if (node_idx.find(index) != node_idx.cend()) {
-			node_idx.erase(index);
-			localNodes.erase(index);
-		};
-	};
-
-	bool exist(int index) {
-		return node_idx.find(index) != node_idx.cend();
-	};
-};
-
 
 //general info
 class GridInfo {
@@ -204,8 +153,8 @@ public:
 	std::vector<int> BoundarySections; // boundary elements sections (possible many)	
 
 	//raw cgns connectivity info
-	std::unordered_map<int, std::set<int> > cgnsIndexToElementNodes;	
-	std::unordered_map<int, ElementType_t > cgnsIndexToElementType;
+	std::map<int, std::set<int> > cgnsIndexToElementNodes;	
+	std::map<int, ElementType_t > cgnsIndexToElementType;
 	std::vector<int> boundaryElements;  //Boundary faces
 	std::vector<int> volumeElements;	//Cells
 
@@ -237,8 +186,9 @@ public:
 	int nDummyCells;  //number of dummy cells
 	std::vector<Cell> Cells; // all cells
 	std::vector<Cell*> localCells; // only local cells (including dummy cells)
-	std::unordered_set<int> dummyLocalCells; // dummy cells created for each boundary face element	
-	std::unordered_map<int, int> cellsGlobalToLocal; // cells global index map to local index	
+	std::set<int> dummyLocalCells; // dummy cells created for each boundary face element	
+	std::map<int, int> cellsGlobalToLocal; // cells global index map to local index
+	std::map<int, std::set<int>> periodicNodesIdentityList; // for each node list of nodes identifyed with it via periodic boundary
 
 	//Faces
 	int nFaces; //number of local faces
@@ -260,15 +210,13 @@ public:
 
 	//Refresh list of boundary nodes
 	void RefreshBoundaryNodes()
-	{
-		std::vector<Face*> f = faces.getLocalNodes();
-		for (int i = 0; i<f.size(); i++) {
-			if (f[i]->isExternal) {
-				for (int j = 0; j < f[i]->FaceNodes.size(); j++) {
-					int index = f[i]->FaceNodes[j];
-					if (boundaryNodes.find(index) != boundaryNodes.end()) continue;
-					boundaryNodes.insert(index);
-				};
+	{		
+		for (int i = nCellsLocal; i<localCells.size(); i++) {
+			Cell* dummyCell = localCells[i];			
+			for (int j = 0; j < dummyCell->Nodes.size(); j++) {
+				int index = dummyCell->Nodes[j];
+				if (boundaryNodes.find(index) != boundaryNodes.end()) continue;
+				boundaryNodes.insert(index);
 			};			
 		};					
 	};
@@ -278,11 +226,7 @@ public:
 	};
 
 	~Grid(void){
-	};
-
-	DistributedEntityManager<Node> nodes;
-	DistributedEntityManager<Cell> cells;
-	DistributedEntityManager<Face> faces;
+	};	
 
 	//Geometric properties computation
 	std::vector<Face> Grid::ObtainFaces(Cell* cell);
@@ -321,10 +265,10 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	a.setlength(nx + ny, patch.nodes_idx.size());
 	int i = 0;
 	for (std::set<int>::iterator it = patch.nodes_idx.begin(); it != patch.nodes_idx.end(); it++) {			
-		a[0][i] = nodes[*it].P.x;
-		a[1][i] = nodes[*it].P.y;
-		a[2][i] = nodes[*it].P.z;
-		a[3][i] = nodes[*it].GlobalIndex;
+		a[0][i] = localNodes[*it].P.x;
+		a[1][i] = localNodes[*it].P.y;
+		a[2][i] = localNodes[*it].P.z;
+		a[3][i] = localNodes[*it].GlobalIndex;
 		i++;
 	};
 	
@@ -365,13 +309,43 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 		Vector rOrigin = localNodes[cell->Nodes[0]].P;
 		for (int i = 0; i<cell->Faces.size(); i++) {
 			//Get face
-			Face& face = faces[cell->Faces[i]];
+			Face& face = localFaces[cell->Faces[i]];
 			//Consider normal direction
 			double direction = 1;
 			if (cell->GlobalIndex != face.FaceCell_1) direction = -1;
 			//Compute normal vector
 			cell->CellVolume += direction * (face.FaceCenter - rOrigin) * face.FaceSquare * face.FaceNormal;
 		};
+		cell->CellVolume /= 3;
+	};
+
+	//
+	if (cell->CGNSType == PENTA_6) {
+		isTypeCheckPassed = true;
+
+		cell->CellVolume = 0;
+		Vector rOrigin = localNodes[cell->Nodes[0]].P;
+		for (int i = 0; i<cell->Faces.size(); i++) {
+			//Get face
+			Face& face = localFaces[cell->Faces[i]];
+			//Consider normal direction
+			double direction = 1;
+			if (cell->GlobalIndex != face.FaceCell_1) direction = -1;
+			//Compute normal vector
+			cell->CellVolume += direction * (face.FaceCenter - rOrigin) * face.FaceSquare * face.FaceNormal;
+		};
+		cell->CellVolume /= 3;
+	};
+
+	if (cell->CGNSType == TETRA_4) {
+		isTypeCheckPassed = true;
+
+		cell->CellVolume = 0;
+		Vector rOrigin = localNodes[cell->Nodes[0]].P;
+		Vector a = localNodes[cell->Nodes[1]].P - rOrigin;
+		Vector b = localNodes[cell->Nodes[2]].P - rOrigin;
+		Vector c = localNodes[cell->Nodes[3]].P - rOrigin;		
+		cell->CellVolume = abs((a & b) * c);
 		cell->CellVolume /= 3;
 	};
 
@@ -406,6 +380,10 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 		cell->CellVolume = a.mod();		
 	};
 
+	if (DEBUG_GRID) {
+		//Check all volumes for non-negativity
+		assert(cell->CellVolume >= 0.0);
+	};
 	if (!isTypeCheckPassed) throw Exception("Cell element type is not supported");
 
 	//Compute cell center (independent from type)
@@ -413,7 +391,6 @@ void Grid::ComputeGeometricProperties(Cell* cell) {
 	for (int i = 0; i<cell->Nodes.size(); i++) cell->CellCenter += localNodes[cell->Nodes[i]].P;
 	cell->CellCenter /= cell->Nodes.size();
 };
-
 
 void Grid::ComputeGeometricProperties(Face* face) {
 	//Check cell type and compute face square and normal
@@ -430,6 +407,20 @@ void Grid::ComputeGeometricProperties(Face* face) {
 		a = localNodes[face->FaceNodes[2]].P - localNodes[face->FaceNodes[0]].P; 
 		b = localNodes[face->FaceNodes[3]].P - localNodes[face->FaceNodes[0]].P; 
 		face->FaceNormal += (a & b) / 2.0;
+
+		//Normalize	
+		face->FaceSquare = face->FaceNormal.mod();
+		face->FaceNormal /= face->FaceSquare;		
+	};
+
+	if (face->CGNSType == TRI_3) {
+		isTypeCheckPassed = true;
+
+		//Compute surface area and normal
+		face->FaceNormal = Vector(0,0,0);
+		Vector a = localNodes[face->FaceNodes[1]].P - localNodes[face->FaceNodes[0]].P; 
+		Vector b = localNodes[face->FaceNodes[2]].P - localNodes[face->FaceNodes[0]].P; 
+		face->FaceNormal += (a & b) / 2.0;		
 
 		//Normalize	
 		face->FaceSquare = face->FaceNormal.mod();
@@ -455,10 +446,16 @@ void Grid::ComputeGeometricProperties(Face* face) {
 		face->FaceSquare = 1.0;
 
 		//Compute normal		
-		face->FaceNormal = (cells[face->FaceCell_1].CellCenter - face->FaceCenter);		
+		face->FaceNormal = Vector(1,0,0);		
 		face->FaceNormal = face->FaceNormal / face->FaceNormal.mod();		
 	};
 
+	if (DEBUG_GRID) {
+		//Check all face squares for non-negativity
+		assert(face->FaceSquare >= 0.0);
+		//And normals for being unit length
+		assert(abs(face->FaceNormal.mod() - 1.0) <= 1e-12);
+	};
 	if (!isTypeCheckPassed) throw Exception("Face element type is not supported");
 	
 	//Compute face center (independent from type)
@@ -519,6 +516,73 @@ std::vector<Face> Grid::ObtainFaces(Cell* cell) {
 		nodes.push_back(cell->Nodes[7]);
 		nodes.push_back(cell->Nodes[3]);
 		res.push_back(Face(QUAD_4, nodes));
+		nodes.clear();
+	};
+
+	if (cell->CGNSType == PENTA_6) {
+		isTypeCheckPassed = true;
+		std::vector<int> nodes;
+		//Add faces one by one		
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[4]);
+		nodes.push_back(cell->Nodes[3]);
+		res.push_back(Face(QUAD_4, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[5]);
+		nodes.push_back(cell->Nodes[4]);
+		res.push_back(Face(QUAD_4, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[3]);
+		nodes.push_back(cell->Nodes[5]);
+		res.push_back(Face(QUAD_4, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[3]);
+		res.push_back(Face(TRI_3, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[3]);
+		nodes.push_back(cell->Nodes[4]);
+		nodes.push_back(cell->Nodes[5]);
+		res.push_back(Face(TRI_3, nodes));
+		nodes.clear();
+	};
+
+	if (cell->CGNSType == TETRA_4) {
+		isTypeCheckPassed = true;
+		std::vector<int> nodes;
+		//Add faces one by one
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
+		res.push_back(Face(TRI_3, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[3]);
+		res.push_back(Face(TRI_3, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[1]);
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[3]);
+		res.push_back(Face(TRI_3, nodes));
+		nodes.clear();
+
+		nodes.push_back(cell->Nodes[2]);
+		nodes.push_back(cell->Nodes[0]);
+		nodes.push_back(cell->Nodes[3]);
+		res.push_back(Face(TRI_3, nodes));
 		nodes.clear();
 	};
 
@@ -588,12 +652,11 @@ std::vector<Face> Grid::ObtainFaces(Cell* cell) {
 //And fill in information about nodes and faces
 bool Grid::ConstructAndCheckPatches() {
 	bool checkResult = true;
-	std::vector<std::string> reasons;
-	std::vector<Face*> fcs = faces.getLocalNodes();
-	for (int i = 0; i<fcs.size(); i++) {
-		if (!fcs[i]->isExternal) continue;
-		int bcMarker = fcs[i]->BCMarker;
-		int globalIndex = fcs[i]->GlobalIndex;
+	std::vector<std::string> reasons;	
+	for (int i = nCellsLocal; i<localCells.size(); i++) {
+		Cell* dummyCell = localCells[i];		
+		int bcMarker = dummyCell->BCMarker;
+		int globalIndex = dummyCell->GlobalIndex;
 		if (patches.find(bcMarker) == patches.end()) {
 			std::string msg;			
 			std::cout<<"Not found patch for boundary marker ";
@@ -604,8 +667,8 @@ bool Grid::ConstructAndCheckPatches() {
 			checkResult = false;
 		} else {
 			//Add nodes and faces
-			patches[fcs[i]->BCMarker].addFace(fcs[i]->GlobalIndex);
-			for (int j = 0; j<fcs[i]->FaceNodes.size(); j++) patches[fcs[i]->BCMarker].addNode(fcs[i]->FaceNodes[j]);
+			patches[dummyCell->BCMarker].addFace(dummyCell->GlobalIndex);
+			for (int j = 0; j<dummyCell->Nodes.size(); j++) patches[dummyCell->BCMarker].addNode(dummyCell->Nodes[j]);
 		};
 	};
 	return checkResult;

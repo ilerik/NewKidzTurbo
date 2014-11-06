@@ -84,7 +84,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>src/stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -137,10 +137,11 @@
     <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryConditions.h" />
     <ClInclude Include="src\gasmodels\GasModel.h" />
+    <ClInclude Include="src\gasmodels\LomonosovFortovGasModel.h" />
     <ClInclude Include="src\gasmodels\PerfectGas.h" />
-    <ClInclude Include="src\grid.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
+    <ClInclude Include="src\gridgeneration\gengrid3D.h" />
     <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
@@ -154,21 +155,24 @@
     <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h" />
+    <ClInclude Include="src\mainsolver\grid.h" />
     <ClInclude Include="src\mainsolver\kernel.h" />
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />
-    <ClInclude Include="src\model.h" />
-    <ClInclude Include="src\patch.h" />
+    <ClInclude Include="src\mainsolver\patch.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
+    <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
+    <ClInclude Include="src\stdafx.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
-    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="libs\alglib-3.8.0.cpp\cpp\src\alglibinternal.cpp">
@@ -193,10 +197,13 @@
     <ClCompile Include="src\main.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+    <ClCompile Include="src\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

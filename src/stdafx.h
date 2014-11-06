@@ -9,7 +9,7 @@
 
 //CGNS error handling macro
 #define CALL_CGNS(cgns_func) {                                                 \
-                               const int ierr = cgns_func;                    \
+                               const int ierr = cgns_func;                     \
                                if (ierr)                                       \
                                {                                               \
                                  const char * error_msg = cg_get_error();      \

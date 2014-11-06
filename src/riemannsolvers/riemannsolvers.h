@@ -3,6 +3,7 @@
 
 #include "perfect_gas_roe_3d.h"
 #include "perfect_gas_godunov_3d.h"
+#include "RiemannSolver.h"
 
 #endif
 

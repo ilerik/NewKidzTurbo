@@ -13,11 +13,23 @@
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
+#include "riemannsolvers.h"
+#include "LomonosovFortovGasModel.h"
+
 
 //Define error types
 enum turbo_errt {
 	TURBO_OK = 0,
 	TURBO_ERROR = 1
+};
+
+//Step info
+class StepInfo {
+public:
+	double Time;
+	double TimeStep;	
+	int Iteration;
+	std::vector<double> Residual;	
 };
 
 //Calculation kernel
@@ -38,16 +50,20 @@ private:
 	Configuration _configuration;	
 
 	//Gas model
-	GasModel _gasModel;	
+	GasModel _gasModel;		
 
-	//Solver (TO DO)
+	//Solver (TO DO)		
+	SimulationType_t _simulationType; //Simulation type
 	double CFL;
-	double RungeKuttaOrder;
+	int RungeKuttaOrder;
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
-	Roe3DSolverPerfectGas rSolver;
+	double SaveSolutionSnapshotTime;
+	int SaveSolutionSnapshotIterations;
+	//Roe3DSolverPerfectGas rSolver;
 	//Godunov3DSolverPerfectGas rSolver;
+	RiemannSolver* rSolver;
 	StepInfo stepInfo;
 
 	//Parallel run information		
@@ -111,10 +127,12 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt InitCalculation() {
-		//Gas model parameters
-		//_gasModel.loadConfiguration(_configuration);
-		nVariables = _gasModel.nConservativeVariables = 5;
+	turbo_errt InitCalculation() {				
+		//Gas model setup
+		_gasModel = GasModel(); // perfect gas gamma = 1.4
+		//_gasModel = LomonosovFortovGasModel(0); //stainless steel
+		_gasModel.loadConfiguration(_configuration);
+		nVariables = _gasModel.nConservativeVariables;
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
@@ -124,15 +142,12 @@ public:
 			flux.resize(nVariables);
 			for (double& v : flux) v = 0;
 		};	
-		MaxWaveSpeed.resize(_grid.nFaces);
-		
-		//Gas model setup
-		_gasModel = GasModel();
-		_gasModel.loadConfiguration(_configuration);
+		MaxWaveSpeed.resize(_grid.nFaces);		
 
 		//Solver settings
-		rSolver.SetGamma(_gasModel.Gamma);
-		rSolver.SetHartenEps(0.0);
+		rSolver = new RiemannSolver(_gasModel);
+		//rSolver.SetGamma(_gasModel.Gamma);
+		//rSolver.SetHartenEps(0.01);
 		//rSolver.SetOperatingPressure(0.0);
 
 		//Initial conditions
@@ -140,7 +155,12 @@ public:
 		GenerateInitialConditions(ic);
 
 		//Boundary conditions
-		InitBoundaryConditions();
+		if (InitBoundaryConditions() == turbo_errt::TURBO_ERROR) {
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
 
 		//Init parallel exchange
 		InitParallelExchange();
@@ -161,20 +181,21 @@ public:
 		//Calc loop
 		std::stringstream msg;	
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation started!");
-		for (int iteration = 0; iteration < MaxIteration; iteration++) {
+		for (stepInfo.Iteration = 0; stepInfo.Iteration <= MaxIteration; stepInfo.Iteration++) {
 			ExplicitTimeStep();
 
 			//Output step information
-			//if (_parallelHelper.IsMaster()) {
 			msg.clear();
 			msg.str(std::string());
-			msg<<"Iteration = "<<iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
+			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
-			//};
+			if (_parallelHelper.IsMaster()) {
+				std::cout<<msg.str();
+			};
 
 			//Debug
 			//Output values
-			msg.clear();
+			/*msg.clear();
 			msg.str(std::string());
 			msg<<"Values:\n";
 			for (int i = 0; i<_grid.nCellsLocal; i++) {
@@ -183,10 +204,21 @@ public:
 				for (int j = 0; j<_gasModel.nConservativeVariables; j++) msg<<Values[i * _gasModel.nConservativeVariables + j]<<" ";
 				msg<<"\n";
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
+
+			//Solution snapshots
+			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
+				//Save snapshot
+				std::stringstream snapshotFileName;
+				snapshotFileName.str(std::string());
+				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".cgns";
+				SaveGrid(snapshotFileName.str());				
+				SaveSolution(snapshotFileName.str(), "Solution");
+			};
+
 
 			//Convergence criteria
-			if (iteration == MaxIteration - 1) {
+			if (stepInfo.Iteration == MaxIteration) {
 				msg.clear();
 				msg.str(std::string());
 				msg<<"Maximal number of iterations reached.";
@@ -194,7 +226,7 @@ public:
 				break;
 			};
 
-			if (stepInfo.Time > MaxTime) {
+			if (stepInfo.Time >= MaxTime) {
 				msg.clear();
 				msg.str(std::string());
 				msg<<"Maximal time reached.";
@@ -306,14 +338,23 @@ public:
 		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
 		std::vector<idx_t> part(_grid.nCellsLocal);
 		std::ostringstream msg;
+		msg.str(std::string());
 		msg<<"vdist[] = \n";
 		for (int i = 0; i<=_nProcessors; i++) msg<<_grid.vdist[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
+		msg.str(std::string());
 		msg<<"xadj[] = \n";
 		for (int i = 0; i<_grid.xadj.size(); i++) msg<<_grid.xadj[i]<<" ";
+		msg<<"\n";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		msg.clear();
+		msg.str(std::string());
+		msg<<"adjncy[] = \n";
+		for (int i = 0; i<_grid.adjncy.size(); i++) msg<<_grid.adjncy[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
@@ -345,10 +386,10 @@ public:
 		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
 
 		//Debug partitioning
-		for (int i = 0; i<_nProcessors; i++) {
+		/*for (int i = 0; i<_nProcessors; i++) {
 			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
-		};		
-		//for (int i = 0; i<51; i++) _grid.cellsPartitioning[i] = 0;
+		};		*/
+		//for (int i = 10; i<51; i++) _grid.cellsPartitioning[i] = 0;
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
@@ -453,19 +494,18 @@ public:
 					result.first->second = face.GlobalIndex;
 					_grid.localFaces.push_back(face);
 					_grid.localFaces[faceIndex].isExternal = true;
-					_grid.localFaces[faceIndex].FaceCell_1 = i;
+					//_grid.localFaces[faceIndex].FaceCell_1 = i;
+					_grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
 					_grid.localCells[i]->Faces.push_back(face.GlobalIndex);
 					faceIndex++;
 				} else {					
 					int fIndex = result.first->second;
-					if (cell->GlobalIndex == 98) {
-						_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cell 98 found, face index = ",fIndex);
-					};
 					_grid.localFaces[fIndex].isExternal = false;
 					if (cell->IsDummy) {
 						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					} else {
-						_grid.localFaces[fIndex].FaceCell_2 = i;
+						//_grid.localFaces[faceIndex].FaceCell_2 = i;
+						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					};
 					_grid.localCells[i]->Faces.push_back(fIndex);
 				};
@@ -477,53 +517,74 @@ public:
 		msg.clear();
 		int nExternal = 0;
 		for (Face& face : _grid.localFaces) if (face.isExternal) {
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
-			nExternal++;
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
 			int faceNodes = face.FaceNodes.size();
-			msg<<"faceNodes = "<<faceNodes<<"\n";
-			Cell* cell = _grid.localCells[face.FaceCell_1];
-			for (int nCellID : cell->NeigbourCells) {
-				msg<<"nCellID = "<<faceNodes<<"\n";
+			//msg<<"faceNodes = "<<faceNodes<<"\n";
+			Cell& cell = _grid.Cells[face.FaceCell_1];
+			for (int nCellID : cell.NeigbourCells) {
+				//msg<<"nCellID = "<<faceNodes<<"\n";
 				Cell& nCell = _grid.Cells[nCellID];
 				int nCommonNodes = 0;
 				std::set<int> cellNodes;
 				for (int cellNodeID : nCell.Nodes) {
 					cellNodes.insert(cellNodeID);
-					msg<<"cellNodeID = "<<cellNodeID<<"\n";
+					//Handle periodic
+					if (_grid.periodicNodesIdentityList.find(cellNodeID) != _grid.periodicNodesIdentityList.end()) {
+						cellNodes.insert(_grid.periodicNodesIdentityList[cellNodeID].begin(), _grid.periodicNodesIdentityList[cellNodeID].end());
+					};
+					//msg<<"cellNodeID = "<<cellNodeID<<"\n";
 				};
 				for (int nodeID : face.FaceNodes) {
-					msg<<"nodeID = "<<nodeID<<"\n";
+					//msg<<"nodeID = "<<nodeID<<"\n";
 					if (cellNodes.find(nodeID) != cellNodes.end()) nCommonNodes++;
 				};
 				if (nCommonNodes == faceNodes) {
 					//We found second cell
+					if (IsLocalCell(nCellID)) {
+						face.isExternal = false;
+					} else {
+						face.isExternal = true; nExternal++;
+					};
 					face.FaceCell_2 = nCellID;
 					break;
 				};
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);	
-
-		//Update cells geometric properties
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
-			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};		
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
 		//Generate face geometric properties		
 		_grid.nFaces = faceIndex;		
 		for (Face& face : _grid.localFaces) {
 			int index = face.GlobalIndex;						
 			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		};
+
+		//Update cells geometric properties
+		for (int i = 0; i < _grid.nCellsLocal; i++) {
+			_grid.ComputeGeometricProperties(_grid.localCells[i]);
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		};	
+
+		//Orient face normals			
+		for (Face& face : _grid.localFaces) {
+			int index = face.GlobalIndex;									
+
+			//If boundary face make sure dummy if FaceCell_2
+			if (face.FaceCell_1 >= _grid.nProperCells) {
+				//Swap
+				int tmp = face.FaceCell_1;
+				face.FaceCell_1 = face.FaceCell_2;
+				face.FaceCell_2 = tmp;
+			};
 
 			//Orient normal
-			Vector cellCenter = _grid.localCells[_grid.localFaces[index].FaceCell_1]->CellCenter;
+			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
 			Vector faceCenter = _grid.localFaces[index].FaceCenter;
 			if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
 				_grid.localFaces[index].FaceNormal *= -1;
@@ -626,6 +687,96 @@ public:
 			for (int j = 0; j<_parallelHelper.toSendValuesNumberByProc[i]; j++) {
 				//Cell index
 				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
+				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
+				//Write values from cell to send buffer
+				for (int k = 0; k < nVariables; k++) {
+					sendbuf.push_back(Values[cellLocalIndex * nVariables + k]);
+				};
+			};
+			sendcounts.push_back(_parallelHelper.toSendValuesNumberByProc[i] * nVariables);
+			recvcounts.push_back(_parallelHelper.toRecvValuesNumberByProc[i] * nVariables);			
+			s += _parallelHelper.toSendValuesNumberByProc[i] * nVariables;
+			r += _parallelHelper.toRecvValuesNumberByProc[i] * nVariables;			
+		};
+
+		//Debug		
+		/*msg.clear();
+		msg.clear();
+		msg<<"Sendbuf values : ";
+		for (double p : sendbuf) {
+			msg<<p<<" ";
+		};*/
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Info : Exchange values 1.");	
+
+		//Make sure that sendbuf isnt empty
+		sendbuf.push_back(0);
+
+		//Allocate recieve buffer
+		recvbuf.resize(r + 1);		
+
+		//Exchange values
+		MPI_Alltoallv(&sendbuf[0], &sendcounts[0], &sdispl[0], MPI_LONG_DOUBLE, &recvbuf[0], &recvcounts[0], &rdispl[0], MPI_LONG_DOUBLE, _parallelHelper.getComm());		
+
+		//Debug		
+	/*	msg.clear();
+		msg<<"Recvbuf values : ";
+		for (double p : recvbuf) {
+			msg<<p<<" ";
+		};
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
+
+		//Write recieved values to appropriate data structure
+		int pointer = 0;
+		for (int i = 0; i<_nProcessors; i++) {								
+			for (int j = 0; j<_parallelHelper.toRecvValuesNumberByProc[i]; j++) {			
+				//Cell index
+				int cellGlobalIndex = _parallelHelper.toRecvValuesByProc[i][j];
+				//Store values
+				_parallelHelper.RequestedValues[cellGlobalIndex] = std::vector<double>(nVariables, 0);
+				for (int k = 0; k < nVariables; k++) {
+					_parallelHelper.RequestedValues[cellGlobalIndex][k] = recvbuf[pointer+k];
+				};				
+				//Increment pointer
+				pointer += nVariables;
+			};			
+		};			
+
+		//Synchronize
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Finished : Exchange values.");	
+		return TURBO_OK;
+	};
+
+	turbo_errt ParallelExchangeGradients() {
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Started : Exchange gradients.");	
+
+		//Debug info
+		std::stringstream msg;
+		msg.clear();
+		msg<<"toSendValuesNumberByProc :";
+		for (int p : _parallelHelper.toSendValuesNumberByProc) msg<<"("<<p<<") ";
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+		//Allocate memory and fill datastructures
+		int s = 0;
+		int r = 0;
+		std::vector<int> sdispl;
+		std::vector<int> rdispl;
+		std::vector<double> recvbuf;
+		std::vector<double> sendbuf;		
+		std::vector<int> sendcounts;
+		std::vector<int> recvcounts;
+		for (int i = 0; i<_nProcessors; i++) {
+			sdispl.push_back(s);
+			rdispl.push_back(r);
+			//From current proc to i-th proc send values that proc requested			
+			for (int j = 0; j<_parallelHelper.toSendValuesNumberByProc[i]; j++) {
+				//Cell index
+				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
 				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
@@ -686,7 +837,7 @@ public:
 
 		//Synchronize
 		_parallelHelper.Barrier();
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Finished : Exchange values.");	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Finished : Exchange gradients.");	
 		return TURBO_OK;
 	};
 
@@ -703,10 +854,12 @@ public:
 		_configuration.SpecificHeatPressure = 1006.43;
 
 		//Solver settings
+		_simulationType = TimeAccurate;
 		CFL = 0.5;
 		RungeKuttaOrder = 1;
-		MaxIteration = 20;
+		MaxIteration = 100000;
 		MaxTime = 0.2;
+		SaveSolutionSnapshotIterations = 100;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
@@ -718,6 +871,12 @@ public:
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["OUTLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["WALL_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -729,17 +888,18 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Initializing boundary conditions");	
 
 		//Create Boundary conditions from configuration
+		bool isUnspecifiedBC = false;
 		for (const auto& bc : _grid.patchesNames) {
 			const std::string& bcName = bc.first;			
-			int bcMarker = bc.second;
+			int bcMarker = bc.second;			
 			if ( _configuration.BoundaryConditions.find(bcName) == _configuration.BoundaryConditions.end()) {
 				//Boundary condition unspecified
-				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition");	
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition :" + bcName);	
+				isUnspecifiedBC = true;	
 
-				//Synchronize
-				_parallelHelper.Barrier();		
-				return turbo_errt::TURBO_ERROR;
-			}
+				//Skip missing boundary condition
+				continue;
+			}								
 
 			//Initialize boundary conditions
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
@@ -752,6 +912,12 @@ public:
 			//Attach needed data structures to boundary condition class
 			_boundaryConditions[bcMarker]->setGrid(_grid);
 			_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+		};
+
+		if (isUnspecifiedBC) {
+			//Synchronize
+			_parallelHelper.Barrier();		
+			return turbo_errt::TURBO_ERROR;
 		};
 
 		//Synchronize
@@ -818,14 +984,23 @@ public:
 		int nv = _gasModel.nConservativeVariables;
 		std::vector<std::string> storedFields = _gasModel.GetStoredFieldsNames();
 
+		//Write simulation type
+
+		//Write iterative data
+		double iter = stepInfo.Iteration;
+		double time = stepInfo.Time;		
+		if (_simulationType == TimeAccurate) {
+			_cgnsWriter.WriteIterativeData(time, iter);
+		};
+
 		//Write solution node		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "1");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "1");	
 		_cgnsWriter.WriteSolution(_grid, solutionName);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
 
 		//Write physical quantities
 		std::vector<double> buffer(_grid.nCellsLocal);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 
 		//Stored fields
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "storedFields.size() = ", storedFields.size());	
@@ -839,9 +1014,9 @@ public:
 				std::vector<double> storedValues = _gasModel.GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
 			_cgnsWriter.WriteField(_grid, solutionName, fieldName, buffer);		
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 		};
 
 		//Additional fields (TO DO) generalize
@@ -915,60 +1090,76 @@ public:
 		//Exchange requested cell values
 		ParallelExchangeValues();
 		std::stringstream msg;
-		msg.clear();		
+		/*msg.clear();		
 		msg<<"Obtained values : ";
 		for (std::pair<int, std::vector<double>> p : _parallelHelper.RequestedValues) {
 			msg<<"cell="<<p.first<<"values=("<<p.second[0]<<","<<p.second[1]<<","
 				<<p.second[2]<<","<<p.second[3]<<","<<p.second[4]<<")";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/	
 
 
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
 		for (int i = 0; i<_grid.localFaces.size(); i++) {
-			Face& f = _grid.localFaces[i];
-			int cellIndexLeft = f.FaceCell_1;			
-			Cell& cLeft = _grid.Cells[cellIndexLeft];		
-			int cellIndexRight = f.FaceCell_2;
+			Face& f = _grid.localFaces[i];			
+			
 			//Debug
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceID = ", f.GlobalIndex);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceCell1 = ", cellIndexLeft);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "FaceCell2 = ", cellIndexRight);	
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "isExternal = ", f.isExternal);
-			Cell& cRight = _grid.Cells[cellIndexRight];
+			
 			std::vector<double> flux;
 			GasModel::ConservativeVariables UL;
 			GasModel::ConservativeVariables UR;
 			//TO DO check for indexes LOCAL vs GLOBAL for cells
-			UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
-			if (!f.isExternal) {			 
-				//If it is local face and both cells local				
-				if (cRight.IsDummy) {
-					//Dummy cell
-					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
-					std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
-					UR = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
-				} else {
-					//Ordinary cell
-					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
-					UR = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
-				};
-			} else {
-				//If it is interprocessor face obtain values from parallel helper
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
-				int globalIndex = cRight.GlobalIndex;
-				UR = _parallelHelper.RequestedValues[globalIndex];
-			};
+			//UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
+			/*msg.str("Reconstruct cell values.");
+			msg<<"cLeft.GlobalIndex = "<< cLeftGlobalIndex << "\n";
+			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
+			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
+			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
+			UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
+			UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
+
+			//GasModel::ConservativeVariables UL_ = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
+			//GasModel::ConservativeVariables UR_;
+			//if (!f.isExternal) {			 
+			//	//If it is local face and both cells local				
+			//	if (cRight.IsDummy) {
+			//		//Dummy cell
+			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
+			//		std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
+			//		UR_ = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
+			//	} else {
+			//		//Ordinary cell
+			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
+			//		UR_ = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
+			//	};
+			//} else {
+			//	//If it is interprocessor face obtain values from parallel helper
+			//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
+			//	int globalIndex = cRight.GlobalIndex;
+			//	UR_ = _parallelHelper.RequestedValues[globalIndex];
+			//};
 
 			//Compute flux
-			flux = rSolver.ComputeFlux( UL,  UR, f);							
+			RiemannProblemSolutionResult result = rSolver->Solve( UL,  UR, f);			
+			/*msg.str("");		
+			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
+				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
+				<<f.FaceNormal.x<<","<<f.FaceNormal.y<<","<<f.FaceNormal.z<<")";
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Store wave speeds
-			maxWaveSpeed[f.GlobalIndex] = rSolver.MaxEigenvalue;
+			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 
 			//Store flux
-			fluxes[f.GlobalIndex] = flux;
+			fluxes[f.GlobalIndex] = result.Fluxes;
 			
 			//Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
 			//if (f.isExternal) {				
@@ -1022,6 +1213,7 @@ public:
 			for (double& v : flux) v = 0;
 		};
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
 		////Compute gradients
 		//if (IsGradientRequired) ComputeGradients();
@@ -1038,13 +1230,12 @@ public:
 			for (int nFaceIndex : nFaces)
 			{
 				Face& face = _grid.localFaces[nFaceIndex];
-				int fluxDirection = (face.FaceCell_1 == cellIndex) ? 1 : -1;		
+				int fluxDirection = (face.FaceCell_1 == cell->GlobalIndex) ? 1 : -1;		
 				std::vector<double> fluxc = FaceFluxes[nFaceIndex];
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
-				};
-				
+				};				
 			};
 		};
 
@@ -1093,14 +1284,14 @@ public:
 		std::map<int, double> spectralRadius;
 		ComputeSpectralRadius(spectralRadius, MaxWaveSpeed, Values);
 
-		msg.clear();
+		/*msg.clear();
 		msg.str(std::string());
 		msg<<"MaxWaveSpeed :\n";
 		int ind = 0;
 		for (auto p : MaxWaveSpeed) {
 			msg<<"Face = "<<ind++<<" MaxWaveSpeed = "<<p<<"\n";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1108,18 +1299,18 @@ public:
 		std::map<int, double> localTimeStep;
 		ComputeLocalTimeStep(localTimeStep, spectralRadius);
 		
-		msg.clear();
+		/*msg.clear();
 		msg.str(std::string());
 		msg<<"Local time step :\n";
 		for (auto p : localTimeStep) {
 			msg<<"cell= "<<p.first<<" timeStep= "<<p.second<<"\n";
-		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+		};*/
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Synchronize
 		_parallelHelper.Barrier();
 
-		stepInfo.TimeStep = std::numeric_limits<double>::max();
+		stepInfo.TimeStep = MaxTime - stepInfo.Time; 
 		for (std::pair<int, double> p : localTimeStep)
 		{
 			double& timeStep = p.second;
@@ -1199,8 +1390,100 @@ public:
 	//Implicit time step
 	void ImplicitTimeStep() {
 	};
-
 	
+	//Compute scalar function gradient in each cell	
+	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {
+	//	//Allocate memory for gradients
+	//	grads.resize(_grid.nCellsLocal);		
+
+	//	//For each cell compute gradient of given function
+	//	std::vector<Vector> nPoints;
+	//	std::vector<double> nValues;
+	//	for (int i = 0; i<_grid.nCellsLocal; i++) {			
+	//		Cell& cell = *_grid.localCells[i];			
+
+	//		//Determine required set of point and values
+	//		nPoints.clear();			
+	//		nValues.clear();			
+
+	//		//Add all neighbours
+	//		for (int j = 0; j<cell.NeigbourCells.size(); j++) {				
+	//			Cell& nCell = _grid.Cells[cell.NeigbourCells[j]];
+	//			std::vector<double> nU;
+	//			if (nCell.
+	//			if (nCell.IsDummy) {
+	//			};
+	//			if (face.isExternal) {
+	//				nU = GetDummyCellValues(values[cell.GlobalIndex], face);
+	//			} else {
+	//				if (face.FaceCell_1 == cell.GlobalIndex) {
+	//					nU = values[face.FaceCell_2];
+	//				} else {
+	//					nU = values[face.FaceCell_1];
+	//				};
+	//			};
+	//			Vector nPoint;
+	//			if (face.isExternal) {
+	//				nPoint = 2 * (face.FaceCenter - cell.CellCenter) + cell.CellCenter;
+	//			} else {
+	//				if (face.FaceCell_1 == cell.GlobalIndex) {
+	//					nPoint = _grid.cells[face.FaceCell_2].CellCenter;
+	//				} else {
+	//					nPoint = _grid.cells[face.FaceCell_1].CellCenter;
+	//				};
+	//			};
+	//			double nValue = (this->*func)(nU);
+	//			nPoints.push_back(nPoint);
+	//			nValues.push_back(nValue);
+	//		};
+
+	//		double cellValue =  (this->*func)(U[cell.GlobalIndex]);
+	//		grads[cell.GlobalIndex] = ComputeGradientByPoints(cell.CellCenter, cellValue, nPoints, nValues);
+	//	};	
+
+	//	return;
+	//};
+
+	inline bool IsLocalCell(int globalIndex) {
+		return _grid.cellsPartitioning[globalIndex] == _parallelHelper.getRank();
+	};
+
+	inline bool IsDummyCell(int globalIndex) {
+		return _grid.Cells[globalIndex].IsDummy;
+	};
+
+	//Get cell values
+	inline std::vector<double> GetCellValues(int globalIndex, int localIndex = -1) {
+		/*std::stringstream msg;
+		msg.str("");
+		msg<<"Global Index = "<<globalIndex;
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
+		if (IsLocalCell(globalIndex)) {
+			if (IsDummyCell(globalIndex)) {
+				//If dummy cell compute on the go
+				/*msg.str("");
+				msg<<"Cells = "<<globalIndex;
+				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
+				Cell& cell = _grid.Cells[globalIndex];				
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );
+				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
+			} else {
+				//If proper cell return part of Values array				
+				if (localIndex == -1) {
+					//If local index is unknown determine it
+					//Lower perfomance WARNING
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];					
+					//msg.str("");					
+					//msg<<"Local Index = "<<localIndex;
+					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
+				};
+				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
+			};
+		} else {
+			//Return result of interprocessor exchange
+			return _parallelHelper.RequestedValues[globalIndex];
+		};
+	};
 };
 
 #endif

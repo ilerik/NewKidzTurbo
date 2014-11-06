@@ -12,8 +12,8 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 	double size_y = y_max - y_min;
 	int rank = pHelper->getRank();
 	int nProc = pHelper->getProcessorNumber();
-	int cartI;
-	int cartJ;
+	//int cartI;
+	//int cartJ;
 
 	//Generate grid topology
 	Grid g;
@@ -21,6 +21,7 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 	M++;
 	std::vector<double> x_p(N);
 	std::vector<double> y_p(M);
+	g.periodicNodesIdentityList.clear();
 	double h_x = 1.0 * size_x * (1.0 -q_x) / (1.0 - pow(q_x, N-1));
 	double h_y = 1.0 * size_y * (1.0 -q_y) / (1.0 - pow(q_y, M-1));
 	for (int i = 0; i<N; i++) {
@@ -98,7 +99,9 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 				g.Cells.push_back(dummyCell);
 				neighbour = dummyCell.GlobalIndex;
 			};
-			if ((i == 0) && (periodicX)) neighbour = N-2 + j*(N-1);			
+			if ((i == 0) && (periodicX)) {
+				neighbour = N-2 + j*(N-1);
+			};
 			if (i != 0) neighbour = i-1 + j*(N-1);
 			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
 
@@ -156,12 +159,25 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 				neighbour = dummyCell.GlobalIndex;
 			};
 			if ((j == M-2) && (periodicY)) neighbour = i + 0*(N-1);			
-			if (j != M-2) neighbour = i+1 + (j+1)*(N-1);
+			if (j != M-2) neighbour = i + (j+1)*(N-1);
 			g.Cells[cIndex].NeigbourCells.push_back(neighbour);
 		}
 	}
-	
 	g.nDummyCells = g.Cells.size() - g.nProperCells;
+
+	//Add periodic boundary nodes identity information
+	if (periodicX) {
+		for (int j = 0; j<M; j++) {
+			g.periodicNodesIdentityList[ j*N ].insert(N-1 + j*N);
+			g.periodicNodesIdentityList[ N-1 + j*N].insert(j*N );
+		};
+	};
+	if (periodicY) {
+		for (int i = 0; i<N; i++) {
+			g.periodicNodesIdentityList[i].insert(i + (M-1)*N);
+			g.periodicNodesIdentityList[i + (M-1)*N].insert(i);
+		};
+	};
 
 	//Fill in connectivity info
 	g.vdist.clear();
