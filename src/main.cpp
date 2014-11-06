@@ -7,6 +7,7 @@
 #include "kernel.h"
 #include "gridgeneration.h"
 #include <cmath>
+#include "LomonosovFortovGasModel.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -77,8 +78,10 @@ void runSodTest(int argc, char *argv[]) {
 	Kernel _kernel;
 	
 	_kernel.Initilize(&argc, &argv);
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, true, true);
+	//Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 1, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, false, true);
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1000, 0, 1.0, false);
 	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Ilya\\Dropbox\\Science\\ValidationCFD\\Mixer\\Mixer.cgns");	
 	_kernel.ReadConfiguration("");		
 	_kernel.InitCalculation();
 
@@ -223,24 +226,36 @@ public:
 			double z = cell.CellCenter.z;
 
 			//Below bottom bound
-			if (z < _bottomBound) {
-				u = 0;
-				v = _bottomV;
+			if (y < _bottomBound) {
+				u = _bottomV;
+				v = 0;
 				w = 0;
 			};
 
 			//Medium layer
-			if ((_bottomBound <= z) && (z <= _topBound)) {
-				double alpha = (z - _bottomBound) / (_topBound - _bottomBound);
-				u = 0.2*sin(y)*cos(x);
-				v = (1.0 - alpha) * _bottomV + alpha * _topV;
-				w = 0.2*sin(y)*cos(x);
+			if ((_bottomBound <= y) && (y <= _topBound)) {
+				double alpha = (y - _bottomBound) / (_topBound - _bottomBound);
+				//u = 0.2*sin(y)*cos(x);
+				//u = 0.2*sin(8*y)*cos(8*x);
+				//u = 0.5*sin(2*ae_pi*y)*cos(ae_pi*x);
+				//v = (1.0 - alpha) * _bottomV + alpha * _topV;
+				//w = 0.2*sin(y)*cos(x);
+				//w = 0.2*sin(8*y)*cos(8*x);				
+				//w = 0.5*sin(2*ae_pi*y)*cos(ae_pi*x);
+				u = (1.0 - alpha) * _bottomV + alpha * _topV;
+				double lambda = 1;
+				double A = 1.0;
+				double B = 1.0;
+				double C = 1.0;
+				w += A*cos(lambda * x) + B*sin(lambda*y);
+				v += C*cos(lambda * z) + A*sin(lambda*x);
+				u += B*cos(lambda * y) + C*sin(lambda*z);
 			};
 
 			//Above top bound
-			if (z > _topBound) {
-				u = 0;
-				v = _topV;
+			if (y > _topBound) {
+				u = _topV;
+				v = 0;
 				w = 0;
 			};
 				
@@ -288,10 +303,134 @@ void runShearLayer(int argc, char *argv[]) {
 	_kernel.Finalize();	
 };
 
+//Shear layer computation
+class ImpactShockInitialConditions : public InitialConditions::InitialConditions
+{
+private:
+	//Material
+	int _nmat;
+	//State of target	
+	double _u0;
+	double _ro0;
+	double _p0;
+	//Speed of projectile	
+	double _V;	
+	//Length of target
+	double _L;
+	
+public:	
+
+	ImpactShockInitialConditions(int nmat, double V, double ro0, double p0, double L) {
+		_V = V;
+		_ro0 = ro0;
+		_p0 = p0;
+		_L = L;
+	};
+
+	virtual std::vector<double> getInitialValues(const Cell& cell) {
+		std::vector<double> initValues;				
+		//Other velocities
+		double v = 0;
+		double w = 0;
+
+		//Left state
+		double roL = _ro0;
+		double PL = _p0;
+		double uL = _V;
+			
+		//Right state
+		double roR = _ro0;
+		double PR = _p0;
+		double uR = 0;
+
+		//Cell center
+		double x = cell.CellCenter.x;
+		double y = cell.CellCenter.y;
+		double z = cell.CellCenter.z;
+				
+		//Values
+		double u = 0;
+		double ro = 0;
+		double roE = 0;		
+		if (x <= 0) {
+			ro = roL;
+			u = uL;
+			roE = PL/(_gasModel->Gamma - 1.0);
+		} else {
+			ro = roR;
+			u = uR;
+			roE = PR/(_gasModel->Gamma - 1.0);
+		};
+		if (_gasModel->GasModelName == "LomonosovFortovGasModel") {
+			LomonosovFortovGasModel* lmgm = dynamic_cast<LomonosovFortovGasModel*>(_gasModel);			
+			double e = 0;
+			if (x <= 0.0) {
+				e = lmgm->FindInternalEnergy(ro, PL);
+			} else {
+				e = lmgm->FindInternalEnergy(ro, PR);
+			};
+			roE = ro*e + ro*(u*u + v*v + w*w)/2.0;
+		};
+			
+		//Convert to conservative variables
+		initValues.resize(_gasModel->nConservativeVariables);
+		initValues[0] = ro;
+		initValues[1] = ro * u;
+		initValues[2] = ro * v;
+		initValues[3] = ro * w;
+		initValues[4] = roE;// + (u*u + v*v + w*w) / 2.0); //TO DO check
+		return initValues;
+	};
+};
+
+void runImpactShockTest(int argc, char *argv[]) {
+	Kernel _kernel;
+	const double PI = 3.14159265359;
+	
+	_kernel.Initilize(&argc, &argv);
+	double L = 1.0;
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 200, -L, L, false);	
+	_kernel.BindGrid(_grid);
+	_kernel.ReadConfiguration("");			
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	//Pb
+	double ro0 = 11.3415e3; // SI
+	double p0 = 1e5; //atm SI	
+	//Velocity
+	double V = 500; //m/s
+	ImpactShockInitialConditions ic(9, V, ro0, p0, L);
+	_kernel.GenerateInitialConditions(ic);	
+
+	//Run test
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
+
+	//Output result
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	_kernel.Finalize();	
+};
+
 //Main program ))
  int main(int argc, char *argv[]) {		
 	//runPeriodicTest2D(argc, argv);
-	//runSodTest(argc, argv);
-	runShearLayer(argc, argv);
+	runSodTest(argc, argv);
+	//runShearLayer(argc, argv);
+	//runImpactShockTest(argc, argv);
+	//LomonosovFortovGasModel gasModel(1);
+	//double P;
+	//double c;
+	//bool nonPhysical;
+	//double ro = 1./0.88200003E-01;
+	//double e = 0;	
+	//double Gr = 0;
+	//gasModel.EOSE5(ro, e, P, c, Gr, nonPhysical);
+	//double P_SI = 1e5;
+	//double ro_SI = ro * 1000;
+	////e = gasModel.FindInternalEnergy(ro_SI, P_SI);
+	//std::cout<<"Pressure = "<<P<<"\n";
+	////std::cout<<"Energy = "<<e<<"\n";
 	return 0;	
 };

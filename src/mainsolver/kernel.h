@@ -14,6 +14,7 @@
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
+#include "LomonosovFortovGasModel.h"
 
 
 //Define error types
@@ -54,14 +55,15 @@ private:
 	//Solver (TO DO)		
 	SimulationType_t _simulationType; //Simulation type
 	double CFL;
-	double RungeKuttaOrder;
+	int RungeKuttaOrder;
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
 	double SaveSolutionSnapshotTime;
 	int SaveSolutionSnapshotIterations;
 	//Roe3DSolverPerfectGas rSolver;
-	Godunov3DSolverPerfectGas rSolver;
+	//Godunov3DSolverPerfectGas rSolver;
+	RiemannSolver* rSolver;
 	StepInfo stepInfo;
 
 	//Parallel run information		
@@ -125,10 +127,12 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt InitCalculation() {
-		//Gas model parameters
-		//_gasModel.loadConfiguration(_configuration);
-		nVariables = _gasModel.nConservativeVariables = 5;
+	turbo_errt InitCalculation() {				
+		//Gas model setup
+		_gasModel = GasModel(); // perfect gas gamma = 1.4
+		//_gasModel = LomonosovFortovGasModel(0); //stainless steel
+		_gasModel.loadConfiguration(_configuration);
+		nVariables = _gasModel.nConservativeVariables;
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
@@ -138,15 +142,12 @@ public:
 			flux.resize(nVariables);
 			for (double& v : flux) v = 0;
 		};	
-		MaxWaveSpeed.resize(_grid.nFaces);
-		
-		//Gas model setup
-		_gasModel = GasModel();
-		_gasModel.loadConfiguration(_configuration);
+		MaxWaveSpeed.resize(_grid.nFaces);		
 
 		//Solver settings
-		rSolver.SetGamma(_gasModel.Gamma);
-		rSolver.SetHartenEps(0.0);
+		rSolver = new RiemannSolver(_gasModel);
+		//rSolver.SetGamma(_gasModel.Gamma);
+		//rSolver.SetHartenEps(0.01);
 		//rSolver.SetOperatingPressure(0.0);
 
 		//Initial conditions
@@ -154,7 +155,12 @@ public:
 		GenerateInitialConditions(ic);
 
 		//Boundary conditions
-		InitBoundaryConditions();
+		if (InitBoundaryConditions() == turbo_errt::TURBO_ERROR) {
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
 
 		//Init parallel exchange
 		InitParallelExchange();
@@ -179,12 +185,13 @@ public:
 			ExplicitTimeStep();
 
 			//Output step information
-			//if (_parallelHelper.IsMaster()) {
 			msg.clear();
 			msg.str(std::string());
 			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
-			//};
+			if (_parallelHelper.IsMaster()) {
+				std::cout<<msg.str();
+			};
 
 			//Debug
 			//Output values
@@ -568,6 +575,14 @@ public:
 		for (Face& face : _grid.localFaces) {
 			int index = face.GlobalIndex;									
 
+			//If boundary face make sure dummy if FaceCell_2
+			if (face.FaceCell_1 >= _grid.nProperCells) {
+				//Swap
+				int tmp = face.FaceCell_1;
+				face.FaceCell_1 = face.FaceCell_2;
+				face.FaceCell_2 = tmp;
+			};
+
 			//Orient normal
 			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
 			Vector faceCenter = _grid.localFaces[index].FaceCenter;
@@ -842,9 +857,9 @@ public:
 		_simulationType = TimeAccurate;
 		CFL = 0.5;
 		RungeKuttaOrder = 1;
-		MaxIteration = 10000;
-		MaxTime = 10;
-		SaveSolutionSnapshotIterations = 1000;
+		MaxIteration = 100000;
+		MaxTime = 0.2;
+		SaveSolutionSnapshotIterations = 100;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
@@ -858,6 +873,10 @@ public:
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["OUTLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["WALL_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -869,17 +888,18 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Initializing boundary conditions");	
 
 		//Create Boundary conditions from configuration
+		bool isUnspecifiedBC = false;
 		for (const auto& bc : _grid.patchesNames) {
 			const std::string& bcName = bc.first;			
-			int bcMarker = bc.second;
+			int bcMarker = bc.second;			
 			if ( _configuration.BoundaryConditions.find(bcName) == _configuration.BoundaryConditions.end()) {
 				//Boundary condition unspecified
-				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition");	
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition :" + bcName);	
+				isUnspecifiedBC = true;	
 
-				//Synchronize
-				_parallelHelper.Barrier();		
-				return turbo_errt::TURBO_ERROR;
-			}
+				//Skip missing boundary condition
+				continue;
+			}								
 
 			//Initialize boundary conditions
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
@@ -892,6 +912,12 @@ public:
 			//Attach needed data structures to boundary condition class
 			_boundaryConditions[bcMarker]->setGrid(_grid);
 			_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+		};
+
+		if (isUnspecifiedBC) {
+			//Synchronize
+			_parallelHelper.Barrier();		
+			return turbo_errt::TURBO_ERROR;
 		};
 
 		//Synchronize
@@ -1122,7 +1148,7 @@ public:
 			//};
 
 			//Compute flux
-			flux = rSolver.ComputeFlux( UL,  UR, f);	
+			RiemannProblemSolutionResult result = rSolver->Solve( UL,  UR, f);			
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
 				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
@@ -1130,10 +1156,10 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Store wave speeds
-			maxWaveSpeed[f.GlobalIndex] = rSolver.MaxEigenvalue;
+			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 
 			//Store flux
-			fluxes[f.GlobalIndex] = flux;
+			fluxes[f.GlobalIndex] = result.Fluxes;
 			
 			//Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
 			//if (f.isExternal) {				
@@ -1209,8 +1235,7 @@ public:
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
-				};
-				
+				};				
 			};
 		};
 
