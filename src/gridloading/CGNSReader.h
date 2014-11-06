@@ -744,7 +744,7 @@ public:
 		for (int BCMarker = 0; BCMarker < bcNames.size(); BCMarker++) {
 			grid.addPatch(bcNames[BCMarker], BCMarker);
 			for (int faceCGNSIndex : bcElements[BCMarker]) {	
-				int faceIndex = _faceCToG[faceIndex];
+				int faceIndex = _faceCToG[faceCGNSIndex];
 				grid.Cells[faceIndex].BCMarker = BCMarker;
 				grid.patches[BCMarker].addFace(faceIndex);
 				for (int nodeIndex : grid.Cells[faceIndex].Nodes) grid.patches[BCMarker].addNode(nodeIndex);
@@ -793,6 +793,9 @@ public:
 		for (int i = 0; i<=nProcessors; i++) msg<<grid.vdist[i]<<" ";
 		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());			
 		_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good read.");			
+
+		//Check patches
+		grid.ConstructAndCheckPatches();
 
 		//Synchronize
 		_parallelHelper->Barrier();
