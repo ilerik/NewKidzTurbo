@@ -855,22 +855,22 @@ public:
 
 		//Solver settings
 		_simulationType = TimeAccurate;
-		CFL = 0.5;
+		CFL = 0.1;
 		RungeKuttaOrder = 1;
 		MaxIteration = 100000;
-		MaxTime = 0.2;
+		MaxTime = 2e-4;
 		SaveSolutionSnapshotIterations = 100;
 
 		//Initialize start moment
 		stepInfo.Time = 0.0;
 
-		//Boundary conditions
-		//_configuration.BoundaryConditions["top_left"].BoundaryConditionType = BCOutflow;
-		//_configuration.BoundaryConditions["top_left"].SetPropertyValue("StaticPressure", 1905);
+		//Boundary conditions				
 		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
@@ -902,21 +902,38 @@ public:
 			}								
 
 			//Initialize boundary conditions
+			bool bcTypeCheckPassed = false;
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
 			BCType_t bcType = bcConfig.BoundaryConditionType;
 			if (bcType == BCType_t::BCSymmetryPlane) {				
 				BoundaryConditions::BCSymmetryPlane* bc = new BoundaryConditions::BCSymmetryPlane();
+				_boundaryConditions[bcMarker] = bc; 	
+				bcTypeCheckPassed = true;
+			};
+			if (bcType == BCType_t::BCOutflowSupersonic) {
+				BoundaryConditions::BCOutflowSupersonic* bc = new BoundaryConditions::BCOutflowSupersonic();
 				_boundaryConditions[bcMarker] = bc; 
+				bcTypeCheckPassed = true;
 			};
 
-			//Attach needed data structures to boundary condition class
-			_boundaryConditions[bcMarker]->setGrid(_grid);
-			_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+			if (!bcTypeCheckPassed) {
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "BCType is not supported.");
+
+				//Synchronize
+				_parallelHelper.Barrier();
+				return turbo_errt::TURBO_ERROR;			
+			} else {
+				//Attach needed data structures to boundary condition class
+				_boundaryConditions[bcMarker]->setGrid(_grid);
+				_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+			};
 		};
 
 		if (isUnspecifiedBC) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition.");
+
 			//Synchronize
-			_parallelHelper.Barrier();		
+			_parallelHelper.Barrier();
 			return turbo_errt::TURBO_ERROR;
 		};
 

@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSupersonicInlet.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
     <ClInclude Include="src\boundaryconditions\BCWallViscousIsothermal.h" />

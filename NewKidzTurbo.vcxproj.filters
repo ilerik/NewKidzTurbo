@@ -183,6 +183,9 @@
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h">
       <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

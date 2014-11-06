@@ -312,7 +312,6 @@ private:
 	//State of target	
 	double _u0;
 	double _ro0;
-	double _p0;
 	//Speed of projectile	
 	double _V;	
 	//Length of target
@@ -320,10 +319,9 @@ private:
 	
 public:	
 
-	ImpactShockInitialConditions(int nmat, double V, double ro0, double p0, double L) {
+	ImpactShockInitialConditions(int nmat, double V, double ro0, double L) {
 		_V = V;
-		_ro0 = ro0;
-		_p0 = p0;
+		_ro0 = ro0;		
 		_L = L;
 	};
 
@@ -332,16 +330,15 @@ public:
 		//Other velocities
 		double v = 0;
 		double w = 0;
+		double e = 0;
 
-		//Left state
-		double roL = _ro0;
-		double PL = _p0;
-		double uL = _V;
+		//Left state		
+		double roL = _ro0;		
+		double uL = 0.5 * _V;
 			
-		//Right state
-		double roR = _ro0;
-		double PR = _p0;
-		double uR = 0;
+		//Right state		
+		double roR = _ro0;		
+		double uR = -0.5 * _V;
 
 		//Cell center
 		double x = cell.CellCenter.x;
@@ -351,28 +348,17 @@ public:
 		//Values
 		double u = 0;
 		double ro = 0;
-		double roE = 0;		
+		double roE = 0;				
 		if (x <= 0) {
 			ro = roL;
-			u = uL;
-			roE = PL/(_gasModel->Gamma - 1.0);
+			u = uL;			
 		} else {
 			ro = roR;
-			u = uR;
-			roE = PR/(_gasModel->Gamma - 1.0);
-		};
-		if (_gasModel->GasModelName == "LomonosovFortovGasModel") {
-			LomonosovFortovGasModel* lmgm = dynamic_cast<LomonosovFortovGasModel*>(_gasModel);			
-			double e = 0;
-			if (x <= 0.0) {
-				e = lmgm->FindInternalEnergy(ro, PL);
-			} else {
-				e = lmgm->FindInternalEnergy(ro, PR);
-			};
-			roE = ro*e + ro*(u*u + v*v + w*w)/2.0;
+			u = uR;						
 		};
 			
 		//Convert to conservative variables
+		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
 		initValues.resize(_gasModel->nConservativeVariables);
 		initValues[0] = ro;
 		initValues[1] = ro * u;
@@ -388,19 +374,17 @@ void runImpactShockTest(int argc, char *argv[]) {
 	const double PI = 3.14159265359;
 	
 	_kernel.Initilize(&argc, &argv);
-	double L = 1.0;
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 200, -L, L, false);	
+	double L = 5e-2; // 5 cm;
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1000, -L, L, false);	
 	_kernel.BindGrid(_grid);
 	_kernel.ReadConfiguration("");			
 	_kernel.InitCalculation();
 
 	//Initial conditions
 	//Pb
-	double ro0 = 11.3415e3; // SI
-	double p0 = 1e5; //atm SI	
-	//Velocity
-	double V = 500; //m/s
-	ImpactShockInitialConditions ic(9, V, ro0, p0, L);
+	double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
+	double V = 1000; //m/s
+	ImpactShockInitialConditions ic(0, V, ro0, L);
 	_kernel.GenerateInitialConditions(ic);	
 
 	//Run test
@@ -416,9 +400,9 @@ void runImpactShockTest(int argc, char *argv[]) {
 //Main program ))
  int main(int argc, char *argv[]) {		
 	//runPeriodicTest2D(argc, argv);
-	runSodTest(argc, argv);
+	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
-	//runImpactShockTest(argc, argv);
+	runImpactShockTest(argc, argv);
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;
 	//double c;
