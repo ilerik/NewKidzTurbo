@@ -38,6 +38,8 @@ public:
 		double c;
 		double Gr;
 		bool NF;
+		e /= 1e6; //J/kg -> kJ/g
+		ro /= 1000; //kg/cc -> g/cc
 		EOSE5(ro, e, P, c, Gr, NF);
 		P *= 1e9;  //GPa -> Pa
 		c *= 1000; //km\s -> m\s
@@ -45,7 +47,7 @@ public:
 	};
 
 	//Get pressure and sound speed
-	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) {
+	void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) {
 		double ro = U.ro;
 		double u = U.rou / ro;
 		double v = U.rov / ro;

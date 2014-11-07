@@ -10,6 +10,7 @@
 #include "parallelHelper.h"
 #include "BoundaryConditions.h"
 #include "InitialConditions.h"
+#include "math.h"
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
@@ -50,7 +51,7 @@ private:
 	Configuration _configuration;	
 
 	//Gas model
-	GasModel _gasModel;		
+	GasModel* _gasModel;		
 
 	//Solver (TO DO)		
 	SimulationType_t _simulationType; //Simulation type
@@ -59,6 +60,7 @@ private:
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
+	double NextSnapshotTime;
 	double SaveSolutionSnapshotTime;
 	int SaveSolutionSnapshotIterations;
 	//Roe3DSolverPerfectGas rSolver;
@@ -129,10 +131,10 @@ public:
 
 	turbo_errt InitCalculation() {				
 		//Gas model setup
-		_gasModel = GasModel(); // perfect gas gamma = 1.4
-		//_gasModel = LomonosovFortovGasModel(0); //stainless steel
-		_gasModel.loadConfiguration(_configuration);
-		nVariables = _gasModel.nConservativeVariables;
+		//_gasModel = GasModel(); // perfect gas gamma = 1.4
+		_gasModel = new LomonosovFortovGasModel(0); //stainless steel
+		_gasModel->loadConfiguration(_configuration);
+		nVariables = _gasModel->nConservativeVariables;
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
@@ -207,6 +209,7 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Solution snapshots
+			//Every few iterations
 			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
 				//Save snapshot
 				std::stringstream snapshotFileName;
@@ -214,6 +217,19 @@ public:
 				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
+			};
+
+			//Every fixed time interval
+			if ((SaveSolutionSnapshotTime > 0) && (NextSnapshotTime == stepInfo.Time)) {
+				//Save snapshot
+				std::stringstream snapshotFileName;
+				snapshotFileName.str(std::string());
+				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
+				SaveGrid(snapshotFileName.str());				
+				SaveSolution(snapshotFileName.str(), "Solution");
+
+				//Adjust next snapshot time
+				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
 
 
@@ -857,12 +873,14 @@ public:
 		_simulationType = TimeAccurate;
 		CFL = 0.1;
 		RungeKuttaOrder = 1;
-		MaxIteration = 100000;
-		MaxTime = 2e-4;
-		SaveSolutionSnapshotIterations = 100;
 
-		//Initialize start moment
-		stepInfo.Time = 0.0;
+		//Run settings
+		MaxIteration = 100000;
+		MaxTime = 10e-6;
+		SaveSolutionSnapshotIterations = 0;
+		SaveSolutionSnapshotTime = 1e-6;		
+		stepInfo.Time = 0.0; //Initialize start moment
+		NextSnapshotTime = stepInfo.Time;
 
 		//Boundary conditions				
 		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
@@ -983,9 +1001,9 @@ public:
 		//For each local cell write initial conditions
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
 			Cell* c = _grid.localCells[i];
-			for (int j = 0; j<_gasModel.nConservativeVariables; j++) {
+			for (int j = 0; j<_gasModel->nConservativeVariables; j++) {
 				std::vector<double> values = initConditions.getInitialValues(*c);
-				Values[i * _gasModel.nConservativeVariables + j] = values[j];
+				Values[i * _gasModel->nConservativeVariables + j] = values[j];
 			};
 		};
 
@@ -998,8 +1016,8 @@ public:
 	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
 		//Open file
 		_cgnsWriter.OpenFile(fname);
-		int nv = _gasModel.nConservativeVariables;
-		std::vector<std::string> storedFields = _gasModel.GetStoredFieldsNames();
+		int nv = _gasModel->nConservativeVariables;
+		std::vector<std::string> storedFields = _gasModel->GetStoredFieldsNames();
 
 		//Write simulation type
 
@@ -1028,7 +1046,7 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);				
 			for (int i = 0; i<_grid.nCellsLocal; i++) {
 				GasModel::ConservativeVariables U(&Values[i * nv]);
-				std::vector<double> storedValues = _gasModel.GetStoredValuesFromConservative(U);				
+				std::vector<double> storedValues = _gasModel->GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
@@ -1066,18 +1084,22 @@ public:
 
 		//Pressure		
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double ro = Values[i * nv + 0];
-			double rou = Values[i * nv + 1];
-			double rov = Values[i * nv + 2];
-			double row = Values[i * nv + 3];
-			double roE = Values[i * nv + 4];
-			double u = rou / ro;
-			double v = rov / ro;
-			double w = row / ro;
-			double P = (roE - ro*(w*w + v*v + u*u)/2.0) / (_gasModel.Gamma - 1.0);
+			double P = _gasModel->GetPressure(&Values[i * nv + 0]);
 			buffer[i] = P;
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer); 
+
+		//Internal energy
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i * nv + 0];
+			double u = Values[i * nv + 1] / ro;
+			double v = Values[i * nv + 2] / ro;
+			double w = Values[i * nv + 3] / ro;
+			double E = Values[i * nv + 4] / ro;
+			double e = E - (u*u + v*v + w*w) / 2.0;	
+			buffer[i] = e;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "EnergyInternal", buffer); 
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
@@ -1328,6 +1350,7 @@ public:
 		_parallelHelper.Barrier();
 
 		stepInfo.TimeStep = MaxTime - stepInfo.Time; 
+		if (SaveSolutionSnapshotTime > 0) stepInfo.TimeStep = min(NextSnapshotTime - stepInfo.Time, stepInfo.TimeStep);
 		for (std::pair<int, double> p : localTimeStep)
 		{
 			double& timeStep = p.second;
@@ -1494,7 +1517,7 @@ public:
 					//msg<<"Local Index = "<<localIndex;
 					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 				};
-				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
+				return std::vector<double>(&Values[localIndex * _gasModel->nConservativeVariables], &Values[localIndex * _gasModel->nConservativeVariables] + _gasModel->nConservativeVariables);
 			};
 		} else {
 			//Return result of interprocessor exchange

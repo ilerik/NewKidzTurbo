@@ -374,10 +374,10 @@ void runImpactShockTest(int argc, char *argv[]) {
 	const double PI = 3.14159265359;
 	
 	_kernel.Initilize(&argc, &argv);
-	double L = 5e-2; // 5 cm;
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1000, -L, L, false);	
+	double L = 15e-2; // 5 cm; 
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 6000, -L, L, false); //Change grid size here
 	_kernel.BindGrid(_grid);
-	_kernel.ReadConfiguration("");			
+	_kernel.ReadConfiguration(""); //Change run parameters here
 	_kernel.InitCalculation();
 
 	//Initial conditions

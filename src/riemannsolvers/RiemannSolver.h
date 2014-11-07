@@ -18,7 +18,7 @@ public:
 
 //Base class for all riemann solvers
 class RiemannSolver {	
-	GasModel& _gasModel; //Link to gasmodel to use
+	GasModel* _gasModel; //Link to gasmodel to use
 
 	//Private helpers
 	inline double takeRoeAverage(double& roLRoot, double roRRoot, double fL, double fR) {
@@ -26,12 +26,12 @@ class RiemannSolver {
 		return roeAvg;
 	};
 public:	
-	RiemannSolver(GasModel& gasModel) : _gasModel(gasModel) { };	
+	RiemannSolver(GasModel* gasModel) : _gasModel(gasModel) { };	
 
 	//Solve riemann problem	
 	RiemannProblemSolutionResult Solve(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		RiemannProblemSolutionResult result;
-		result.Fluxes.resize(_gasModel.nConservativeVariables, 0);
+		result.Fluxes.resize(_gasModel->nConservativeVariables, 0);
 
 		//The Harten, Lax, and van Leer with contact restoration (HLLC) Riemann solver
 		//Left and right states
@@ -41,7 +41,7 @@ public:
 		double pL = 0;
 		double cL = 0;
 		double GrL = 0;		
-		_gasModel.GetPressureAndSoundSpeed(UL, pL, cL, GrL);
+		_gasModel->GetPressureAndSoundSpeed(UL, pL, cL, GrL);
 		double phiL = cL*cL - GrL * pL / roL;		
 
 		double roR = UR.ro;
@@ -51,7 +51,7 @@ public:
 		double cR = 0;
 		double GrR = 0;
 		double GammaR = 0;		
-		_gasModel.GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
+		_gasModel->GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
 		double phiR = cR*cR - GrR * pR / roR;
 
 		//Generalized Roe averages (according to Hu et al)
@@ -123,11 +123,11 @@ public:
 		result.Velocity = velocity;
 
 		//DEBUG
-		Roe3DSolverPerfectGas rSolver;
+		/*Roe3DSolverPerfectGas rSolver;
 		rSolver.SetGamma(1.4);
 		rSolver.SetOperatingPressure(0.0);
 		rSolver.SetHartenEps(0.0);
-		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);
+		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);*/
 		return result;
 	};
 };

@@ -70,7 +70,7 @@ public:
 	};
 
 	//Obtain medium pressure, soundspeed, Gruneisen coefficient and adiabatic exponent values
-	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) {
+	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0 {
 		double ro = U.ro;
 		double u = U.rou / ro;
 		double v = U.rov / ro;

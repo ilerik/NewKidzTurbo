@@ -33,8 +33,8 @@ namespace BoundaryConditions {
 			_grid = &grid;
 		};
 
-		virtual void setGasModel(GasModel& gasModel) {
-			_gasModel = &gasModel;
+		virtual void setGasModel(GasModel* gasModel) {
+			_gasModel = gasModel;
 		};
 
 		//virtual void setRiemannSolver(RiemannSolver& rSolver) = 0;
