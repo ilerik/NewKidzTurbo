@@ -132,7 +132,7 @@ public:
 	turbo_errt InitCalculation() {				
 		//Gas model setup
 		//_gasModel = GasModel(); // perfect gas gamma = 1.4
-		_gasModel = new LomonosovFortovGasModel(0); //stainless steel
+		_gasModel = new LomonosovFortovGasModel(1); //Pb
 		_gasModel->loadConfiguration(_configuration);
 		nVariables = _gasModel->nConservativeVariables;
 
@@ -872,11 +872,11 @@ public:
 		//Solver settings
 		_simulationType = TimeAccurate;
 		CFL = 0.1;
-		RungeKuttaOrder = 1;
+		RungeKuttaOrder = 2;
 
 		//Run settings
 		MaxIteration = 100000;
-		MaxTime = 10e-6;
+		MaxTime = 20e-6;
 		SaveSolutionSnapshotIterations = 0;
 		SaveSolutionSnapshotTime = 1e-6;		
 		stepInfo.Time = 0.0; //Initialize start moment

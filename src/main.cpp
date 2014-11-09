@@ -307,22 +307,18 @@ void runShearLayer(int argc, char *argv[]) {
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
 {
 private:
-	//Material
-	int _nmat;
 	//State of target	
 	double _u0;
 	double _ro0;
 	//Speed of projectile	
 	double _V;	
-	//Length of target
-	double _L;
+
 	
 public:	
 
-	ImpactShockInitialConditions(int nmat, double V, double ro0, double L) {
+	ImpactShockInitialConditions(double V, double ro0) {
 		_V = V;
 		_ro0 = ro0;		
-		_L = L;
 	};
 
 	virtual std::vector<double> getInitialValues(const Cell& cell) {
@@ -330,6 +326,8 @@ public:
 		//Other velocities
 		double v = 0;
 		double w = 0;
+
+		//Internal energy
 		double e = 0;
 
 		//Left state		
@@ -375,16 +373,16 @@ void runImpactShockTest(int argc, char *argv[]) {
 	
 	_kernel.Initilize(&argc, &argv);
 	double L = 15e-2; // 5 cm; 
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 6000, -L, L, false); //Change grid size here
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1200, -L, L, false); //Change grid size here
 	_kernel.BindGrid(_grid);
 	_kernel.ReadConfiguration(""); //Change run parameters here
 	_kernel.InitCalculation();
 
 	//Initial conditions
-	//Pb
-	double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
+	double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+	//double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
 	double V = 1000; //m/s
-	ImpactShockInitialConditions ic(0, V, ro0, L);
+	ImpactShockInitialConditions ic(V, ro0);
 	_kernel.GenerateInitialConditions(ic);	
 
 	//Run test
