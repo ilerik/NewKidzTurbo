@@ -141,13 +141,7 @@
     <ClInclude Include="src\gasmodels\GasModel.h">
       <Filter>Header Files\GasModels</Filter>
     </ClInclude>
-    <ClInclude Include="src\gasmodels\PerfectGas.h">
-      <Filter>Header Files\GasModels</Filter>
-    </ClInclude>
     <ClInclude Include="src\boundaryconditions\BoundaryConditions.h">
-      <Filter>Header Files\BoundaryConditions</Filter>
-    </ClInclude>
-    <ClInclude Include="src\boundaryconditions\BCSupersonicInlet.h">
       <Filter>Header Files\BoundaryConditions</Filter>
     </ClInclude>
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h">
@@ -185,6 +179,12 @@
     </ClInclude>
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h">
       <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gasmodels\PerfectGasModel.h">
+      <Filter>Header Files\GasModels</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -236,6 +236,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="config.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="CMakeLists.txt">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>

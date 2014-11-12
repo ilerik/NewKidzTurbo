@@ -132,14 +132,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
-    <ClInclude Include="src\boundaryconditions\BCSupersonicInlet.h" />
+    <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
     <ClInclude Include="src\boundaryconditions\BCWallViscousIsothermal.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryConditions.h" />
     <ClInclude Include="src\gasmodels\GasModel.h" />
     <ClInclude Include="src\gasmodels\LomonosovFortovGasModel.h" />
-    <ClInclude Include="src\gasmodels\PerfectGas.h" />
+    <ClInclude Include="src\gasmodels\PerfectGasModel.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
     <ClInclude Include="src\gridgeneration\gengrid3D.h" />
@@ -208,6 +208,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <Text Include="CMakeLists.txt" />
     <Text Include="config.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
