@@ -83,13 +83,7 @@ public:
 
 
 	//Read configuration
-	void loadConfiguration(Configuration _configuration) {
-		nConservativeVariables = 5;
-		R = _configuration.IdealGasConstant;
-		Gamma = _configuration.SpecificHeatRatio;
-		Cp = _configuration.SpecificHeatPressure;
-		Cv = _configuration.SpecificHeatVolume;		
-	};
+	virtual void loadConfiguration(Configuration _configuration) = 0 { };
 
 	//Storing / saving service functions
 	std::vector<std::string> GetStoredFieldsNames() {
