@@ -70,20 +70,10 @@ public:
 	};
 
 	//Obtain medium pressure, soundspeed, Gruneisen coefficient and adiabatic exponent values
-	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0 {
-		double ro = U.ro;
-		double u = U.rou / ro;
-		double v = U.rov / ro;
-		double w = U.row / ro;	
-		double e = (U.roE / ro) - (u*u + v*v + w*w) / 2.0;
-		pressure = (ro * e) * (Gamma - 1.0);
-		soundspeed = sqrt((Gamma - 1.0) * (e + pressure/ro));
-		gruneisen = Gamma - 1.0;		
-	};		
-
+	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0;
 
 	//Read configuration
-	virtual void loadConfiguration(Configuration _configuration) = 0 { };
+	virtual void loadConfiguration(Configuration _configuration) = 0;
 
 	//Storing / saving service functions
 	std::vector<std::string> GetStoredFieldsNames() {

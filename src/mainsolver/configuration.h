@@ -23,7 +23,6 @@ public:
 	double SpecificHeatVolume;
 	double SpecificHeatPressure;
 
-
 	//Boundary conditions		
 	std::map<std::string, BoundaryConditionConfiguration> BoundaryConditions;
 };

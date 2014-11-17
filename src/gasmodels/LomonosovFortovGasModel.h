@@ -26,6 +26,12 @@ public:
 		_prepareData();
 	};
 
+	//Load configuration
+	void loadConfiguration(Configuration _conf) {
+		//Not implemented yet
+		nConservativeVariables = 5;
+	};
+
 	//Get pressure
 	double GetPressure(GasModel::ConservativeVariables U) {
 		double ro = U.ro;

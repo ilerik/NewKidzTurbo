@@ -81,7 +81,7 @@ public:
 	};
 
 	//Gather arrays of double of different size on master node
-	void GathervInt(std::vector<int>& local, std::vector<int>& counts, std::vector<int>& result) {		
+	void GathervInt(std::vector<cgsize_t>& local, std::vector<int>& counts, std::vector<cgsize_t>& result) {		
 		if (IsMaster()) {			
 			//Make displacement array
 			std::vector<int> displs(counts.size());

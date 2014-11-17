@@ -192,12 +192,12 @@ void runPeriodicTest3D(int argc, char *argv[]) {
 class ShearLayerInitialConditions : public InitialConditions::InitialConditions
 {
 private:
+	double _Pressure;
 	double _topBound;
 	double _bottomBound;	
 	double _ro;
 	double _topV;
-	double _bottomV;
-	double _P;	
+	double _bottomV;	
 	double _PI;
 public:	
 
@@ -206,7 +206,7 @@ public:
 		_topBound = _PI + 0.5;
 		_bottomBound = _PI - 0.5;
 		_ro = 1.0;
-		_P = 1000;
+		_Pressure = 1000.0;
 		_topV = 5;
 		_bottomV = -5;
 	};
@@ -218,7 +218,7 @@ public:
 			double u = 0;
 			double v = 0;
 			double w = 0;
-			double P = _P;
+			double P = _Pressure;
 
 			//Cell center
 			double x = cell.CellCenter.x;
@@ -328,15 +328,15 @@ public:
 		double w = 0;
 
 		//Internal energy
-		double e = 0;
+		double e = 10;
 
 		//Left state		
 		double roL = _ro0;		
-		double uL = 0.5 * _V;
+		double uL = 0.5*_V;
 			
 		//Right state		
 		double roR = _ro0;		
-		double uR = -0.5 * _V;
+		double uR = -0.5*_V;
 
 		//Cell center
 		double x = cell.CellCenter.x;
@@ -373,15 +373,19 @@ void runImpactShockTest(int argc, char *argv[]) {
 	
 	_kernel.Initilize(&argc, &argv);
 	double L = 15e-2; // 5 cm; 
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1200, -L, L, false); //Change grid size here
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1800, -L, L, false); //Change grid size here
 	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
+
+	//Fill in configuration
 	_kernel.ReadConfiguration(""); //Change run parameters here
 	_kernel.InitCalculation();
 
 	//Initial conditions
+	//double ro0 = 1;
 	double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
 	//double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
-	double V = 1000; //m/s
+	double V = 500; //m/s
 	ImpactShockInitialConditions ic(V, ro0);
 	_kernel.GenerateInitialConditions(ic);	
 
@@ -396,11 +400,11 @@ void runImpactShockTest(int argc, char *argv[]) {
 };
 
 //Main program ))
- int main(int argc, char *argv[]) {		
+ int main(int argc, char *argv[]) {
 	//runPeriodicTest2D(argc, argv);
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
-	runImpactShockTest(argc, argv);
+ 	runImpactShockTest(argc, argv);
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;
 	//double c;

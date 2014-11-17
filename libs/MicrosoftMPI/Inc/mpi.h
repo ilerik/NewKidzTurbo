@@ -125,7 +125,7 @@ extern "C" {
 
 /* Address size integer */
 #ifdef _WIN64
-typedef __int64 MPI_Aint;
+typedef long long MPI_Aint;
 #else
 typedef int MPI_Aint;
 #endif
@@ -134,7 +134,7 @@ typedef int MPI_Aint;
 typedef int MPI_Fint;
 
 /* File offset */
-typedef __int64 MPI_Offset;
+typedef long long MPI_Offset;
 
 
 /*---------------------------------------------------------------------------*/

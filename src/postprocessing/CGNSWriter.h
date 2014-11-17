@@ -70,8 +70,8 @@ protected:
 		bool unique;
 		std::string name;
 		ElementType_t type;
-		int eBegin;
-		int eEnd;
+		cgsize_t eBegin;
+		cgsize_t eEnd;
 		int nbBdry;
 		int parentFlag;
 		int elemNodeCount;
@@ -88,9 +88,9 @@ protected:
 		std::string name;
 		BCType_t boco_type;  // e.g. BCDirichlet, BCSubsonicInflow, ...
 		PointSetType_t ptset_type; // PointList / PointRange / ElementList / ElementRange
-		int nBC_elem;
+		cgsize_t nBC_elem;
 		int normalIndex;
-		int normalListFlag;
+		cgsize_t normalListFlag;
 		DataType_t normalDataType;
 		int nDataSet;
 	} m_boco; 
@@ -270,7 +270,7 @@ public:
 			CALL_CGNS(cg_array_write("TimeValues", DataType_t::RealDouble, 1, &nSteps, &time));			
 			CALL_CGNS(cg_ziter_write(m_file.idx, m_base.idx, m_zone.idx, "IterativeData"));
 			CALL_CGNS(cg_goto(m_file.idx, m_base.idx, "Zone", 0, "IterativeData", 0, "end"));
-			int dimensionVector[2];
+			cgsize_t dimensionVector[2];
 			dimensionVector[0] = 32;
 			dimensionVector[1] = nSteps;
 			CALL_CGNS(cg_array_write("FlowSolutionPointers", DataType_t::Character, 2, dimensionVector, solutionName));			

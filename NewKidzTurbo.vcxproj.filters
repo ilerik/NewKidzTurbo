@@ -238,6 +238,9 @@
     <Text Include="config.txt">
       <Filter>Resource Files</Filter>
     </Text>
+    <Text Include="CMakeListsWin64.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
     <Text Include="CMakeLists.txt">
       <Filter>Resource Files</Filter>
     </Text>

@@ -10,12 +10,13 @@
 #include "parallelHelper.h"
 #include "BoundaryConditions.h"
 #include "InitialConditions.h"
-#include "math.h"
+#include "cmath"
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
+#include "PerfectGasModel.h"
 
 
 //Define error types
@@ -130,8 +131,8 @@ public:
 	};
 
 	turbo_errt InitCalculation() {				
-		//Gas model setup
-		//_gasModel = GasModel(); // perfect gas gamma = 1.4
+		//Gas model setup		
+		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
 		_gasModel = new LomonosovFortovGasModel(1); //Pb
 		_gasModel->loadConfiguration(_configuration);
 		nVariables = _gasModel->nConservativeVariables;
@@ -166,6 +167,10 @@ public:
 
 		//Init parallel exchange
 		InitParallelExchange();
+
+		//Initialize start moment
+		stepInfo.Time = 0.0; 
+		NextSnapshotTime = stepInfo.Time;
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -857,6 +862,10 @@ public:
 		return TURBO_OK;
 	};
 
+	turbo_errt BindConfiguration() {
+
+	};
+
 	turbo_errt ReadConfiguration(std::string fname) {
 		//Hardcode configuration for now
 		_configuration.InputCGNSFile = "";
@@ -864,6 +873,7 @@ public:
 
 		//Ideal gas law
 		_configuration.GasModel = CaloricallyPerfect;
+
 		_configuration.IdealGasConstant = 8.3144621;
 		_configuration.SpecificHeatRatio = 1.4;
 		_configuration.SpecificHeatVolume = 1006.43 / 1.4;
@@ -872,23 +882,27 @@ public:
 		//Solver settings
 		_simulationType = TimeAccurate;
 		CFL = 0.1;
-		RungeKuttaOrder = 2;
+		RungeKuttaOrder = 1;
 
 		//Run settings
-		MaxIteration = 100000;
-		MaxTime = 20e-6;
+		MaxIteration = 1000000;
+		MaxTime = 10e-6;
 		SaveSolutionSnapshotIterations = 0;
-		SaveSolutionSnapshotTime = 1e-6;		
-		stepInfo.Time = 0.0; //Initialize start moment
-		NextSnapshotTime = stepInfo.Time;
+		SaveSolutionSnapshotTime = 1e-6;				
 
 		//Boundary conditions				
 		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("Density", 1000 * 1.0 / 0.88200003E-01); //Pb
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", 1000); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", 0); //
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
@@ -918,7 +932,7 @@ public:
 				//Skip missing boundary condition
 				continue;
 			}								
-
+			
 			//Initialize boundary conditions
 			bool bcTypeCheckPassed = false;
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
@@ -933,6 +947,11 @@ public:
 				_boundaryConditions[bcMarker] = bc; 
 				bcTypeCheckPassed = true;
 			};
+			if (bcType == BCType_t::BCInflowSupersonic) {
+				BoundaryConditions::BCInflowSupersonic* bc = new BoundaryConditions::BCInflowSupersonic();
+				_boundaryConditions[bcMarker] = bc; 
+				bcTypeCheckPassed = true;
+			};
 
 			if (!bcTypeCheckPassed) {
 				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "BCType is not supported.");
@@ -944,6 +963,9 @@ public:
 				//Attach needed data structures to boundary condition class
 				_boundaryConditions[bcMarker]->setGrid(_grid);
 				_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+
+				//Load specific configuration parameters
+				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
 			};
 		};
 

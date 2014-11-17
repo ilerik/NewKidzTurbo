@@ -123,11 +123,11 @@ public:
 		result.Velocity = velocity;
 
 		//DEBUG
-		/*Roe3DSolverPerfectGas rSolver;
+		Roe3DSolverPerfectGas rSolver;
 		rSolver.SetGamma(1.4);
 		rSolver.SetOperatingPressure(0.0);
 		rSolver.SetHartenEps(0.0);
-		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);*/
+		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);
 		return result;
 	};
 };
