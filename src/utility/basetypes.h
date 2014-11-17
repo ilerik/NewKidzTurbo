@@ -10,21 +10,23 @@
 #include <map>
 
 
-inline double max(double a, double b) {
+template<class T>
+inline T max(T a, T b) {
 	return (a>b)?a:b;
 };
 
-inline double min(double a, double b) {
+template<class T>
+inline T min(T a, T b) {
 	return (a<b)?a:b;
 };
 
-inline int max(int a, int b) {
-	return (a>b)?a:b;
-};
-
-inline int min(int a, int b) {
-	return (a<b)?a:b;
-};
+//inline int max(int a, int b) {
+//	return (a>b)?a:b;
+//};
+//
+//inline int min(int a, int b) {
+//	return (a<b)?a:b;
+//};
 
 inline std::pair<int, int> swap(std::pair<int,int>& pair)
 {

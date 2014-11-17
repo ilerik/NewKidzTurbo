@@ -192,12 +192,12 @@ void runPeriodicTest3D(int argc, char *argv[]) {
 class ShearLayerInitialConditions : public InitialConditions::InitialConditions
 {
 private:
+	double _Pressure;
 	double _topBound;
 	double _bottomBound;	
 	double _ro;
 	double _topV;
-	double _bottomV;
-	double _P;	
+	double _bottomV;	
 	double _PI;
 public:	
 
@@ -206,7 +206,7 @@ public:
 		_topBound = _PI + 0.5;
 		_bottomBound = _PI - 0.5;
 		_ro = 1.0;
-		_P = 1000;
+		_Pressure = 1000.0;
 		_topV = 5;
 		_bottomV = -5;
 	};
@@ -218,7 +218,7 @@ public:
 			double u = 0;
 			double v = 0;
 			double w = 0;
-			double P = _P;
+			double P = _Pressure;
 
 			//Cell center
 			double x = cell.CellCenter.x;
@@ -307,24 +307,18 @@ void runShearLayer(int argc, char *argv[]) {
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
 {
 private:
-	//Material
-	int _nmat;
 	//State of target	
 	double _u0;
 	double _ro0;
-	double _p0;
 	//Speed of projectile	
 	double _V;	
-	//Length of target
-	double _L;
+
 	
 public:	
 
-	ImpactShockInitialConditions(int nmat, double V, double ro0, double p0, double L) {
+	ImpactShockInitialConditions(double V, double ro0) {
 		_V = V;
-		_ro0 = ro0;
-		_p0 = p0;
-		_L = L;
+		_ro0 = ro0;		
 	};
 
 	virtual std::vector<double> getInitialValues(const Cell& cell) {
@@ -333,15 +327,16 @@ public:
 		double v = 0;
 		double w = 0;
 
-		//Left state
-		double roL = _ro0;
-		double PL = _p0;
-		double uL = _V;
+		//Internal energy
+		double e = 10;
+
+		//Left state		
+		double roL = _ro0;		
+		double uL = 0.5*_V;
 			
-		//Right state
-		double roR = _ro0;
-		double PR = _p0;
-		double uR = 0;
+		//Right state		
+		double roR = _ro0;		
+		double uR = -0.5*_V;
 
 		//Cell center
 		double x = cell.CellCenter.x;
@@ -351,28 +346,17 @@ public:
 		//Values
 		double u = 0;
 		double ro = 0;
-		double roE = 0;		
+		double roE = 0;				
 		if (x <= 0) {
 			ro = roL;
-			u = uL;
-			roE = PL/(_gasModel->Gamma - 1.0);
+			u = uL;			
 		} else {
 			ro = roR;
-			u = uR;
-			roE = PR/(_gasModel->Gamma - 1.0);
-		};
-		if (_gasModel->GasModelName == "LomonosovFortovGasModel") {
-			LomonosovFortovGasModel* lmgm = dynamic_cast<LomonosovFortovGasModel*>(_gasModel);			
-			double e = 0;
-			if (x <= 0.0) {
-				e = lmgm->FindInternalEnergy(ro, PL);
-			} else {
-				e = lmgm->FindInternalEnergy(ro, PR);
-			};
-			roE = ro*e + ro*(u*u + v*v + w*w)/2.0;
+			u = uR;						
 		};
 			
 		//Convert to conservative variables
+		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
 		initValues.resize(_gasModel->nConservativeVariables);
 		initValues[0] = ro;
 		initValues[1] = ro * u;
@@ -388,19 +372,21 @@ void runImpactShockTest(int argc, char *argv[]) {
 	const double PI = 3.14159265359;
 	
 	_kernel.Initilize(&argc, &argv);
-	double L = 1.0;
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 200, -L, L, false);	
+	double L = 15e-2; // 5 cm; 
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1800, -L, L, false); //Change grid size here
 	_kernel.BindGrid(_grid);
-	_kernel.ReadConfiguration("");			
+	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
+
+	//Fill in configuration
+	_kernel.ReadConfiguration(""); //Change run parameters here
 	_kernel.InitCalculation();
 
 	//Initial conditions
-	//Pb
-	double ro0 = 11.3415e3; // SI
-	double p0 = 1e5; //atm SI	
-	//Velocity
+	//double ro0 = 1;
+	double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+	//double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
 	double V = 500; //m/s
-	ImpactShockInitialConditions ic(9, V, ro0, p0, L);
+	ImpactShockInitialConditions ic(V, ro0);
 	_kernel.GenerateInitialConditions(ic);	
 
 	//Run test
@@ -414,11 +400,11 @@ void runImpactShockTest(int argc, char *argv[]) {
 };
 
 //Main program ))
- int main(int argc, char *argv[]) {		
+ int main(int argc, char *argv[]) {
 	//runPeriodicTest2D(argc, argv);
-	runSodTest(argc, argv);
+	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
-	//runImpactShockTest(argc, argv);
+ 	runImpactShockTest(argc, argv);
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;
 	//double c;

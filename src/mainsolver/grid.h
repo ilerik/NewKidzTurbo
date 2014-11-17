@@ -229,7 +229,7 @@ public:
 	};	
 
 	//Geometric properties computation
-	std::vector<Face> Grid::ObtainFaces(Cell* cell);
+	std::vector<Face> ObtainFaces(Cell* cell);
 	void ComputeGeometricProperties(Cell* cell);
 	void ComputeGeometricProperties(Face* face);
 	

@@ -102,7 +102,7 @@ protected:
 		bool unique;
 		std::string name;
 		ZoneType_t type;
-		int total_nbVertices;
+		cgsize_t total_nbVertices;
 		int nbVertices[3];
 		int nbElements;
 		int nbBdryVertices;
@@ -119,8 +119,8 @@ protected:
 		bool unique;
 		std::string name;
 		ElementType_t type;
-		int eBegin;
-		int eEnd;
+		cgsize_t eBegin;
+		cgsize_t eEnd;
 		int nbBdry;
 		int parentFlag;
 		int elemNodeCount;
@@ -137,9 +137,9 @@ protected:
 		std::string name;
 		BCType_t boco_type;  // e.g. BCDirichlet, BCSubsonicInflow, ...
 		PointSetType_t ptset_type; // PointList / PointRange / ElementList / ElementRange
-		int nBC_elem;
+		cgsize_t nBC_elem;
 		int normalIndex;
-		int normalListFlag;
+		cgsize_t normalListFlag;
 		DataType_t normalDataType;
 		int nDataSet;
 	} m_boco; 	
@@ -194,7 +194,7 @@ private:
 	void read_coordinates()
 	{
 		// read coordinates
-		int one = 1;
+		cgsize_t one = 1;
 		std::vector<double> xCoord;
 		std::vector<double> yCoord;
 		std::vector<double> zCoord;
@@ -250,10 +250,10 @@ private:
 
 		if (m_section.type == CGNS_ENUMV( MIXED )) // Different element types, Can also be faces
 		{		
-			int connDataSize;				
-			int parentData;
+			cgsize_t connDataSize;				
+			cgsize_t parentData;
 			CALL_CGNS(cg_ElementDataSize(m_file.idx, m_base.idx, m_zone.idx, m_section.idx, &connDataSize));
-			std::vector<int> connectivityInfo(connDataSize);
+			std::vector<cgsize_t> connectivityInfo(connDataSize);
 			CALL_CGNS(cg_elements_read(m_file.idx, m_base.idx, m_zone.idx, m_section.idx, &connectivityInfo[0], &parentData));			
 						
 			//Parse each element connectivity info
@@ -300,10 +300,10 @@ private:
 			CALL_CGNS(cg_npe(m_section.type, &elememtNodeCount)); 
 				
 			//Read all connectivity
-			int connDataSize;				
-			int parentData;
+			cgsize_t connDataSize;				
+			cgsize_t parentData;
 			CALL_CGNS(cg_ElementDataSize(m_file.idx, m_base.idx, m_zone.idx, m_section.idx, &connDataSize));
-			std::vector<int> connectivityInfo(connDataSize);
+			std::vector<cgsize_t> connectivityInfo(connDataSize);
 			CALL_CGNS(cg_elements_read(m_file.idx, m_base.idx, m_zone.idx, m_section.idx, &connectivityInfo[0], &parentData));			
 						
 			//Parse each element connectivity info
@@ -342,7 +342,7 @@ private:
 		// Read boundary condition types
 
 		// Read the element ID's
-		int* boco_elems = new int [m_boco.nBC_elem];
+		cgsize_t* boco_elems = new cgsize_t [m_boco.nBC_elem];
 		void* NormalList(NULL);
 		CALL_CGNS(cg_boco_read(m_file.idx, m_base.idx, m_zone.idx, m_boco.idx, boco_elems, NormalList));
 

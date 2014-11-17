@@ -10,11 +10,13 @@
 #include "parallelHelper.h"
 #include "BoundaryConditions.h"
 #include "InitialConditions.h"
+#include "cmath"
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
+#include "PerfectGasModel.h"
 
 
 //Define error types
@@ -50,7 +52,7 @@ private:
 	Configuration _configuration;	
 
 	//Gas model
-	GasModel _gasModel;		
+	GasModel* _gasModel;		
 
 	//Solver (TO DO)		
 	SimulationType_t _simulationType; //Simulation type
@@ -59,6 +61,7 @@ private:
 	double MaxIteration;
 	double MaxTime;
 	double CurrentTime;
+	double NextSnapshotTime;
 	double SaveSolutionSnapshotTime;
 	int SaveSolutionSnapshotIterations;
 	//Roe3DSolverPerfectGas rSolver;
@@ -128,11 +131,11 @@ public:
 	};
 
 	turbo_errt InitCalculation() {				
-		//Gas model setup
-		_gasModel = GasModel(); // perfect gas gamma = 1.4
-		//_gasModel = LomonosovFortovGasModel(0); //stainless steel
-		_gasModel.loadConfiguration(_configuration);
-		nVariables = _gasModel.nConservativeVariables;
+		//Gas model setup		
+		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
+		_gasModel = new LomonosovFortovGasModel(1); //Pb
+		_gasModel->loadConfiguration(_configuration);
+		nVariables = _gasModel->nConservativeVariables;
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
@@ -164,6 +167,10 @@ public:
 
 		//Init parallel exchange
 		InitParallelExchange();
+
+		//Initialize start moment
+		stepInfo.Time = 0.0; 
+		NextSnapshotTime = stepInfo.Time;
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -207,6 +214,7 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
 
 			//Solution snapshots
+			//Every few iterations
 			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
 				//Save snapshot
 				std::stringstream snapshotFileName;
@@ -214,6 +222,19 @@ public:
 				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
+			};
+
+			//Every fixed time interval
+			if ((SaveSolutionSnapshotTime > 0) && (NextSnapshotTime == stepInfo.Time)) {
+				//Save snapshot
+				std::stringstream snapshotFileName;
+				snapshotFileName.str(std::string());
+				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
+				SaveGrid(snapshotFileName.str());				
+				SaveSolution(snapshotFileName.str(), "Solution");
+
+				//Adjust next snapshot time
+				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
 
 
@@ -841,6 +862,10 @@ public:
 		return TURBO_OK;
 	};
 
+	turbo_errt BindConfiguration() {
+
+	};
+
 	turbo_errt ReadConfiguration(std::string fname) {
 		//Hardcode configuration for now
 		_configuration.InputCGNSFile = "";
@@ -848,6 +873,7 @@ public:
 
 		//Ideal gas law
 		_configuration.GasModel = CaloricallyPerfect;
+
 		_configuration.IdealGasConstant = 8.3144621;
 		_configuration.SpecificHeatRatio = 1.4;
 		_configuration.SpecificHeatVolume = 1006.43 / 1.4;
@@ -855,22 +881,28 @@ public:
 
 		//Solver settings
 		_simulationType = TimeAccurate;
-		CFL = 0.5;
+		CFL = 0.1;
 		RungeKuttaOrder = 1;
-		MaxIteration = 100000;
-		MaxTime = 0.2;
-		SaveSolutionSnapshotIterations = 100;
 
-		//Initialize start moment
-		stepInfo.Time = 0.0;
+		//Run settings
+		MaxIteration = 1000000;
+		MaxTime = 10e-6;
+		SaveSolutionSnapshotIterations = 0;
+		SaveSolutionSnapshotTime = 1e-6;				
 
-		//Boundary conditions
-		//_configuration.BoundaryConditions["top_left"].BoundaryConditionType = BCOutflow;
-		//_configuration.BoundaryConditions["top_left"].SetPropertyValue("StaticPressure", 1905);
+		//Boundary conditions				
 		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("Density", 1000 * 1.0 / 0.88200003E-01); //Pb
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", 1000); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0); //
+		//_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", 0); //
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
@@ -900,23 +932,48 @@ public:
 				//Skip missing boundary condition
 				continue;
 			}								
-
+			
 			//Initialize boundary conditions
+			bool bcTypeCheckPassed = false;
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
 			BCType_t bcType = bcConfig.BoundaryConditionType;
 			if (bcType == BCType_t::BCSymmetryPlane) {				
 				BoundaryConditions::BCSymmetryPlane* bc = new BoundaryConditions::BCSymmetryPlane();
+				_boundaryConditions[bcMarker] = bc; 	
+				bcTypeCheckPassed = true;
+			};
+			if (bcType == BCType_t::BCOutflowSupersonic) {
+				BoundaryConditions::BCOutflowSupersonic* bc = new BoundaryConditions::BCOutflowSupersonic();
 				_boundaryConditions[bcMarker] = bc; 
+				bcTypeCheckPassed = true;
+			};
+			if (bcType == BCType_t::BCInflowSupersonic) {
+				BoundaryConditions::BCInflowSupersonic* bc = new BoundaryConditions::BCInflowSupersonic();
+				_boundaryConditions[bcMarker] = bc; 
+				bcTypeCheckPassed = true;
 			};
 
-			//Attach needed data structures to boundary condition class
-			_boundaryConditions[bcMarker]->setGrid(_grid);
-			_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+			if (!bcTypeCheckPassed) {
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "BCType is not supported.");
+
+				//Synchronize
+				_parallelHelper.Barrier();
+				return turbo_errt::TURBO_ERROR;			
+			} else {
+				//Attach needed data structures to boundary condition class
+				_boundaryConditions[bcMarker]->setGrid(_grid);
+				_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+
+				//Load specific configuration parameters
+				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
+			};
 		};
 
 		if (isUnspecifiedBC) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified boundary condition.");
+
 			//Synchronize
-			_parallelHelper.Barrier();		
+			_parallelHelper.Barrier();
 			return turbo_errt::TURBO_ERROR;
 		};
 
@@ -966,9 +1023,9 @@ public:
 		//For each local cell write initial conditions
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
 			Cell* c = _grid.localCells[i];
-			for (int j = 0; j<_gasModel.nConservativeVariables; j++) {
+			for (int j = 0; j<_gasModel->nConservativeVariables; j++) {
 				std::vector<double> values = initConditions.getInitialValues(*c);
-				Values[i * _gasModel.nConservativeVariables + j] = values[j];
+				Values[i * _gasModel->nConservativeVariables + j] = values[j];
 			};
 		};
 
@@ -981,8 +1038,8 @@ public:
 	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
 		//Open file
 		_cgnsWriter.OpenFile(fname);
-		int nv = _gasModel.nConservativeVariables;
-		std::vector<std::string> storedFields = _gasModel.GetStoredFieldsNames();
+		int nv = _gasModel->nConservativeVariables;
+		std::vector<std::string> storedFields = _gasModel->GetStoredFieldsNames();
 
 		//Write simulation type
 
@@ -1011,7 +1068,7 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);				
 			for (int i = 0; i<_grid.nCellsLocal; i++) {
 				GasModel::ConservativeVariables U(&Values[i * nv]);
-				std::vector<double> storedValues = _gasModel.GetStoredValuesFromConservative(U);				
+				std::vector<double> storedValues = _gasModel->GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
@@ -1049,18 +1106,22 @@ public:
 
 		//Pressure		
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double ro = Values[i * nv + 0];
-			double rou = Values[i * nv + 1];
-			double rov = Values[i * nv + 2];
-			double row = Values[i * nv + 3];
-			double roE = Values[i * nv + 4];
-			double u = rou / ro;
-			double v = rov / ro;
-			double w = row / ro;
-			double P = (roE - ro*(w*w + v*v + u*u)/2.0) / (_gasModel.Gamma - 1.0);
+			double P = _gasModel->GetPressure(&Values[i * nv + 0]);
 			buffer[i] = P;
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer); 
+
+		//Internal energy
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i * nv + 0];
+			double u = Values[i * nv + 1] / ro;
+			double v = Values[i * nv + 2] / ro;
+			double w = Values[i * nv + 3] / ro;
+			double E = Values[i * nv + 4] / ro;
+			double e = E - (u*u + v*v + w*w) / 2.0;	
+			buffer[i] = e;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "EnergyInternal", buffer); 
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
@@ -1311,6 +1372,7 @@ public:
 		_parallelHelper.Barrier();
 
 		stepInfo.TimeStep = MaxTime - stepInfo.Time; 
+		if (SaveSolutionSnapshotTime > 0) stepInfo.TimeStep = min(NextSnapshotTime - stepInfo.Time, stepInfo.TimeStep);
 		for (std::pair<int, double> p : localTimeStep)
 		{
 			double& timeStep = p.second;
@@ -1477,7 +1539,7 @@ public:
 					//msg<<"Local Index = "<<localIndex;
 					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 				};
-				return std::vector<double>(&Values[localIndex * _gasModel.nConservativeVariables], &Values[localIndex * _gasModel.nConservativeVariables] + _gasModel.nConservativeVariables);
+				return std::vector<double>(&Values[localIndex * _gasModel->nConservativeVariables], &Values[localIndex * _gasModel->nConservativeVariables] + _gasModel->nConservativeVariables);
 			};
 		} else {
 			//Return result of interprocessor exchange

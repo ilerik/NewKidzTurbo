@@ -167,7 +167,7 @@ public:
 
 		//Set boundary constraints (non negative pressure)
 		bl[0] = 0.0;
-		bu[0] = _Inf._Double;
+		bu[0] = std::numeric_limits<double>::max();
 
 		//Initial guess (possible othe choises, the simplest for now)
 		double pStar = 0.5*(params.pL + params.pR);
@@ -214,7 +214,7 @@ public:
 			result.SL = sqrt((gamma + 1) * pRatioL / (2*gamma) + (gamma - 1) / (2*gamma));
 			result.SL = uL - aL * result.SL;
 
-			result.MaxSpeed = max(result.MaxSpeed, abs(result.SL));
+			result.MaxSpeed = max(result.MaxSpeed, std::abs(result.SL));
 		} else {
 			//Left rarefaction
 			result.leftWave = Rarefaction;
@@ -229,7 +229,7 @@ public:
 			double aStarL = aL * pow(pRatioL, (gamma - 1) / (2*gamma));
 			result.STL = result.uStar - aStarL;		
 
-			result.MaxSpeed = max(result.MaxSpeed, abs(result.SHL));
+			result.MaxSpeed = max(result.MaxSpeed, std::abs(result.SHL));
 		};
 
 		//Right side of contact
@@ -248,7 +248,7 @@ public:
 			result.SR = sqrt((gamma + 1) * pRatioR / (2*gamma) + (gamma - 1) / (2*gamma));
 			result.SR = uL + aR * result.SR;
 
-			result.MaxSpeed = max(result.MaxSpeed, abs(result.SR));
+			result.MaxSpeed = max(result.MaxSpeed, std::abs(result.SR));
 		} else {
 			//Left rarefaction
 			result.rightWave = Rarefaction;
@@ -263,7 +263,7 @@ public:
 			double aStarR = aR * pow(pRatioL, (gamma - 1) / (2*gamma));
 			result.STR = result.uStar + aStarR;			
 
-			result.MaxSpeed = max(result.MaxSpeed, abs(result.SHR));
+			result.MaxSpeed = max(result.MaxSpeed, std::abs(result.SHR));
 		};
 				
 		return result;
@@ -427,7 +427,7 @@ public:
 	//fabs() and Harten's entropy correction procedure
 	double Harten(double z, double eps) 
 	{
-		z = fabs(z);
+		z = std::abs(z);
 		if (z<eps) z = ((z*z)/eps + eps)*0.5;
 		return z;
 	};
