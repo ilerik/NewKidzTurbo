@@ -55,6 +55,12 @@
     <Filter Include="Header Files\GasModels">
       <UniqueIdentifier>{4da2224d-8a78-406a-a5d8-084bf6b97158}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\MeshAdaptation">
+      <UniqueIdentifier>{af2181e6-eec1-4b4a-a10e-e74b7dcc5b3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MeshMovement">
+      <UniqueIdentifier>{19f8956d-6af9-4511-90e7-dc36e016ea19}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">

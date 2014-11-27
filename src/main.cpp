@@ -399,12 +399,89 @@ void runImpactShockTest(int argc, char *argv[]) {
 	_kernel.Finalize();	
 };
 
+//Kelvin-Helmgolz instability
+//Shear layer computation
+class KelvinHelmholzInitialConditions : public InitialConditions::InitialConditions
+{
+private:
+	double _Pressure;
+	double _V;
+	double _roUp;
+	double _roDown;
+	double _LX;
+	double _LY;
+	double _A;
+	int _nModes;
+public:	
+	//Constructor
+	KelvinHelmholzInitialConditions(double Pressure, double V, double roUp, double roDown, double LX, double LY, double A, int nModes) {
+		_Pressure = Pressure;
+		_V = V;
+		_roUp = roUp;	
+		_roDown = roDown;
+		_LX = LX;
+		_LY = LY;
+		_A = A;
+		_nModes = nModes;
+	};
+
+	virtual std::vector<double> getInitialValues(const Cell& cell) {
+		std::vector<double> initValues;				
+		//Other velocities
+		double v = 0;
+		double w = 0;
+
+		//Internal energy
+		double e = 10;
+
+		//Upper state		
+		double roUp = _roUp;		
+		double uUp = 0.5*_V;
+			
+		//Right state		
+		double roDown = _roDown;		
+		double uDown = -0.5*_V;
+
+		//Cell center
+		double x = cell.CellCenter.x;
+		double y = cell.CellCenter.y;
+		double z = cell.CellCenter.z;
+				
+		//Values
+		double u = 0;
+		double ro = 0;
+		double roE = 0;			
+		if (y <= 0) {
+			ro = roDown;
+			u = uDown;			
+		} else {
+			ro = roUp;
+			u = uUp;						
+		};
+		
+			
+		//Convert to conservative variables
+		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
+		initValues.resize(_gasModel->nConservativeVariables);
+		initValues[0] = ro;
+		initValues[1] = ro * u;
+		initValues[2] = ro * v;
+		initValues[3] = ro * w;
+		initValues[4] = roE;// + (u*u + v*v + w*w) / 2.0); //TO DO check
+		return initValues;
+	};
+};
+
+void runKelvinHelmholzTest(int argc, char *argv[]) {
+
+};
+
 //Main program ))
  int main(int argc, char *argv[]) {
 	//runPeriodicTest2D(argc, argv);
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
- 	runImpactShockTest(argc, argv);
+ 	//runImpactShockTest(argc, argv);
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;
 	//double c;

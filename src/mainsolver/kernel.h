@@ -25,6 +25,82 @@ enum turbo_errt {
 	TURBO_ERROR = 1
 };
 
+
+//Define availible types of ALE motion
+
+
+//Define ALE integration method
+class ALEMethod {	
+	Grid* _grid;	
+public:
+	//Set reference to grid
+	void SetGrid(Grid& grid) {
+		_grid = &grid;
+	};
+
+	//Method type
+	enum class ALEMotionType {
+		PureEulerian,
+		PureLagrangian,
+		ALEMaterialInterfaces
+	} ALEMotionType;
+
+	//Velocity of faces and nodes for ALE step
+	std::map<int, Vector> nodesVelocity;
+	std::map<int, Vector> facesVelocity;
+
+	//List of adjacent faces for each node
+	std::map<int, std::vector<int>> adjacentFaces;
+
+	//Compute velocities
+	void ComputeNodeVelocities() {
+		//For each node refresh list of adjacent faces
+		adjacentFaces.clear();
+		for (Face& f : _grid->localFaces) {
+			for (int node : f.FaceNodes) {
+				adjacentFaces[node].push_back(f.GlobalIndex);
+			};
+		};
+
+		//For each node compute velocity
+		for (Node& n : _grid->localNodes) {
+			Vector nodeVelocity; //Resulting node velocity
+			double sumFacesSquare = 0;
+
+			//Matrix consisting of face normals
+			std::vector<double> faceNormals;
+			//Vector of face noemal velocities
+			std::vector<double> faceVelocities;
+			
+			//TO DO replace simple average by LS approximation
+			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
+				Face& face = _grid->localFaces[faceIndex];
+				Vector faceVelocity = facesVelocity[faceIndex];	
+				sumFacesSquare += face.FaceSquare;
+				nodeVelocity += faceVelocity * face.FaceSquare;
+			};
+
+			//Store node velocity
+			nodesVelocity[n.GlobalIndex] = nodeVelocity / sumFacesSquare;
+		};		
+	};
+
+	//Move mesh
+	void MoveMesh() {
+
+	};
+
+	//Remeshing procedure
+	void Remesh() {
+
+	};
+
+	//Remap variables
+	void Remap() {
+		
+	};
+};
+
 //Step info
 class StepInfo {
 public:
@@ -51,8 +127,11 @@ private:
 	//Configuration
 	Configuration _configuration;	
 
-	//Gas model
-	GasModel* _gasModel;		
+	//Gas model (equations of state)
+	std::vector<GasModel*> _gasModels;		
+
+	//ALE data and logic
+	ALEMethod _ALEmethod;
 
 	//Solver (TO DO)		
 	SimulationType_t _simulationType; //Simulation type
@@ -64,9 +143,16 @@ private:
 	double NextSnapshotTime;
 	double SaveSolutionSnapshotTime;
 	int SaveSolutionSnapshotIterations;
+
+	//Arbitrary Eulerian-Lagrange treatment type	
+
 	//Roe3DSolverPerfectGas rSolver;
 	//Godunov3DSolverPerfectGas rSolver;
+
+	//Riemann solver
 	RiemannSolver* rSolver;
+
+	//Step information
 	StepInfo stepInfo;
 
 	//Parallel run information		
@@ -79,6 +165,7 @@ private:
 
 	//Internal storage		
 	int nVariables; //number of variables in each cell
+	std::vector<int> CellGasModel; //Index of gas model for cell constituents (localCell index -> GasModel index)
 	std::vector<double> Values;	//Conservative variables
 	std::vector<double> Residual; //Residual values	
 
@@ -131,11 +218,15 @@ public:
 	};
 
 	turbo_errt InitCalculation() {				
-		//Gas model setup		
-		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
-		_gasModel = new LomonosovFortovGasModel(1); //Pb
-		_gasModel->loadConfiguration(_configuration);
-		nVariables = _gasModel->nConservativeVariables;
+		//Gas models setup
+		//List of availible gas models
+		_gasModels.push_back(new PerfectGasModel()); // perfect gas gamma = 1.4
+		_gasModels.push_back(new LomonosovFortovGasModel(0)); //Stainless steel
+		_gasModels.push_back(new LomonosovFortovGasModel(1)); //Pb
+		for (GasModel* gasModel : _gasModels) {
+			gasModel->loadConfiguration(_configuration);
+			nVariables = gasModel->nConservativeVariables; //TO DO generalize for now equal number of conservative variables assumed
+		};
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
