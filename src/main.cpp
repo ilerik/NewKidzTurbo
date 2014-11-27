@@ -372,7 +372,7 @@ void runImpactShockTest(int argc, char *argv[]) {
 	const double PI = 3.14159265359;
 	
 	_kernel.Initilize(&argc, &argv);
-	double L = 15e-2; // 5 cm; 
+	double L = 5e-2; // 5 cm; 
 	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1800, -L, L, false); //Change grid size here
 	_kernel.BindGrid(_grid);
 	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
@@ -383,11 +383,59 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 	//Initial conditions
 	//double ro0 = 1;
-	double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+	//double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
 	//double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
+	double ro0 = 1000 * 1.0/0.369;		//SI for Aluminium
 	double V = 500; //m/s
 	ImpactShockInitialConditions ic(V, ro0);
-	_kernel.GenerateInitialConditions(ic);	
+	_kernel.GenerateInitialConditions(ic);
+
+	//set params for solution saving
+	_kernel.SetMaxIteration(1000000);
+	_kernel.SetMaxTime(1.0e-5);
+	_kernel.SetSaveSolutionSnapshotIterations(0);
+	_kernel.SetSaveSolutionSnapshotTime(1.0e-6);
+
+	//Run test
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
+
+	//Output result
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	_kernel.Finalize();	
+};
+
+void runImpactShockTest2D(int argc, char *argv[]) {
+	Kernel _kernel;
+	const double PI = 3.14159265359;
+	
+	_kernel.Initilize(&argc, &argv);
+	double xMin = -2e-2; // 2 cm; 
+	double xMax = 2e-2; // 2 cm; 
+	double yMin = -15e-2; // 15 cm; 
+	double yMax = 15e-2; // 15 cm; 
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 20, xMin, xMax, yMin, yMax, 1.0, 1.0, false, false); //Change grid size here
+	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
+
+	//Fill in configuration
+	_kernel.ReadConfiguration(""); //Change run parameters here
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	//double ro0 = 1;
+	//double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+	double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
+	double V = 500; //m/s
+	ImpactShockInitialConditions ic(V, ro0);
+	_kernel.GenerateInitialConditions(ic);
+
+	//set params for solution saving
+	_kernel.SetMaxIteration(1000000);
+	_kernel.SetMaxTime(1.0e-5);
+	_kernel.SetSaveSolutionSnapshotIterations(0);
+	_kernel.SetSaveSolutionSnapshotTime(1.0e-6);
 
 	//Run test
 	_kernel.RunCalculation();
@@ -405,6 +453,7 @@ void runImpactShockTest(int argc, char *argv[]) {
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
  	runImpactShockTest(argc, argv);
+	//runImpactShockTest(argc, argv);
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;
 	//double c;

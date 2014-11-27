@@ -93,7 +93,21 @@ public:
 	//Parallel helper
 	ParallelHelper* getParallelHelper() {
 		return &_parallelHelper;
-	};	
+	};
+
+	//functions to set task settings
+	inline void SetMaxIteration(int _MaxIterations) {
+		MaxIteration = _MaxIterations;
+	};
+	inline void SetMaxTime(double _MaxTime) {
+		MaxTime = _MaxTime;
+	};
+	inline void SetSaveSolutionSnapshotIterations(int _SaveSolutionSnapshotIterations) {
+		SaveSolutionSnapshotIterations = _SaveSolutionSnapshotIterations;
+	};
+	inline void SetSaveSolutionSnapshotTime(double _SaveSolutionSnapshotTime) {
+		SaveSolutionSnapshotTime = _SaveSolutionSnapshotTime;
+	};
 
 	//Initialize computational kernel
 	turbo_errt Initilize(int *argc, char **argv[]) {		
@@ -133,7 +147,9 @@ public:
 	turbo_errt InitCalculation() {				
 		//Gas model setup		
 		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
-		_gasModel = new LomonosovFortovGasModel(1); //Pb
+		//_gasModel = new LomonosovFortovGasModel(0); //Steel
+		//_gasModel = new LomonosovFortovGasModel(1); //Pb
+		_gasModel = new LomonosovFortovGasModel(2); //Al
 		_gasModel->loadConfiguration(_configuration);
 		nVariables = _gasModel->nConservativeVariables;
 
