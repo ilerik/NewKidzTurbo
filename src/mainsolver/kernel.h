@@ -149,7 +149,8 @@ public:
 		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
 		//_gasModel = new LomonosovFortovGasModel(0); //Steel
 		//_gasModel = new LomonosovFortovGasModel(1); //Pb
-		_gasModel = new LomonosovFortovGasModel(2); //Al
+		//_gasModel = new LomonosovFortovGasModel(2); //Al
+		_gasModel = new LomonosovFortovGasModel(3); //Cu
 		_gasModel->loadConfiguration(_configuration);
 		nVariables = _gasModel->nConservativeVariables;
 

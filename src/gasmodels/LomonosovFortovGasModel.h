@@ -7,7 +7,7 @@
 class LomonosovFortovGasModel : public GasModel {
 private:	
 	//    List of materials:
-    //    0 - steel   1 - Leed     2 - Al
+    //    0 - steel   1 - Leed     2 - Al	3 - Cu
 	int _nmat; // Index of material
 public:
 	//Constructor specifies material to use
@@ -327,7 +327,7 @@ private:
 		CR.push_back(0.16488581E+01);
 		C1R.push_back(0.81879050E+00);
 
-		//2 - Al
+		//2 - Al (it seemed to don't work)
 		V0.push_back(0.36899999E+00);
 		DX.push_back(0.97923738E+00);
 		CMN.push_back(0.13236353E+01);
@@ -351,6 +351,29 @@ private:
 		CR.push_back(0.41500096E+01);
 		C1R.push_back(0.52029748E+01);
 
+		//3 - Cu
+		V0.push_back(0.11200000E+00);
+		DX.push_back(0.98512793E+00);
+		CMN.push_back(0.32090862E+02);
+		GM.push_back(0.20000000E+01);
+		GN.push_back(0.15083531E+01);
+		ES.push_back(0.52300000E+01);
+		E0.push_back(0.11601043E+00);
+		A1.push_back(-0.65371002E+03);
+		A2.push_back(0.28425300E+04);
+		A3.push_back(-0.44766201E+04);
+		A4.push_back(0.26115000E+04);
+		A5.push_back(-.32370001E+03);
+		TA.push_back(0.88399196E+00);
+		GC.push_back(0.20048616E+02);
+		GF.push_back(0.10064120E+01);
+		GI.push_back(0.50000000E+00);
+		QS.push_back(0.20000000E+01);
+		RS.push_back(0.50000000E+00);
+		SM.push_back(0.84974420E+00);
+		EA.push_back(0.18000000E+02);
+		CR.push_back(0.31175354E+01);
+		C1R.push_back(0.25285969E+01);
 		
 		/*V0.push_back(0.54200000E+00);V0.push_back(0.57700002E+00);V0.push_back(0.36899999E+00);V0.push_back(0.12000000E+00);
 		V0.push_back(0.13900000E+00);V0.push_back(0.11300000E+00);V0.push_back(0.11200000E+00);V0.push_back(0.11200000E+00);

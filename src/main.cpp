@@ -328,7 +328,7 @@ public:
 		double w = 0;
 
 		//Internal energy
-		double e = 10;
+		double e = 0;
 
 		//Left state		
 		double roL = _ro0;		
@@ -385,8 +385,9 @@ void runImpactShockTest(int argc, char *argv[]) {
 	//double ro0 = 1;
 	//double ro0 = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
 	//double ro0 = 1000 * 1.0 / 0.127; // SI	for stainless steel
-	double ro0 = 1000 * 1.0/0.369;		//SI for Aluminium
-	double V = 500; //m/s
+	//double ro0 = 1000 * 1.0/0.369;		//SI for Aluminium
+	double ro0 = 1000*1.0/0.112;		//SI for cuprum
+	double V = 500; //m/s	
 	ImpactShockInitialConditions ic(V, ro0);
 	_kernel.GenerateInitialConditions(ic);
 
