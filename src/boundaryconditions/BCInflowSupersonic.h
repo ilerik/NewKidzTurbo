@@ -11,13 +11,13 @@ public:
 	double Density;
 	double InternalEnergy;
 
-	std::vector<double> getDummyValues(std::vector<double> values, const Cell& dummyCell) {
+	std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) {
 		//Obtain face
 		if (dummyCell.Faces.size() != 1) throw new Exception("Dummy cell has more than one face");
 		Face& face = _grid->localFaces[dummyCell.Faces[0]];
 		//Obtain neighbour cell
 		int nCellIndex = _grid->cellsGlobalToLocal[face.FaceCell_1];
-		int nVariables = _gasModel->nConservativeVariables;
+		int nVariables = _gasModels[nmat]->nConservativeVariables;
 
 		//Compute dummy values
 		std::vector<double> res(nVariables);	
@@ -31,7 +31,7 @@ public:
 
 	void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
 		//Read configuration
-		if (_gasModel->GasModelName == "LomonosovFortovGasModel") {
+		if (_gasModels[_nmat]->GasModelName == "LomonosovFortovGasModel") {
 			std::pair<double, bool> propertyValue;
 			propertyValue = bcConfig.GetPropertyValue("Density");
 			Density = propertyValue.first;

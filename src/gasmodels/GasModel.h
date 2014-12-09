@@ -73,7 +73,7 @@ public:
 	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0;
 
 	//Read configuration
-	virtual void loadConfiguration(Configuration _configuration) = 0;
+	virtual void loadConfiguration(GasModelConfiguration _configuration) = 0;
 
 	//Storing / saving service functions
 	std::vector<std::string> GetStoredFieldsNames() {

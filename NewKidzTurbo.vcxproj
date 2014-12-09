@@ -149,6 +149,7 @@
     <ClInclude Include="src\gridloading\CGNSReader.h" />
     <ClInclude Include="src\gridloading\triangleload.h" />
     <ClInclude Include="src\initialConditions\InitialConditions.h" />
+    <ClInclude Include="src\initialconditions\ObsoleteTests.h" />
     <ClInclude Include="src\linearsolvers\bicgstab.h" />
     <ClInclude Include="src\linearsolvers\cgCUDA.h" />
     <ClInclude Include="src\linearsolvers\gmres.h" />

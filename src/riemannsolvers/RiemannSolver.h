@@ -11,14 +11,16 @@
 //Solution information structure
 class RiemannProblemSolutionResult {
 public:
-	std::vector<double> Fluxes; //Conservative flux
+	std::vector<double> FluxesLeft; //Conservative flux to the left state
+	std::vector<double> FluxesRight; //Conservative flux to the right state
 	double MaxEigenvalue; //Maximal local eigenvalue of Jacobian
-	Vector Velocity; //Interface velocity estimate	
+	Vector Velocity; //Interface velocity estimate
+	double Pressure; //Interface pressure estimate
 };
 
 //Base class for all riemann solvers
 class RiemannSolver {	
-	GasModel* _gasModel; //Link to gasmodel to use
+	std::vector<GasModel*> _gasModels; //Link to gasmodel to use
 
 	//Private helpers
 	inline double takeRoeAverage(double& roLRoot, double roRRoot, double fL, double fR) {
@@ -26,12 +28,13 @@ class RiemannSolver {
 		return roeAvg;
 	};
 public:	
-	RiemannSolver(GasModel* gasModel) : _gasModel(gasModel) { };	
+	RiemannSolver(std::vector<GasModel*>& gasModels) : _gasModels(gasModels) { };	
 
 	//Solve riemann problem	
-	RiemannProblemSolutionResult Solve(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
+	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f) {
 		RiemannProblemSolutionResult result;
-		result.Fluxes.resize(_gasModel->nConservativeVariables, 0);
+		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
+		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
 
 		//The Harten, Lax, and van Leer with contact restoration (HLLC) Riemann solver
 		//Left and right states
@@ -40,9 +43,10 @@ public:
 		double uL = vL * f.FaceNormal;
 		double pL = 0;
 		double cL = 0;
-		double GrL = 0;		
-		_gasModel->GetPressureAndSoundSpeed(UL, pL, cL, GrL);
-		double phiL = cL*cL - GrL * pL / roL;		
+		double GrL = 0;	
+		assert(roL > 0);
+		_gasModels[nmatL]->GetPressureAndSoundSpeed(UL, pL, cL, GrL);				
+		double phiL = cL*cL - GrL * pL / roL;
 
 		double roR = UR.ro;
 		Vector vR = Vector(UR.rou / roR, UR.rov / roR, UR.row / roR);
@@ -50,8 +54,9 @@ public:
 		double pR = 0;
 		double cR = 0;
 		double GrR = 0;
-		double GammaR = 0;		
-		_gasModel->GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
+		double GammaR = 0;				
+		assert(roR > 0);
+		_gasModels[nmatR]->GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
 		double phiR = cR*cR - GrR * pR / roR;
 
 		//Generalized Roe averages (according to Hu et al)
@@ -77,7 +82,8 @@ public:
 		
 		//Choose flux according to wave speeds pattern Toto 10.26
 		//And choose estimate for interface velocity
-		Vector velocity;
+		Vector velocity = SStar * f.FaceNormal; 
+		assert(velocity.x == velocity.x);
 		std::vector<double> DL(5);
 		DL[0] = 0;
 		DL[1] = 1;
@@ -86,7 +92,9 @@ public:
 		DL[4] = uL;
 		std::vector<double> FL = uL*UL + pL*DL;
 		if (0 <= SL) {
-			result.Fluxes = FL;
+			result.FluxesLeft = FL;
+			result.FluxesRight = FL;
+			result.Pressure = pL; //Pressure estimate
 		};
 
 		std::vector<double> DR(5);
@@ -97,7 +105,9 @@ public:
 		DR[4] = uR;
 		std::vector<double> FR = uR*UR + pR*DR;
 		if ( 0 >= SR ) {
-			result.Fluxes = FR;
+			result.FluxesLeft = FR;
+			result.FluxesRight = FR;
+			result.Pressure = pR; //Pressure estimate
 		};
 
 		//Toro formulation 10.41 for HLLC flux 
@@ -108,26 +118,31 @@ public:
 		DStar[3] = f.FaceNormal.z;
 		DStar[4] = SStar;		
 		if (( SL < 0 ) && ( 0 <= SStar )) {
-			result.Fluxes = SStar * (SL * UL - FL) + SL * (pL + roL*(SL - uL)*(SStar - uL)) * DStar;
-			result.Fluxes /= SL - SStar;
+			result.FluxesLeft = SStar * (SL * UL - FL) + SL * (pL + roL*(SL - uL)*(SStar - uL)) * DStar;
+			result.FluxesLeft /= SL - SStar;
+			result.FluxesRight = result.FluxesLeft;
+			result.Pressure =  SL * (pL + roL*(SL - uL)*(SStar - uL)); //Pressure estimate
 		};
 		if (( SStar < 0 ) && ( 0 < SR )) {
-			result.Fluxes = SStar * (SR * UR - FR) + SR * (pR + roR*(SR - uR)*(SStar - uR)) * DStar;
-			result.Fluxes /= SR - SStar;
+			result.FluxesLeft = SStar * (SR * UR - FR) + SR * (pR + roR*(SR - uR)*(SStar - uR)) * DStar;
+			result.FluxesLeft /= SR - SStar;
+			result.FluxesRight = result.FluxesLeft;			
+			result.Pressure = SR * (pR + roR*(SR - uR)*(SStar - uR)); //Pressure estimate
 		};
 
 		//Estimate for maximal speed
 		result.MaxEigenvalue = max(abs(SL), abs(SR));
 
 		//Estimate for velocity
-		result.Velocity = velocity;
+		result.Velocity = velocity;		
 
 		//DEBUG
-		Roe3DSolverPerfectGas rSolver;
+		/*Roe3DSolverPerfectGas rSolver;
 		rSolver.SetGamma(1.4);
 		rSolver.SetOperatingPressure(0.0);
 		rSolver.SetHartenEps(0.0);
-		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);
+		std::vector<double> roeFlux = rSolver.ComputeFlux(UL, UR, f);*/
+
 		return result;
 	};
 };

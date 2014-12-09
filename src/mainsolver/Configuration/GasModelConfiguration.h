@@ -7,6 +7,9 @@ class GasModelConfiguration
 {
 	std::map<std::string, double> _properties;
 public:
+	//Gas model name (type)
+	std::string GasModelName;
+
 	//CGNS style types
 	ModelType_t GasModelType;
 

@@ -61,6 +61,9 @@
     <Filter Include="Header Files\MeshMovement">
       <UniqueIdentifier>{19f8956d-6af9-4511-90e7-dc36e016ea19}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases">
+      <UniqueIdentifier>{8e781f7e-e76e-4d15-bf31-c6f04eb34a75}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -191,6 +194,9 @@
     </ClInclude>
     <ClInclude Include="src\gasmodels\PerfectGasModel.h">
       <Filter>Header Files\GasModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\initialconditions\ObsoleteTests.h">
+      <Filter>Header Files\InitialConditions</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

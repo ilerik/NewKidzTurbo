@@ -18,8 +18,9 @@ namespace BoundaryConditions {
 	//Base class for all boundary conditions
 	class BoundaryCondition {
 	public:	
+		int _nmat; //Gas model index
 		Grid* _grid;
-		GasModel* _gasModel;	
+		std::vector<GasModel*> _gasModels;
 	
 		//Result types
 		std::vector<BoundaryConditionResultType> bcResultTypes;
@@ -27,18 +28,21 @@ namespace BoundaryConditions {
 		virtual ~BoundaryCondition() {};
 
 		//Interface functions
-		virtual std::vector<double> getDummyValues(std::vector<double> values, const Cell& dummyCell) = 0;	
+		/*virtual int getDummyGasModelIndex(const Cell& dummyCell) {			
+			return nmat;
+		};*/
+		virtual std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) = 0;	
 
 		virtual void setGrid(Grid& grid) {
 			_grid = &grid;
 		};
 
-		virtual void setGasModel(GasModel* gasModel) {
-			_gasModel = gasModel;
+		virtual void setGasModel(std::vector<GasModel*>& gasModels) {
+			_gasModels = gasModels;
 		};
 
 		//virtual void setRiemannSolver(RiemannSolver& rSolver) = 0;
-		virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) = 0; 
+		virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) = 0;
 	};
 
 };

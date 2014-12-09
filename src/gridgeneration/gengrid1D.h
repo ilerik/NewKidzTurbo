@@ -4,7 +4,7 @@
 #include "grid.h"
 #include "cgnslib.h"
 #include "parallelHelper.h"
-#include <assert.h>
+#include <cassert>
 
 Grid GenGrid1D(ParallelHelper* pHelper, int N, double x_begin, double x_end, bool IsPeriodic = false)
 {

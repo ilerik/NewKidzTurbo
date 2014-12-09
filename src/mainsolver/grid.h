@@ -11,7 +11,7 @@
 //#include <unordered_set>
 //#include <unordered_map>
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 
 #define DEBUG_GRID true
 

@@ -36,12 +36,29 @@ public:
 
 
 	//Read configuration
-	void loadConfiguration(Configuration _configuration) {
+	void loadConfiguration(GasModelConfiguration conf) {
 		nConservativeVariables = 5;
-		R = _configuration.IdealGasConstant;
-		Gamma = _configuration.SpecificHeatRatio;
-		Cp = _configuration.SpecificHeatPressure;
-		Cv = _configuration.SpecificHeatVolume;		
+		std::pair<double, bool> res;
+		//Load properties
+		res = conf.GetPropertyValue("IdealGasConstant");
+		R = res.first;
+		res = conf.GetPropertyValue("SpecificHeatRatio");
+		Gamma = res.first;
+
+		//Specific heats
+		res = conf.GetPropertyValue("SpecificHeatPressure");
+		bool isCpSet = res.second;
+		Cp = res.first;
+		res = conf.GetPropertyValue("SpecificHeatVolume");		
+		bool isCvSet = res.second;
+		Cv = res.first;
+		
+		//Check if everything is fine
+		if ((!isCvSet) && (!isCpSet)) {
+			//Error
+			//TO DO
+		};
+				
 	};
 };
 

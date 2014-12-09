@@ -3,7 +3,8 @@
 
 #include <mpi.h>
 #include <time.h>
-#include <assert.h>
+#include <cassert>
+#include "GasModel.h"
 
 //Class that implements MPI-based operations for distributed memory architecture
 class ParallelHelper {
@@ -11,6 +12,7 @@ class ParallelHelper {
 	int _nProcessors; //total number of processes
 	int _rank;  //current processor rank in _comm
 	MPI_Comm _comm;	//global communicator
+	std::vector<GasModel* > _gasModels; //References to gas models in use
 public:
 	//Accessor functions
 	inline MPI_Comm getComm() {
@@ -170,6 +172,7 @@ public:
 	//Problem oriented routines and data
 	int nVariables; //Number of conservative variables
 	std::vector<int> part; //Partitioning
+	std::map<int, int> RequestedGasModelIndex; //Requested material index for cells 
 	std::map<int, std::vector<double>> RequestedValues; //Requested values for cells
 	std::map<int, std::vector<Vector>> RequestedGradients; //Requested gradients for cells
 
@@ -207,7 +210,10 @@ public:
 	};
 
 	//Initialize data structures for exchange
-	void InitExchange() {				
+	void InitExchange(std::vector<GasModel*>& gasModels) {
+		//Initialize gas models
+		_gasModels = gasModels;
+
 		//Cell indexes per processor to recieve		
 		for (int cellID : toRecvValues) {
 			toRecvValuesByProc[part[cellID]].push_back(cellID);
@@ -255,9 +261,14 @@ public:
 		};
 	};
 
+	//Exchange gas model indexes of cells
+	void ExchangeGasModelIndexes(Grid& grid, std::vector<int>& gasmodelIndexes) {
+
+	};
+
 	//Exchange values
 	void ExchangeValues(Grid& grid, std::vector<double>& values) {
-		printf("00");
+		//printf("00");
 		//Allocate memory and fill datastructures
 		int s = 0;
 		int r = 0;
@@ -284,7 +295,7 @@ public:
 
 		//Allocate recieve buffer
 		recvbuf.resize(r);
-		printf("11");
+		//printf("11");
 
 		//Exchange values
 		MPI_Alltoallv(&sendbuf[0], &toSendValuesNumberByProc[0], &sdispl[0], MPI_LONG_DOUBLE, &recvbuf[0], &toRecvValuesNumberByProc[0], &rdispl[0], MPI_LONG_DOUBLE, _comm);		
@@ -306,6 +317,8 @@ public:
 		};
 		
 	};
+
+	
 };
 
 #endif

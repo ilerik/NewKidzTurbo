@@ -14,22 +14,27 @@ private:
 	int _nmat; // Index of material
 public:
 	//Constructor specifies material to use
-	LomonosovFortovGasModel(int nmat) {
+	LomonosovFortovGasModel() {
 		//Model information
 		GasModelName = "LomonosovFortovGasModel";
-		GasModelType = ModelType_t::ModelTypeUserDefined;
-
-		//Material index
-		_nmat = nmat;
+		GasModelType = ModelType_t::ModelTypeUserDefined;		
 
 		//Fill material dependent constants
 		_prepareData();
 	};
 
 	//Load configuration
-	void loadConfiguration(Configuration _conf) {
+	void loadConfiguration(GasModelConfiguration conf) {
 		//Not implemented yet
 		nConservativeVariables = 5;
+		std::pair<double, bool> res;
+
+		//Load properties
+		res = conf.GetPropertyValue("MaterialIndex");
+		_nmat = res.first;
+		if (!res.second) {
+			//Error TO DO
+		};
 	};
 
 	//Get pressure
