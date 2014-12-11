@@ -26,6 +26,11 @@ public:
 		res[2] = 0;
 		res[3] = 0;
 		res[4] = pressure / (0.4);*/
+		res[0] = inV[0];
+		res[1] = inV[1];
+		res[2] = inV[2];
+		res[3] = inV[3];
+		res[4] = 0;
 		Vector roU(inV[1], inV[2], inV[3]);					
 		return res;
 	};

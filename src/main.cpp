@@ -7,6 +7,7 @@
 #include "kernel.h"
 #include "gridgeneration.h"
 #include <cmath>
+#include <random>
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -91,6 +92,8 @@ public:
 		};
 			
 		//Convert to conservative variables
+		double P = 1e5;
+		//e = P / (0.4 * ro);
 		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
 		initValues.resize(_gasModels[nmat]->nConservativeVariables);
 		initValues[0] = ro;
@@ -136,13 +139,58 @@ void runImpactShockTest(int argc, char *argv[]) {
 	_kernel.Finalize();	
 };
 
+void runImpactShockTest2D(int argc, char *argv[]) {
+	Kernel _kernel;
+	const double PI = 3.14159265359;
+	
+	_kernel.Initilize(&argc, &argv);
+	double L = 15e-3; // 15 mm; 
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 100, 50, -3*L, L, -L, L, 1.0, 1.0, false, false); //Change grid size here
+	//Modify grid for initial disturbances
+	double A = 4e-5;
+	std::default_random_engine generator;
+	std::uniform_real_distribution<double> distribution(-A,A);	
+	for (Node& n : _grid.localNodes) {
+		if ((n.P.x == 0) && (std::abs(n.P.y) != L)) {
+			double dr = distribution(generator);
+			n.P.x += dr;
+		};
+	};
+	_kernel.BindGrid(_grid);
+	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
+
+	//Fill in configuration
+	_kernel.ReadConfiguration(""); //Change run parameters here
+	_kernel.InitCalculation();
+
+	//Initial conditions
+	//double ro0 = 1;
+	double roPb = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+	double roSteel = 1000 * 1.0 / 0.127; // SI	for stainless steel	
+	double V = 500; //m/s
+	//ImpactShockInitialConditions ic(V, 0, roSteel, 0, roPb);
+	ImpactShockInitialConditions ic(V, 1, roSteel, 2, roPb);
+	//ImpactShockInitialConditions ic(V, 1, roSteel, 1, roSteel);
+	//ImpactShockInitialConditions ic(V, 2, roPb, 2, roPb);
+	_kernel.GenerateInitialConditions(&ic);	
+
+	//Run test
+	_kernel.RunCalculation();
+	_kernel.FinalizeCalculation();
+
+	//Output result
+	_kernel.SaveGrid("result.cgns");
+	_kernel.SaveSolution("result.cgns", "Solution");
+	_kernel.Finalize();	
+};
+
 //Main program ))
  int main(int argc, char *argv[]) {
 	//runPeriodicTest2D(argc, argv);
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
 
- 	runImpactShockTest(argc, argv);
+ 	runImpactShockTest2D(argc, argv);
 
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;

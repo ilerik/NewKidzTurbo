@@ -13,6 +13,7 @@
 #include "cmath"
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
+#include "geomfunctions.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
@@ -69,19 +70,26 @@ public:
 
 			//Matrix consisting of face normals
 			std::vector<double> faceNormals;
-			//Vector of face noemal velocities
+			//Vector of face normal velocities
 			std::vector<double> faceVelocities;
+
+			std::vector<double> velocities;
+			std::vector<Vector> normals;
+			std::vector<double> weights;
 			
-			//TO DO replace simple average by LS approximation
+			//LLS approximation
 			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
 				Face& face = _grid->localFaces[faceIndex];
-				Vector faceVelocity = facesVelocity[faceIndex];	
-				sumFacesSquare += face.FaceSquare;
-				nodeVelocity += faceVelocity * face.FaceSquare;
+				Vector faceVelocity = facesVelocity[faceIndex];
+				velocities.push_back(faceVelocity * face.FaceNormal);
+				normals.push_back(face.FaceNormal);
+				weights.push_back(face.FaceSquare);				
 			};
 
+			nodeVelocity = ComputeVelocityByPoints(_grid->gridInfo.CellDimensions, velocities, normals, weights);
+
 			//Store node velocity
-			nodesVelocity[n.GlobalIndex] = nodeVelocity / sumFacesSquare;
+			nodesVelocity[n.GlobalIndex] = nodeVelocity;
 		};		
 	};
 
@@ -267,6 +275,7 @@ public:
 
 		//ALE settings
 		_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;
+		//_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;
 		_ALEmethod.SetGrid(_grid);		
 
 		//Run settings
@@ -351,6 +360,8 @@ public:
 				//Save snapshot
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
+				snapshotFileName<<std::fixed;
+				snapshotFileName.precision(6);								
 				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
@@ -1016,8 +1027,8 @@ public:
 		_configuration.GasModelsConfiguration["Plumbum"].SetPropertyValue("MaterialIndex", 1);				
 
 		//Boundary conditions				
-		//_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		//_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
@@ -1494,7 +1505,7 @@ public:
 					//Flux correction for moving face					
 					double un = u * f.FaceNormal;
 					double roCell = Values[cellInd * nVariables + 0];					
-					double A = -1.0;
+					double A = -1.0 * f.FaceSquare;
 					if (f.FaceCell_1 != c->GlobalIndex) {
 						A *= -1; //Reverse flow if normal directed inwards
 						//roCell = GetCellValues(f.FaceCell_2)[0];
@@ -1638,7 +1649,7 @@ public:
 	void ImplicitTimeStep() {
 	};
 	
-	//Compute scalar function gradient in each cell	
+	////Compute scalar function gradient in each cell	
 	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {
 	//	//Allocate memory for gradients
 	//	grads.resize(_grid.nCellsLocal);		
@@ -1656,8 +1667,7 @@ public:
 	//		//Add all neighbours
 	//		for (int j = 0; j<cell.NeigbourCells.size(); j++) {				
 	//			Cell& nCell = _grid.Cells[cell.NeigbourCells[j]];
-	//			std::vector<double> nU;
-	//			if (nCell.
+	//			std::vector<double> nU;				
 	//			if (nCell.IsDummy) {
 	//			};
 	//			if (face.isExternal) {

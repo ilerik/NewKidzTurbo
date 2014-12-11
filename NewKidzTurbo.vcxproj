@@ -143,7 +143,6 @@
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
     <ClInclude Include="src\gridgeneration\gengrid3D.h" />
-    <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
     <ClInclude Include="src\gridloading\CGNSReader.h" />
@@ -174,6 +173,7 @@
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="src\utility\geomfunctions.h" />
     <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>

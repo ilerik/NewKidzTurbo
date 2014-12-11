@@ -93,9 +93,6 @@
     <ClInclude Include="src\gridgeneration\gridgeneration.h">
       <Filter>Header Files\GridGeneration</Filter>
     </ClInclude>
-    <ClInclude Include="src\gridgeneration\geomfunctions.h">
-      <Filter>Header Files\Utility</Filter>
-    </ClInclude>
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
@@ -197,6 +194,9 @@
     </ClInclude>
     <ClInclude Include="src\initialconditions\ObsoleteTests.h">
       <Filter>Header Files\InitialConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\geomfunctions.h">
+      <Filter>Header Files\Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

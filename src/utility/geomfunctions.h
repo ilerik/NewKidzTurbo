@@ -101,4 +101,52 @@ Vector ComputeGradientByPoints(Vector point, double value, const std::vector<Vec
 		return grad;
 	};
 
+//Compute gradient using least squares
+Vector ComputeVelocityByPoints(int ndim, const std::vector<double>& velocities, const std::vector<Vector>& normals, const std::vector<double>& weights) {
+	Vector velocity;			
+
+	//Input
+	int n = ndim; //Number of dimensions (unknowns)
+	int nPoints = velocities.size(); 
+	int m = nPoints; //Number of equations
+	int nrhs = 1; //Number of right hand side
+	std::vector<double> a(n*m, 0);
+	std::vector<double> b(nrhs*m, 0);
+	std::vector<double> work(1 , 0);
+	int lda = m; //m; //lda = n;
+	int ldb = m; //ldb = nrhs;
+	std::vector<int> jpvt(n, 0);
+	double rcond = 0.01;
+	int lwork = -1;
+
+	//Output
+	int _info;
+	int rank;				
+				
+	//Build matrix and right hand side
+	for (int i = 0; i<velocities.size(); i++) {			
+		Vector normal = normals[i];		
+		double vn = velocities[i];
+		b[0 * ldb + i]  = vn;
+		if (ndim >= 1) a[i + 0*lda] = normal.x;
+		if (ndim >= 2) a[i + 1*lda] = normal.y;
+		if (ndim >= 3) a[i + 2*lda] = normal.z;
+	};
+
+	//Workspace querry
+	dgelsy(&m, &n, &nrhs, &a[0], &lda, &b[0], &ldb, &jpvt[0], &rcond, &rank, &work[0], &lwork, &_info);
+	lwork = (int)work[0];
+	work.resize(lwork, 0);
+
+	//Solve problem
+	dgelsy(&m, &n, &nrhs, &a[0], &lda, &b[0], &ldb, &jpvt[0], &rcond, &rank, &work[0], &lwork, &_info);
+	if (_info != 0) throw Exception("Could not solve for gradient");
+	velocity = Vector(0, 0, 0);
+	if (ndim >= 1) velocity.x = b[0];
+	if (ndim >= 2) velocity.y = b[1];
+	if (ndim >= 3) velocity.z = b[2];
+
+	return velocity;
+};
+
 #endif
