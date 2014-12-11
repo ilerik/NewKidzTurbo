@@ -198,6 +198,12 @@
     <ClInclude Include="src\utility\geomfunctions.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="src\meshmovement\MeshMovement.h">
+      <Filter>Header Files\MeshMovement</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\meshquality.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

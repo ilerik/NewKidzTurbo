@@ -1,5 +1,5 @@
-#ifndef TURBO_GEOMFUNCTIONS
-#define TURBO_GEOMFUNCTIONS
+#ifndef TURBO_Utility_GeomFunctions
+#define TURBO_Utility_GeomFunctions
 
 //Functions operating geometrical objects
 

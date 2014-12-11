@@ -18,6 +18,7 @@
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
 #include "PerfectGasModel.h"
+#include "meshquality.h"
 
 
 //Define error types
@@ -1277,7 +1278,19 @@ public:
 			const double Cv = 130; //Pb temporary
 			buffer[i] = e / Cv;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Tenperature", buffer);
+		_cgnsWriter.WriteField(_grid, solutionName, "Temperature", buffer);
+
+		//Material index
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = GetCellGasModelIndex(i);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Material", buffer);
+
+		//Quality
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::Anisotropy(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Anisotropy", buffer);
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		

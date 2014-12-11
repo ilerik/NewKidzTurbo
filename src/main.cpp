@@ -68,11 +68,11 @@ public:
 
 		//Left state		
 		double roL = _roL;		
-		double uL = 0.5*_V;
+		double uL = 0;
 			
 		//Right state		
 		double roR = _roR;		
-		double uR = -0.5*_V;
+		double uR = -1.0*_V;
 
 		//Cell center
 		double x = cell.CellCenter.x;
@@ -145,9 +145,9 @@ void runImpactShockTest2D(int argc, char *argv[]) {
 	
 	_kernel.Initilize(&argc, &argv);
 	double L = 15e-3; // 15 mm; 
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 100, 50, -3*L, L, -L, L, 1.0, 1.0, false, false); //Change grid size here
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 100, -3*L, L, -L, L, 1.0, 1.0, false, false); //Change grid size here
 	//Modify grid for initial disturbances
-	double A = 4e-5;
+	double A = 0; //4e-5;
 	std::default_random_engine generator;
 	std::uniform_real_distribution<double> distribution(-A,A);	
 	for (Node& n : _grid.localNodes) {
