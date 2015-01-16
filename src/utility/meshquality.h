@@ -51,6 +51,9 @@ double Anisotropy(const Grid& grid, const Cell& cell) {
 		q /= normRatio;
 		return q;
 	};
+
+	throw new Exception("Unsupported number of dimensions");
+	return 0;
 };
 
 

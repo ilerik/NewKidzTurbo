@@ -33,8 +33,13 @@ enum turbo_errt {
 
 //Define ALE integration method
 class ALEMethod {	
-	Grid* _grid;	
+	Grid* _grid;
+
+	// map faceIndex to [0,1] indicator value. 1.0 - F
+	double (*_indicatorFunction)(int); 
 public:
+	//Set pointer to indicator function
+
 	//Set reference to grid
 	void SetGrid(Grid& grid) {
 		_grid = &grid;
@@ -50,9 +55,67 @@ public:
 	//Velocity of faces and nodes for ALE step
 	std::map<int, Vector> nodesVelocity;
 	std::map<int, Vector> facesVelocity;
+	std::map<int, double> facesPressure; 
 
 	//List of adjacent faces for each node
 	std::map<int, std::vector<int>> adjacentFaces;
+
+	//Compute swept volume
+	double CalcSweptVolumeRate(Face& f) {
+		double volume = 0;
+		if (f.CGNSType == NODE) {
+			Vector v = nodesVelocity[f.FaceNodes[0]];
+			volume = f.FaceSquare * v * f.FaceNormal;
+			return volume;
+		};
+		if (f.CGNSType == BAR_2) {
+			Vector v1 = nodesVelocity[f.FaceNodes[0]];
+			Vector v2 = nodesVelocity[f.FaceNodes[1]];
+			volume = 0.5 * f.FaceSquare * (v1+v2) * f.FaceNormal;
+			return volume;
+		};
+		throw new Exception("Unsupported element type");
+		return 0;
+	};
+
+	//ALE residual correction procedure
+	void Remap(int nVariables, std::vector<double>& residual, std::vector<double>& cellValues, double dt) {
+		//Compute grid motion fluxes through each face
+		for (int cellInd = 0; cellInd < _grid->nCellsLocal; cellInd++) {
+			Cell* c = _grid->localCells[cellInd];
+			for (int faceInd : c->Faces) {
+				Face& f = _grid->localFaces[faceInd];					
+
+				//Compute volume swept by face TO DO generalize
+				double sweptVolume = 0;
+				Vector avgVelocity = Vector(0,0,0);
+				for (int nodeInd : f.FaceNodes) {
+					avgVelocity += nodesVelocity[nodeInd];
+				};
+				avgVelocity /= f.FaceNodes.size();
+				sweptVolume = avgVelocity.mod() * dt;
+
+				//Distribute moving face flux				
+				for (int i = 0; i<nVariables; i++) { 
+					residual += cellValues * sweptVolume;
+				};
+
+				//Vector uR = ;
+				//double roCell = Values[cellInd * nVariables + 0];					
+				//double A = -1.0 * f.FaceSquare;
+				//if (f.FaceCell_1 != c->GlobalIndex) {
+				//	A *= -1; //Reverse flow if normal directed inwards
+				//	//roCell = GetCellValues(f.FaceCell_2)[0];
+				//};
+				////A *= FaceFluxes[f.GlobalIndex][0] / (roCell * un);
+
+				//for (int j = 0; j<nVariables; j++) {
+				//	double dR =  -Values[cellInd * nVariables + j] * un * A;
+				//	residual[cellInd * nVariables + j] += dR; // / _grid.localCells[cellInd]->CellVolume;
+				//};
+			};				
+		};
+	};
 
 	//Compute velocities
 	void ComputeNodeVelocities() {
@@ -108,10 +171,6 @@ public:
 
 	};
 
-	//Remap variables
-	void Remap() {
-		
-	};
 };
 
 //Step info
@@ -146,7 +205,7 @@ private:
 	//ALE data and logic
 	ALEMethod _ALEmethod;
 
-	//Solver (TO DO)		
+	//Solver (TO DO)
 	SimulationType_t _simulationType; //Simulation type
 	double CFL;
 	int RungeKuttaOrder;
@@ -271,19 +330,19 @@ public:
 		//Solver settings
 		rSolver = new RiemannSolver(_gasModels);			
 		_simulationType = TimeAccurate;
-		CFL = 0.1;
+		CFL = 0.01;
 		RungeKuttaOrder = 1;		
 
 		//ALE settings
-		_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;
-		//_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;
+		//_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;
+		_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;
 		_ALEmethod.SetGrid(_grid);		
 
 		//Run settings
 		MaxIteration = 1000000;
-		MaxTime = 100e-6;
+		MaxTime = 10e-6;
 		SaveSolutionSnapshotIterations = 0;
-		SaveSolutionSnapshotTime = 1e-6;	
+		SaveSolutionSnapshotTime = 1e-7;	
 
 		//Initialize start moment
 		stepInfo.Time = 0.0; 
@@ -326,7 +385,7 @@ public:
 			//Output step information
 			msg.clear();
 			msg.str(std::string());
-			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
+			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 			if (_parallelHelper.IsMaster()) {
 				std::cout<<msg.str();
@@ -362,7 +421,7 @@ public:
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
 				snapshotFileName<<std::fixed;
-				snapshotFileName.precision(6);								
+				snapshotFileName.precision(7);								
 				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
@@ -438,8 +497,8 @@ public:
 	}
 
 	//Bind existing grid to kernel
-	turbo_errt BindGrid(Grid& grid) {
-		_grid = grid;
+	turbo_errt BindGrid(Grid* grid) {
+		_grid = *grid;
 		PartitionGrid();
 		GenerateGridGeometry();
 		return TURBO_OK;
@@ -516,11 +575,13 @@ public:
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
 		_parallelHelper.Barrier();
-		int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], &_grid.adjncy[0], vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
-		if (result != METIS_OK) {
-			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
-			return TURBO_ERROR;
-		};							
+		if (_nProcessors < _grid.nProperCells) { //Make sure that partitioning is needed
+			int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], _grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
+			if (result != METIS_OK) {
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
+				return TURBO_ERROR;
+			};							
+		};
 
 		//Gather partitioning on every processor
 		std::vector<int> recvcounts(_nProcessors);
@@ -594,7 +655,7 @@ public:
 		//Otput result
 		msg.str(std::string());
 		msg<<"Number of local cells = "<<_grid.nCellsLocal;
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());															
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 
 		//Synchronize		
 		_parallelHelper.Barrier();
@@ -710,60 +771,63 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
+		_grid.nFaces = faceIndex;	
+
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
-		//Generate face geometric properties		
-		_grid.nFaces = faceIndex;		
-		for (Face& face : _grid.localFaces) {
-			int index = face.GlobalIndex;						
-			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
-		};
+		_grid.UpdateGeometricProperties();
 
-		//Update cells geometric properties
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
-			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};	
+		////Generate face geometric properties			
+		//for (Face& face : _grid.localFaces) {
+		//	int index = face.GlobalIndex;						
+		//	_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		//};
 
-		//Orient face normals			
-		for (Face& face : _grid.localFaces) {
-			int index = face.GlobalIndex;									
+		////Update cells geometric properties
+		//for (int i = 0; i < _grid.nCellsLocal; i++) {
+		//	_grid.ComputeGeometricProperties(_grid.localCells[i]);
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//};	
 
-			//If boundary face make sure dummy if FaceCell_2
-			if (face.FaceCell_1 >= _grid.nProperCells) {
-				//Swap
-				int tmp = face.FaceCell_1;
-				face.FaceCell_1 = face.FaceCell_2;
-				face.FaceCell_2 = tmp;
-			};
+		////Orient face normals			
+		//for (Face& face : _grid.localFaces) {
+		//	int index = face.GlobalIndex;									
 
-			//Orient normal
-			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
-			Vector faceCenter = _grid.localFaces[index].FaceCenter;
-			if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
-				_grid.localFaces[index].FaceNormal *= -1;
-			};
+		//	//If boundary face make sure dummy if FaceCell_2
+		//	if (face.FaceCell_1 >= _grid.nProperCells) {
+		//		//Swap
+		//		int tmp = face.FaceCell_1;
+		//		face.FaceCell_1 = face.FaceCell_2;
+		//		face.FaceCell_2 = tmp;
+		//	};
 
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
-		};
+		//	//Orient normal
+		//	Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
+		//	Vector faceCenter = _grid.localFaces[index].FaceCenter;
+		//	if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
+		//		_grid.localFaces[index].FaceNormal *= -1;
+		//	};
+
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
+		//};
 
 
-		//Compute dummy cell geometric properties
-		for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
-			int neighbour = _grid.localCells[i]->NeigbourCells[0];
-			Cell& cell = _grid.Cells[neighbour];
-			_grid.localCells[i]->CellVolume = cell.CellVolume;
+		////Compute dummy cell geometric properties
+		//for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
+		//	int neighbour = _grid.localCells[i]->NeigbourCells[0];
+		//	Cell& cell = _grid.Cells[neighbour];
+		//	_grid.localCells[i]->CellVolume = cell.CellVolume;
 
-			//Reflect cell center over boundary face plane
-			Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
-			Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
-			Vector dummyCenter = cell.CellCenter - 2 * dR;
-			_grid.localCells[i]->CellCenter = dummyCenter;
-			//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};
+		//	//Reflect cell center over boundary face plane
+		//	Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
+		//	Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
+		//	Vector dummyCenter = cell.CellCenter - 2 * dR;
+		//	_grid.localCells[i]->CellCenter = dummyCenter;
+		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1303,7 +1367,7 @@ public:
 	};	
 
 	//Compute convective flux and max wave propagation speed throught each face
-	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues) {		
+	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {		
 		//Compute gradients for second order reconstruction
 		/*if (IsSecondOrder) {
 			ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
@@ -1362,14 +1426,14 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/						
 
 			//Compute flux
-			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f);			
+			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, 1.0);			
 			//Store interface velocity and pressure for ALE
-			FacePressure[f.GlobalIndex] = result.Pressure;
+			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
 			_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 			//Store flux
-			fluxes[f.GlobalIndex] = result.FluxesLeft;
+			fluxes[f.GlobalIndex] = result.Fluxes;
 			
 			if (IsDummyCell(f.FaceCell_2)) {
 				//Correct dummy face flux
@@ -1433,12 +1497,34 @@ public:
 	};	
 
 	////Compute residual for each cell		
-	void ComputeResidual(std::vector<double>& residual, std::vector<double>& cellValues) {		
+	void ComputeResidual(std::vector<double>& residual, std::vector<double>& cellValues) {	
+		//Compute ALE indicator values
+		std::vector<double> ALEindicators(_grid.nFaces, 0);
+		for (Face& f : _grid.localFaces) {
+			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
+				ALEindicators[f.GlobalIndex] = 1; // all move
+			};
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
+				ALEindicators[f.GlobalIndex] = 0;
+				if (nmatL != nmatR) { //move material interface
+					ALEindicators[f.GlobalIndex] = 1;
+				};
+				if (IsDummyCell(f.FaceCell_2)) { // move boundaries
+					ALEindicators[f.GlobalIndex] = 1;
+				};
+			};
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
+				ALEindicators[f.GlobalIndex] = 0;
+			};
+		};
+
 		//Compute convective fluxes and max wave speeds
 		for (std::vector<double>& flux : FaceFluxes) {
 			for (double& v : flux) v = 0;
 		};
-		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues);
+		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
 		////Compute gradients
@@ -1446,6 +1532,12 @@ public:
 
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
+
+		//ALE step mesh transformation
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+			//Compute node velocities
+			_ALEmethod.ComputeNodeVelocities();	
+		};		
 
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1461,7 +1553,15 @@ public:
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
-				};				
+				};		
+
+				//Mesh deformation contribution
+				if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+					double sweptVolume = _ALEmethod.CalcSweptVolumeRate(face);
+					for (int j = 0; j<nVariables; j++) {						
+						residual[cellIndex * nVariables + j] += sweptVolume * cellValues[cellIndex * nVariables + j] * fluxDirection;
+					};					
+				};
 			};
 		};
 
@@ -1503,37 +1603,6 @@ public:
 		//Compute residual		
 		ComputeResidual(Residual, Values);
 
-		//Ajust fluxes and move mesh in ALE manner
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-			//Compute node velocities
-			_ALEmethod.ComputeNodeVelocities();
-			//Compute grid motion fluxes through each face
-			for (int cellInd = 0; cellInd < _grid.nCellsLocal; cellInd++) {
-				Cell* c = _grid.localCells[cellInd];
-				for (int faceInd : c->Faces) {
-					Face& f = _grid.localFaces[faceInd];					
-					double P = FacePressure[faceInd];
-					Vector u = _ALEmethod.facesVelocity[faceInd];
-
-					//Flux correction for moving face					
-					double un = u * f.FaceNormal;
-					double roCell = Values[cellInd * nVariables + 0];					
-					double A = -1.0 * f.FaceSquare;
-					if (f.FaceCell_1 != c->GlobalIndex) {
-						A *= -1; //Reverse flow if normal directed inwards
-						//roCell = GetCellValues(f.FaceCell_2)[0];
-					};
-					//A *= FaceFluxes[f.GlobalIndex][0] / (roCell * un);
-
-					for (int j = 0; j<nVariables; j++) {
-						double dR =  -Values[cellInd * nVariables + j] * un * A;
-						Residual[cellInd * nVariables + j] += dR; // / _grid.localCells[cellInd]->CellVolume;
-					};
-				};				
-			};
-			
-		};		
-
 		//Synchronize
 		_parallelHelper.Barrier();
 
@@ -1574,20 +1643,7 @@ public:
 			double& timeStep = p.second;
 			if (timeStep < stepInfo.TimeStep) stepInfo.TimeStep = timeStep;
 		}
-		stepInfo.TimeStep = _parallelHelper.Min(stepInfo.TimeStep);
-
-
-		//ALE step mesh transformation
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-			//Move mesh
-			_ALEmethod.MoveMesh(stepInfo.TimeStep);
-
-			//Remesh\adapt\repair grid
-			_ALEmethod.Remesh();
-
-			//Regenerate geometric entities
-			GenerateGridGeometry();
-		};		
+		stepInfo.TimeStep = _parallelHelper.Min(stepInfo.TimeStep);		
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1642,7 +1698,7 @@ public:
 			for (int i = 0; i < nVariables; i++) {
 				Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[nStages-1];
 				stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
-			};			
+			};					
 		};
 
 		//Compute RMS residual		
@@ -1650,6 +1706,15 @@ public:
 			stepInfo.Residual[i] = _parallelHelper.SumDouble(stepInfo.Residual[i]);
 			stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);
 		};
+
+		//ALE step mesh transformation
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
+			//Move mesh
+			_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+
+			//Regenerate geometric entities
+			GenerateGridGeometry();
+		};		
 
 		//Advance total time
 		stepInfo.Time += stepInfo.TimeStep;

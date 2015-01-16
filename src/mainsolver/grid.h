@@ -243,10 +243,13 @@ public:
 	void BuildBoundaryKDTree(Patch& patch);
 
 	//Generate local cells given partitioning
-	void GenerateLocalCells(int rank, std::vector<int>& cellsPart);	
+	void GenerateLocalCells(int rank, std::vector<int>& cellsPart);
 
-	//Update geometric properties of cells
-	void UpdateGeometricProperties(std::vector<Cell>& cells, std::vector<Face>& faces);
+	//Update geometric properties of cells and faces
+	void UpdateGeometricProperties();
+
+	//Generate local faces given partitioning
+	void GenerateLocalFaces();	
 
 	//Construct patches (fill in nodes and faces)
 	bool ConstructAndCheckPatches();
@@ -291,10 +294,20 @@ void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
 		};
 	};
 
-	//Generate faces
+	//Create local cells
+	localCells.resize(localCellIndexes.size());		
+	for (int i = 0; i < localCellIndexes.size(); i++) {	
+		int cellGlobalIndex = localCellIndexes[i];
+		int cellLocalIndex = i;
+		localCells[i] = &Cells[cellGlobalIndex];	
+		localCells[i]->Faces.clear();
+		cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
+	};	
+};
 
+//Generate local faces 
+void Grid::GenerateLocalFaces() {
 
-	//Update grometric properties of all cells
 };
 
 //Given type of element and nodes fill the properties of cell
@@ -646,6 +659,57 @@ std::vector<Face> Grid::ObtainFaces(Cell* cell) {
 
 	if (!isTypeCheckPassed) throw Exception("Cell element type is not supported");
 	return res;
+};
+
+void Grid::UpdateGeometricProperties() {
+	//Generate face geometric properties		
+	for (Face& face : localFaces) {
+		int index = face.GlobalIndex;						
+		ComputeGeometricProperties(&localFaces[index]);
+	};
+
+	//Update cells geometric properties
+	for (int i = 0; i < nCellsLocal; i++) {
+		ComputeGeometricProperties(localCells[i]);
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, localCells[i]->getInfo());
+	};	
+
+	//Orient face normals			
+	for (Face& face : localFaces) {
+		int index = face.GlobalIndex;									
+
+		//If boundary face make sure dummy if FaceCell_2
+		if (face.FaceCell_1 >= nProperCells) {
+			//Swap
+			int tmp = face.FaceCell_1;
+			face.FaceCell_1 = face.FaceCell_2;
+			face.FaceCell_2 = tmp;
+		};
+
+		//Orient normal
+		Vector cellCenter = Cells[localFaces[index].FaceCell_1].CellCenter;
+		Vector faceCenter = localFaces[index].FaceCenter;
+		if (((cellCenter - faceCenter) * localFaces[index].FaceNormal) > 0) {
+			localFaces[index].FaceNormal *= -1;
+		};
+
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
+	};
+
+
+	//Compute dummy cell geometric properties
+	for (int i = nCellsLocal; i < localCells.size(); i++) {			
+		int neighbour = localCells[i]->NeigbourCells[0];
+		Cell& cell = Cells[neighbour];
+		localCells[i]->CellVolume = cell.CellVolume;
+
+		//Reflect cell center over boundary face plane
+		Face& face = localFaces[ localCells[i]->Faces[0]];
+		Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
+		Vector dummyCenter = cell.CellCenter - 2 * dR;
+		localCells[i]->CellCenter = dummyCenter;
+		//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, localCells[i]->getInfo());
+	};
 };
 
 //Check that all boundary markers are set to some patchs

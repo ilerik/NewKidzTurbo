@@ -31,6 +31,9 @@ public:
 	std::string OutputCGNSFile;
 	std::string InitialConditionsSolution;	
 
+	//Simulation parameters
+
+
 	//Set of equations settings	
 	GoverningEquationsType_t GoverningEquations;
 

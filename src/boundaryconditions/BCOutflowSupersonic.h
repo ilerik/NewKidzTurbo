@@ -19,13 +19,15 @@ public:
 
 		//Compute dummy values
 		std::vector<double> res = inV;
-	/*	double pressure = 1e5;
+		double pressure = 1e11;
+		/*
 		double density = 1.0;
 		res[0] = density;
 		res[1] = 0;
 		res[2] = 0;
 		res[3] = 0;
 		res[4] = pressure / (0.4);*/
+		//res[4] = pressure / (0.4);
 		res[0] = inV[0];
 		res[1] = inV[1];
 		res[2] = inV[2];

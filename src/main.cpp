@@ -8,6 +8,7 @@
 #include "gridgeneration.h"
 #include <cmath>
 #include <random>
+#include "MeshMovement.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -68,7 +69,7 @@ public:
 
 		//Left state		
 		double roL = _roL;		
-		double uL = 0;
+		double uL = 1.0*_V;
 			
 		//Right state		
 		double roR = _roR;		
@@ -92,7 +93,7 @@ public:
 		};
 			
 		//Convert to conservative variables
-		double P = 1e5;
+		//double P = 1e11;
 		//e = P / (0.4 * ro);
 		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
 		initValues.resize(_gasModels[nmat]->nConservativeVariables);
@@ -111,8 +112,8 @@ void runImpactShockTest(int argc, char *argv[]) {
 	
 	_kernel.Initilize(&argc, &argv);
 	double L = 15e-3; // 15 mm; 
-	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 1000, -L, L, false); //Change grid size here
-	_kernel.BindGrid(_grid);
+	Grid _grid = GenGrid1D(_kernel.getParallelHelper(), 200, -L, L, false); //Change grid size here
+	_kernel.BindGrid(&_grid);
 	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
 
 	//Fill in configuration
@@ -123,10 +124,11 @@ void runImpactShockTest(int argc, char *argv[]) {
 	//double ro0 = 1;
 	double roPb = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
 	double roSteel = 1000 * 1.0 / 0.127; // SI	for stainless steel	
-	double V = 500; //m/s
-	ImpactShockInitialConditions ic(V, 1, roSteel, 2, roPb);
+	double V = 250; //m/s
+	///ImpactShockInitialConditions ic(V, 0, roPb, 0, roPb);
+	//ImpactShockInitialConditions ic(V, 1, roSteel, 2, roPb);
 	//ImpactShockInitialConditions ic(V, 1, roSteel, 1, roSteel);
-	//ImpactShockInitialConditions ic(V, 2, roPb, 2, roPb);
+	ImpactShockInitialConditions ic(V, 2, roPb, 2, roPb);
 	_kernel.GenerateInitialConditions(&ic);	
 
 	//Run test
@@ -145,18 +147,37 @@ void runImpactShockTest2D(int argc, char *argv[]) {
 	
 	_kernel.Initilize(&argc, &argv);
 	double L = 15e-3; // 15 mm; 
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 100, -3*L, L, -L, L, 1.0, 1.0, false, false); //Change grid size here
+	double xMin = -3*L;
+	double xMax = L;
+	double yMin = -L;
+	double yMax = L;
+	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 100, xMin, xMax, yMin, yMax, 1.0, 1.0, false, false); //Change grid size here
 	//Modify grid for initial disturbances
-	double A = 0; //4e-5;
+	double A = 1e-4;
 	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution(-A,A);	
+	std::uniform_real_distribution<double> distribution(-A,A);
+	std::vector<int> nodes;
+	std::vector<Vector> displacements;
 	for (Node& n : _grid.localNodes) {
+		//Distortion
 		if ((n.P.x == 0) && (std::abs(n.P.y) != L)) {
-			double dr = distribution(generator);
-			n.P.x += dr;
+			double delta = distribution(generator);
+			Vector dr(delta, 0, 0);
+			nodes.push_back(n.GlobalIndex);
+			displacements.push_back(dr);
+		};
+
+		//Unmovable borders
+		if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+			nodes.push_back(n.GlobalIndex);
+			displacements.push_back(Vector(0,0,0));
 		};
 	};
-	_kernel.BindGrid(_grid);
+
+	_kernel.BindGrid(&_grid);
+	_kernel.GenerateGridGeometry();
+	MeshMovement _moveHelper;
+	_moveHelper.IDWMove(_grid, nodes, displacements); 
 	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
 
 	//Fill in configuration
@@ -190,7 +211,8 @@ void runImpactShockTest2D(int argc, char *argv[]) {
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
 
- 	runImpactShockTest2D(argc, argv);
+	runImpactShockTest(argc, argv);
+ 	//runImpactShockTest2D(argc, argv);
 
 	//LomonosovFortovGasModel gasModel(1);
 	//double P;

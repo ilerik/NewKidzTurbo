@@ -11,6 +11,7 @@
 //Solution information structure
 class RiemannProblemSolutionResult {
 public:
+	std::vector<double> Fluxes;
 	std::vector<double> FluxesLeft; //Conservative flux to the left state
 	std::vector<double> FluxesRight; //Conservative flux to the right state
 	double MaxEigenvalue; //Maximal local eigenvalue of Jacobian
@@ -31,7 +32,7 @@ public:
 	RiemannSolver(std::vector<GasModel*>& gasModels) : _gasModels(gasModels) { };	
 
 	//Solve riemann problem	
-	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f) {
+	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f, double ALEindicator = 0) {
 		RiemannProblemSolutionResult result;
 		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
 		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
@@ -81,54 +82,59 @@ public:
 		double PStarR = pR + roR * (SR - uR)*(SStar - uR); //Pressure estimate for right star region Toro 10.36
 		
 		//Choose flux according to wave speeds pattern Toto 10.26
-		//And choose estimate for interface velocity
-		Vector velocity = SStar * f.FaceNormal; 
-		assert(velocity.x == velocity.x);
-		std::vector<double> DL(5);
-		DL[0] = 0;
-		DL[1] = 1;
-		DL[2] = 0;
-		DL[3] = 0;
-		DL[4] = uL;
-		std::vector<double> FL = uL*UL + pL*DL;
-		if (0 <= SL) {
-			result.FluxesLeft = FL;
-			result.FluxesRight = FL;
-			result.Pressure = pL; //Pressure estimate
-		};
 
-		std::vector<double> DR(5);
-		DR[0] = 0;
-		DR[1] = f.FaceNormal.x;
-		DR[2] = f.FaceNormal.y;
-		DR[3] = f.FaceNormal.z;
-		DR[4] = uR;
-		std::vector<double> FR = uR*UR + pR*DR;
+		//Sample state and pressure
+		std::vector<double> D(5);
+		D[0] = 0;
+		D[1] = f.FaceNormal.x;
+		D[2] = f.FaceNormal.y;
+		D[3] = f.FaceNormal.z;
+		D[4] = 0;
+		double u = 0;
+		GasModel::ConservativeVariables U;
+		D[4] = uL;
+		std::vector<double> FL = uL*UL + pL*D;
+		if (0 <= SL) {
+			U = UL;
+			result.Pressure = pL; //Pressure estimate
+			u = uL; 
+		};
+	
+		D[4] = uR;
+		std::vector<double> FR = uR*UR + pR*D;
 		if ( 0 >= SR ) {
-			result.FluxesLeft = FR;
-			result.FluxesRight = FR;
+			U = UR;
 			result.Pressure = pR; //Pressure estimate
+			u = uR;
 		};
 
 		//Toro formulation 10.41 for HLLC flux 
-		std::vector<double> DStar(5);
-		DStar[0] = 0;
-		DStar[1] = f.FaceNormal.x;
-		DStar[2] = f.FaceNormal.y;
-		DStar[3] = f.FaceNormal.z;
-		DStar[4] = SStar;		
 		if (( SL < 0 ) && ( 0 <= SStar )) {
-			result.FluxesLeft = SStar * (SL * UL - FL) + SL * (pL + roL*(SL - uL)*(SStar - uL)) * DStar;
+			result.Pressure = pL + SL * roL*(SL - uL)*(SStar - uL); //Pressure estimate
+			U = (SStar * (SL * UL - FL)) / (SL - SStar);
+			u = SStar;
+			/*result.FluxesLeft = SStar * (SL * UL - FL);
+			result.FluxesLeft = SL * (pL + roL*(SL - uL)*(SStar - uL)) * DStar;
 			result.FluxesLeft /= SL - SStar;
-			result.FluxesRight = result.FluxesLeft;
-			result.Pressure =  SL * (pL + roL*(SL - uL)*(SStar - uL)); //Pressure estimate
+			result.FluxesRight = result.FluxesLeft;*/
 		};
 		if (( SStar < 0 ) && ( 0 < SR )) {
-			result.FluxesLeft = SStar * (SR * UR - FR) + SR * (pR + roR*(SR - uR)*(SStar - uR)) * DStar;
+		/*	result.FluxesLeft = SStar * (SR * UR - FR) + SR * (pR + roR*(SR - uR)*(SStar - uR)) * DStar;
 			result.FluxesLeft /= SR - SStar;
-			result.FluxesRight = result.FluxesLeft;			
-			result.Pressure = SR * (pR + roR*(SR - uR)*(SStar - uR)); //Pressure estimate
+			result.FluxesRight = result.FluxesLeft;	*/		
+			result.Pressure = pR + SR * roR * (SR - uR) * (SStar - uR); //Pressure estimate
+			U = (SStar * (SR * UR - FR)) / (SR - SStar);
+			u = SStar;
 		};
+
+		//And choose estimate for interface velocity
+		Vector velocity = ALEindicator * u * f.FaceNormal; 
+		double uRelative = (u * (1.0 - ALEindicator));
+		assert(velocity.x == velocity.x);
+	
+		//Now compute flux
+		D[4] = uRelative;
+		result.Fluxes = (uRelative)*UL + result.Pressure*D;
 
 		//Estimate for maximal speed
 		result.MaxEigenvalue = max(abs(SL), abs(SR));
