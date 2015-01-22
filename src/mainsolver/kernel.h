@@ -185,6 +185,8 @@ public:
 //Calculation kernel
 class Kernel {
 private:
+	Kernel& operator=(const Kernel&); //non copyable
+
 	//Logger
 	std::string _logfilename;
 	Logger _logger;
@@ -329,20 +331,24 @@ public:
 
 		//Solver settings
 		rSolver = new RiemannSolver(_gasModels);			
-		_simulationType = TimeAccurate;
-		CFL = 0.01;
-		RungeKuttaOrder = 1;		
+		_simulationType = _configuration.SimulationType;
+		CFL = _configuration.CFL;
+		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
 
 		//ALE settings
-		//_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;
-		_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;
+		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
+		};
+		if (_configuration.ALEConfiguration.ALEMotionType == "Lagrangian") {		
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;				
+		}		
 		_ALEmethod.SetGrid(_grid);		
 
 		//Run settings
-		MaxIteration = 1000000;
-		MaxTime = 10e-6;
-		SaveSolutionSnapshotIterations = 0;
-		SaveSolutionSnapshotTime = 1e-7;	
+		MaxIteration = _configuration.MaxIteration;
+		MaxTime = _configuration.MaxTime;
+		SaveSolutionSnapshotIterations = _configuration.SaveSolutionSnapshotIterations;
+		SaveSolutionSnapshotTime = _configuration.SaveSolutionSnapshotTime;	
 
 		//Initialize start moment
 		stepInfo.Time = 0.0; 
@@ -1062,8 +1068,14 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt BindConfiguration() {
+	turbo_errt BindConfiguration(Configuration& configuration) {
+		_configuration = configuration;
 
+		//Synchronize
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished : configuration loaded programmatically");	
+
+		return turbo_errt::TURBO_OK;
 	};
 
 	turbo_errt ReadConfiguration(std::string fname) {
@@ -1426,7 +1438,7 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/						
 
 			//Compute flux
-			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, 1.0);			
+			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, ALEindicators[i]);			
 			//Store interface velocity and pressure for ALE
 			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
 			_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
@@ -1565,7 +1577,7 @@ public:
 			};
 		};
 
-		return;
+ 		return;
 	};
 
 	//Compute spectral radii estimate for each cell

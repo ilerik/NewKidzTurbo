@@ -34,8 +34,8 @@ public:
 
 	//Initialize MPI programm
 	void Init(int *argc, char **argv[]) {
-		_comm = MPI_COMM_WORLD;
 		MPI_Init(argc, argv);		
+		_comm = MPI_COMM_WORLD;
 		MPI_Comm_size(_comm, &_nProcessors);
 		MPI_Comm_rank(_comm, &_rank);
 		isInitilized = true;

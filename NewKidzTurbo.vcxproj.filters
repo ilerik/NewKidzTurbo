@@ -64,6 +64,9 @@
     <Filter Include="Header Files\TestCases">
       <UniqueIdentifier>{8e781f7e-e76e-4d15-bf31-c6f04eb34a75}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases\TestCases1D">
+      <UniqueIdentifier>{2c32ba89-a344-4f0e-94bf-d541f43a8db5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -203,6 +206,15 @@
     </ClInclude>
     <ClInclude Include="src\utility\meshquality.h">
       <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCase.h">
+      <Filter>Header Files\TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\ALEConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

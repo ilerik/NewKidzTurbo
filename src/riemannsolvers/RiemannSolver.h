@@ -109,7 +109,7 @@ public:
 		};
 
 		//Toro formulation 10.41 for HLLC flux 
-		if (( SL < 0 ) && ( 0 <= SStar )) {
+		if (( SL < 0 ) && ( 0 <= SStar )) {			
 			result.Pressure = pL + SL * roL*(SL - uL)*(SStar - uL); //Pressure estimate
 			U = (SStar * (SL * UL - FL)) / (SL - SStar);
 			u = SStar;
@@ -121,7 +121,7 @@ public:
 		if (( SStar < 0 ) && ( 0 < SR )) {
 		/*	result.FluxesLeft = SStar * (SR * UR - FR) + SR * (pR + roR*(SR - uR)*(SStar - uR)) * DStar;
 			result.FluxesLeft /= SR - SStar;
-			result.FluxesRight = result.FluxesLeft;	*/		
+			result.FluxesRight = result.FluxesLeft;	*/                                  		
 			result.Pressure = pR + SR * roR * (SR - uR) * (SStar - uR); //Pressure estimate
 			U = (SStar * (SR * UR - FR)) / (SR - SStar);
 			u = SStar;
@@ -134,7 +134,7 @@ public:
 	
 		//Now compute flux
 		D[4] = uRelative;
-		result.Fluxes = (uRelative)*UL + result.Pressure*D;
+		result.Fluxes = (uRelative)*U + result.Pressure*D;
 
 		//Estimate for maximal speed
 		result.MaxEigenvalue = max(abs(SL), abs(SR));

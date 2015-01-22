@@ -10,6 +10,9 @@
 #include <random>
 #include "MeshMovement.h"
 
+//Test cases
+#include "testcases\TestCases1D\TestCase1D_1.h"
+
 template< typename T >
 std::string int_to_hex( T i )
 {
@@ -207,6 +210,9 @@ void runImpactShockTest2D(int argc, char *argv[]) {
 
 //Main program ))
  int main(int argc, char *argv[]) {
+	TestCases1D::TestCase1 test;
+	test.RunTest(&argc, &argv);
+	return 0;
 	//runPeriodicTest2D(argc, argv);
 	//runSodTest(argc, argv);
 	//runShearLayer(argc, argv);
