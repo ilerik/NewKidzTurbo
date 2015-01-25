@@ -4,7 +4,7 @@
 #include "grid.h"
 #include "cgnslib.h"
 #include "parallelHelper.h"
-#include <assert.h>
+#include <cassert>
 
 Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
 {

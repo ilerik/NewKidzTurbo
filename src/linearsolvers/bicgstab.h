@@ -53,7 +53,7 @@ bicgstab( unsigned N, const MATRIX &A, const PC_MATRIX &C,
 // ============================================================================
 
 
-#include <assert.h>
+#include <cassert>
 //#include "cblas.h"
 #include "mkl_blas.h"
 

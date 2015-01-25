@@ -1,5 +1,6 @@
 # Ignore data files
 
+*.tiff
 *.dat
 *.txt
 *.sol

@@ -82,7 +82,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>src/stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -116,7 +116,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -143,36 +143,44 @@
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
     <ClInclude Include="src\gridgeneration\gengrid3D.h" />
-    <ClInclude Include="src\gridgeneration\geomfunctions.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
     <ClInclude Include="src\gridloading\CGNSReader.h" />
     <ClInclude Include="src\gridloading\triangleload.h" />
     <ClInclude Include="src\initialConditions\InitialConditions.h" />
+    <ClInclude Include="src\initialconditions\ObsoleteTests.h" />
     <ClInclude Include="src\linearsolvers\bicgstab.h" />
     <ClInclude Include="src\linearsolvers\cgCUDA.h" />
     <ClInclude Include="src\linearsolvers\gmres.h" />
     <ClInclude Include="src\mainsolver\configuration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\ALEConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\RiemannSolverConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h" />
     <ClInclude Include="src\mainsolver\grid.h" />
     <ClInclude Include="src\mainsolver\kernel.h" />
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />
     <ClInclude Include="src\mainsolver\patch.h" />
+    <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
+    <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
     <ClInclude Include="src\stdafx.h" />
+    <ClInclude Include="src\testcases\TestCase.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="src\utility\geomfunctions.h" />
+    <ClInclude Include="src\utility\meshquality.h" />
     <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>

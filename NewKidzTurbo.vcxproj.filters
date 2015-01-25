@@ -55,6 +55,18 @@
     <Filter Include="Header Files\GasModels">
       <UniqueIdentifier>{4da2224d-8a78-406a-a5d8-084bf6b97158}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\MeshAdaptation">
+      <UniqueIdentifier>{af2181e6-eec1-4b4a-a10e-e74b7dcc5b3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MeshMovement">
+      <UniqueIdentifier>{19f8956d-6af9-4511-90e7-dc36e016ea19}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\TestCases">
+      <UniqueIdentifier>{8e781f7e-e76e-4d15-bf31-c6f04eb34a75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\TestCases\TestCases1D">
+      <UniqueIdentifier>{2c32ba89-a344-4f0e-94bf-d541f43a8db5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -83,9 +95,6 @@
     </ClInclude>
     <ClInclude Include="src\gridgeneration\gridgeneration.h">
       <Filter>Header Files\GridGeneration</Filter>
-    </ClInclude>
-    <ClInclude Include="src\gridgeneration\geomfunctions.h">
-      <Filter>Header Files\Utility</Filter>
     </ClInclude>
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
@@ -185,6 +194,33 @@
     </ClInclude>
     <ClInclude Include="src\gasmodels\PerfectGasModel.h">
       <Filter>Header Files\GasModels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\initialconditions\ObsoleteTests.h">
+      <Filter>Header Files\InitialConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\geomfunctions.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\meshmovement\MeshMovement.h">
+      <Filter>Header Files\MeshMovement</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\meshquality.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCase.h">
+      <Filter>Header Files\TestCases</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\ALEConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\RiemannSolverConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h">
+      <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

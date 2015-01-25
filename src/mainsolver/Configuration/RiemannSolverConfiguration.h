@@ -1,17 +1,17 @@
-#ifndef TURBO_MAINSOLVER_CONFIGURATION_GasModelConfiguration
-#define TURBO_MAINSOLVER_CONFIGURATION_GasModelConfiguration
+#ifndef TURBO_MAINSOLVER_CONFIGURATION_RiemannSolverConfiguration
+#define TURBO_MAINSOLVER_CONFIGURATION_RiemannSolverConfiguration
 
 #include "cgnslib.h"
 
-class GasModelConfiguration
+class RiemannSolverConfiguration
 {
 	std::map<std::string, double> _properties;
 public:
-	//Gas model name (type)
-	std::string GasModelName;
-
-	//CGNS style types
-	ModelType_t GasModelType;
+	//Riemann solver type
+	enum class RiemannSolverType {
+		Roe,
+		HLLC
+	} RiemannSolverType;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {

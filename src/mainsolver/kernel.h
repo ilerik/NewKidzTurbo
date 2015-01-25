@@ -13,16 +13,164 @@
 #include "cmath"
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
+#include "geomfunctions.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
 #include "PerfectGasModel.h"
+#include "meshquality.h"
 
 
 //Define error types
 enum turbo_errt {
 	TURBO_OK = 0,
 	TURBO_ERROR = 1
+};
+
+
+//Define availible types of ALE motion
+
+
+//Define ALE integration method
+class ALEMethod {	
+	Grid* _grid;
+
+	// map faceIndex to [0,1] indicator value. 1.0 - F
+	double (*_indicatorFunction)(int); 
+public:
+	//Set pointer to indicator function
+
+	//Set reference to grid
+	void SetGrid(Grid& grid) {
+		_grid = &grid;
+	};
+
+	//Method type
+	enum class ALEMotionType {
+		PureEulerian,
+		PureLagrangian,
+		ALEMaterialInterfaces
+	} ALEMotionType;
+
+	//Velocity of faces and nodes for ALE step
+	std::map<int, Vector> nodesVelocity;
+	std::map<int, Vector> facesVelocity;
+	std::map<int, double> facesPressure; 
+
+	//List of adjacent faces for each node
+	std::map<int, std::vector<int>> adjacentFaces;
+
+	//Compute swept volume
+	double CalcSweptVolumeRate(Face& f) {
+		double volume = 0;
+		if (f.CGNSType == NODE) {
+			Vector v = nodesVelocity[f.FaceNodes[0]];
+			volume = f.FaceSquare * v * f.FaceNormal;
+			return volume;
+		};
+		if (f.CGNSType == BAR_2) {
+			Vector v1 = nodesVelocity[f.FaceNodes[0]];
+			Vector v2 = nodesVelocity[f.FaceNodes[1]];
+			volume = 0.5 * f.FaceSquare * (v1+v2) * f.FaceNormal;
+			return volume;
+		};
+		throw new Exception("Unsupported element type");
+		return 0;
+	};
+
+	//ALE residual correction procedure
+	void Remap(int nVariables, std::vector<double>& residual, std::vector<double>& cellValues, double dt) {
+		//Compute grid motion fluxes through each face
+		for (int cellInd = 0; cellInd < _grid->nCellsLocal; cellInd++) {
+			Cell* c = _grid->localCells[cellInd];
+			for (int faceInd : c->Faces) {
+				Face& f = _grid->localFaces[faceInd];					
+
+				//Compute volume swept by face TO DO generalize
+				double sweptVolume = 0;
+				Vector avgVelocity = Vector(0,0,0);
+				for (int nodeInd : f.FaceNodes) {
+					avgVelocity += nodesVelocity[nodeInd];
+				};
+				avgVelocity /= f.FaceNodes.size();
+				sweptVolume = avgVelocity.mod() * dt;
+
+				//Distribute moving face flux				
+				for (int i = 0; i<nVariables; i++) { 
+					residual += cellValues * sweptVolume;
+				};
+
+				//Vector uR = ;
+				//double roCell = Values[cellInd * nVariables + 0];					
+				//double A = -1.0 * f.FaceSquare;
+				//if (f.FaceCell_1 != c->GlobalIndex) {
+				//	A *= -1; //Reverse flow if normal directed inwards
+				//	//roCell = GetCellValues(f.FaceCell_2)[0];
+				//};
+				////A *= FaceFluxes[f.GlobalIndex][0] / (roCell * un);
+
+				//for (int j = 0; j<nVariables; j++) {
+				//	double dR =  -Values[cellInd * nVariables + j] * un * A;
+				//	residual[cellInd * nVariables + j] += dR; // / _grid.localCells[cellInd]->CellVolume;
+				//};
+			};				
+		};
+	};
+
+	//Compute velocities
+	void ComputeNodeVelocities() {
+		//For each node refresh list of adjacent faces
+		adjacentFaces.clear();
+		for (Face& f : _grid->localFaces) {
+			for (int node : f.FaceNodes) {
+				adjacentFaces[node].push_back(f.GlobalIndex);
+			};
+		};
+
+		//For each node compute velocity
+		for (Node& n : _grid->localNodes) {
+			Vector nodeVelocity; //Resulting node velocity
+			double sumFacesSquare = 0;
+
+			//Matrix consisting of face normals
+			std::vector<double> faceNormals;
+			//Vector of face normal velocities
+			std::vector<double> faceVelocities;
+
+			std::vector<double> velocities;
+			std::vector<Vector> normals;
+			std::vector<double> weights;
+			
+			//LLS approximation
+			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
+				Face& face = _grid->localFaces[faceIndex];
+				Vector faceVelocity = facesVelocity[faceIndex];
+				velocities.push_back(faceVelocity * face.FaceNormal);
+				normals.push_back(face.FaceNormal);
+				weights.push_back(face.FaceSquare);				
+			};
+
+			nodeVelocity = ComputeVelocityByPoints(_grid->gridInfo.CellDimensions, velocities, normals, weights);
+
+			//Store node velocity
+			nodesVelocity[n.GlobalIndex] = nodeVelocity;
+		};		
+	};
+
+	//Move mesh
+	void MoveMesh(double timestep) {
+		for (std::pair<int, Vector> pair : nodesVelocity) {
+			int nodeInd = pair.first;
+			Vector v = pair.second;
+			_grid->localNodes[nodeInd].P += v * timestep;
+		};
+	};
+
+	//Remeshing procedure
+	void Remesh() {
+
+	};
+
 };
 
 //Step info
@@ -37,6 +185,8 @@ public:
 //Calculation kernel
 class Kernel {
 private:
+	Kernel& operator=(const Kernel&); //non copyable
+
 	//Logger
 	std::string _logfilename;
 	Logger _logger;
@@ -51,10 +201,13 @@ private:
 	//Configuration
 	Configuration _configuration;	
 
-	//Gas model
-	GasModel* _gasModel;		
+	//Gas model (equations of state)
+	std::vector<GasModel*> _gasModels;		
 
-	//Solver (TO DO)		
+	//ALE data and logic
+	ALEMethod _ALEmethod;
+
+	//Solver (TO DO)
 	SimulationType_t _simulationType; //Simulation type
 	double CFL;
 	int RungeKuttaOrder;
@@ -64,9 +217,16 @@ private:
 	double NextSnapshotTime;
 	double SaveSolutionSnapshotTime;
 	int SaveSolutionSnapshotIterations;
+
+	//Arbitrary Eulerian-Lagrange treatment type	
+
 	//Roe3DSolverPerfectGas rSolver;
 	//Godunov3DSolverPerfectGas rSolver;
+
+	//Riemann solver
 	RiemannSolver* rSolver;
+
+	//Step information
 	StepInfo stepInfo;
 
 	//Parallel run information		
@@ -75,19 +235,23 @@ private:
 	int _nProcessors;
 
 	//Boundary conditions
+	std::map<int, int> _boundaryGasModelIndex;
 	std::map<int, BoundaryConditions::BoundaryCondition*> _boundaryConditions;
 
 	//Internal storage		
 	int nVariables; //number of variables in each cell
+	std::vector<int> CellGasModel; //Index of gas model for cell constituents (localCell index -> GasModel index)
 	std::vector<double> Values;	//Conservative variables
 	std::vector<double> Residual; //Residual values	
 
 	//Fluxes
 	std::vector<std::vector<double>> FaceFluxes;
-	std::vector<double> MaxWaveSpeed;
+	std::vector<double> MaxWaveSpeed; //Maximal wave speed estimate for face
+	std::vector<double> FacePressure; //Pressure at each face	
 
 	//Gradients
 	std::vector<Vector> GradientT;
+	std::vector<Vector> GradientP;
 
 public:
 	//Parallel helper
@@ -131,31 +295,104 @@ public:
 	};
 
 	turbo_errt InitCalculation() {				
-		//Gas model setup		
-		//_gasModel = new PerfectGasModel(); // perfect gas gamma = 1.4
-		_gasModel = new LomonosovFortovGasModel(1); //Pb
-		_gasModel->loadConfiguration(_configuration);
-		nVariables = _gasModel->nConservativeVariables;
+		//Gas models setup
+		//List of availible gas models
+		_gasModels.resize(_configuration.GasModelsConfiguration.size());
+		for (std::pair<std::string, GasModelConfiguration> pair : _configuration.GasModelsConfiguration) {
+			int gmIndex = _configuration.GasModelNameToIndex[pair.first];
+			std::string gmName = pair.second.GasModelName;
+			if (gmName == "PerfectGasModel") {
+				_gasModels[gmIndex] = new PerfectGasModel();				
+			};
+			if (gmName == "LomonosovFortovGasModel") {
+				_gasModels[gmIndex] = new LomonosovFortovGasModel();
+			};
+
+			//Load configuration for gas model
+			_gasModels[gmIndex]->loadConfiguration(pair.second);
+		};
+
+		//TO DO set shifts instead of global nVariables constant
+		for (GasModel* gasModel : _gasModels) {			
+			nVariables = gasModel->nConservativeVariables; //TO DO generalize for now equal number of conservative variables assumed
+		};
 
 		//Allocate memory for data structures
 		Values.resize(nVariables * _grid.nCellsLocal);
 		Residual.resize(nVariables * _grid.nCellsLocal);
+		CellGasModel.resize(_grid.nCellsLocal);
 		FaceFluxes.resize(_grid.nFaces);
 		for (std::vector<double>& flux : FaceFluxes) {
 			flux.resize(nVariables);
 			for (double& v : flux) v = 0;
 		};	
 		MaxWaveSpeed.resize(_grid.nFaces);		
+		FacePressure.resize(_grid.nFaces);
 
 		//Solver settings
-		rSolver = new RiemannSolver(_gasModel);
-		//rSolver.SetGamma(_gasModel.Gamma);
-		//rSolver.SetHartenEps(0.01);
-		//rSolver.SetOperatingPressure(0.0);
+		bool isSolverSpecified = false;
+		//Instantiate solver depending on user choice
+		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
+			rSolver = new HLLCSolverGeneralEOS();
+			isSolverSpecified = true;
+		};
+		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
+			rSolver = new Roe3DSolverPerfectGas();
+			isSolverSpecified = true;
+		};
+		if (!isSolverSpecified) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver is not specified.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+		
+		//Try to bind gas models to solver
+		if (!rSolver->BindGasModels(_gasModels)) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver doesn't support specified gas models.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+		//Try to load configuration for Riemann solver
+		if (!rSolver->loadConfiguration(&_logger, _configuration.RiemannSolverConfiguration)) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver configuration load unsuccesful.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+			
+
+		//Simulation settings
+		_simulationType = _configuration.SimulationType;
+		CFL = _configuration.CFL;
+		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
+
+		//ALE settings
+		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
+		};
+		if (_configuration.ALEConfiguration.ALEMotionType == "Lagrangian") {		
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;				
+		}		
+		_ALEmethod.SetGrid(_grid);		
+
+		//Run settings
+		MaxIteration = _configuration.MaxIteration;
+		MaxTime = _configuration.MaxTime;
+		SaveSolutionSnapshotIterations = _configuration.SaveSolutionSnapshotIterations;
+		SaveSolutionSnapshotTime = _configuration.SaveSolutionSnapshotTime;	
+
+		//Initialize start moment
+		stepInfo.Time = 0.0; 
+		NextSnapshotTime = stepInfo.Time;
 
 		//Initial conditions
-		InitialConditions::InitialConditions ic;
-		GenerateInitialConditions(ic);
+		//InitialConditions::InitialConditions ic;
+		//GenerateInitialConditions(ic);
 
 		//Boundary conditions
 		if (InitBoundaryConditions() == turbo_errt::TURBO_ERROR) {
@@ -166,11 +403,7 @@ public:
 		};
 
 		//Init parallel exchange
-		InitParallelExchange();
-
-		//Initialize start moment
-		stepInfo.Time = 0.0; 
-		NextSnapshotTime = stepInfo.Time;
+		InitParallelExchange();		
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -194,7 +427,7 @@ public:
 			//Output step information
 			msg.clear();
 			msg.str(std::string());
-			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSro = "<<stepInfo.Residual[0]<<"\n";
+			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 			if (_parallelHelper.IsMaster()) {
 				std::cout<<msg.str();
@@ -229,6 +462,8 @@ public:
 				//Save snapshot
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
+				snapshotFileName<<std::fixed;
+				snapshotFileName.precision(7);								
 				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
@@ -280,6 +515,9 @@ public:
 			delete (p.second);
 		};
 
+		//Riemann solver
+		if (rSolver != NULL) delete rSolver;
+
 		//Synchronize
 		_parallelHelper.Barrier();
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished calculation finalization.");	
@@ -304,8 +542,8 @@ public:
 	}
 
 	//Bind existing grid to kernel
-	turbo_errt BindGrid(Grid& grid) {
-		_grid = grid;
+	turbo_errt BindGrid(Grid* grid) {
+		_grid = *grid;
 		PartitionGrid();
 		GenerateGridGeometry();
 		return TURBO_OK;
@@ -382,11 +620,13 @@ public:
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
 		_parallelHelper.Barrier();
-		int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], &_grid.adjncy[0], vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
-		if (result != METIS_OK) {
-			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
-			return TURBO_ERROR;
-		};							
+		if (_nProcessors < _grid.nProperCells) { //Make sure that partitioning is needed
+			int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], _grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
+			if (result != METIS_OK) {
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
+				return TURBO_ERROR;
+			};							
+		};
 
 		//Gather partitioning on every processor
 		std::vector<int> recvcounts(_nProcessors);
@@ -460,7 +700,7 @@ public:
 		//Otput result
 		msg.str(std::string());
 		msg<<"Number of local cells = "<<_grid.nCellsLocal;
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());															
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 
 		//Synchronize		
 		_parallelHelper.Barrier();
@@ -481,6 +721,7 @@ public:
 			int cellGlobalIndex = _grid.localCellIndexes[i];
 			int cellLocalIndex = i;
 			_grid.localCells[i] = &_grid.Cells[cellGlobalIndex];	
+			_grid.localCells[i]->Faces.clear();
 			_grid.cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
 		};
 
@@ -488,6 +729,7 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", _grid.localCellIndexes.size());		
 
 		//Create faces		
+		_grid.localFaces.clear();
 		int faceIndex = 0;
 		std::map<std::set<int>, int> faces;	//Face nodes to face index		
 		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {
@@ -574,60 +816,63 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
+		_grid.nFaces = faceIndex;	
+
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
-		//Generate face geometric properties		
-		_grid.nFaces = faceIndex;		
-		for (Face& face : _grid.localFaces) {
-			int index = face.GlobalIndex;						
-			_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
-		};
+		_grid.UpdateGeometricProperties();
 
-		//Update cells geometric properties
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
-			_grid.ComputeGeometricProperties(_grid.localCells[i]);
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};	
+		////Generate face geometric properties			
+		//for (Face& face : _grid.localFaces) {
+		//	int index = face.GlobalIndex;						
+		//	_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		//};
 
-		//Orient face normals			
-		for (Face& face : _grid.localFaces) {
-			int index = face.GlobalIndex;									
+		////Update cells geometric properties
+		//for (int i = 0; i < _grid.nCellsLocal; i++) {
+		//	_grid.ComputeGeometricProperties(_grid.localCells[i]);
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//};	
 
-			//If boundary face make sure dummy if FaceCell_2
-			if (face.FaceCell_1 >= _grid.nProperCells) {
-				//Swap
-				int tmp = face.FaceCell_1;
-				face.FaceCell_1 = face.FaceCell_2;
-				face.FaceCell_2 = tmp;
-			};
+		////Orient face normals			
+		//for (Face& face : _grid.localFaces) {
+		//	int index = face.GlobalIndex;									
 
-			//Orient normal
-			Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
-			Vector faceCenter = _grid.localFaces[index].FaceCenter;
-			if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
-				_grid.localFaces[index].FaceNormal *= -1;
-			};
+		//	//If boundary face make sure dummy if FaceCell_2
+		//	if (face.FaceCell_1 >= _grid.nProperCells) {
+		//		//Swap
+		//		int tmp = face.FaceCell_1;
+		//		face.FaceCell_1 = face.FaceCell_2;
+		//		face.FaceCell_2 = tmp;
+		//	};
 
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
-		};
+		//	//Orient normal
+		//	Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
+		//	Vector faceCenter = _grid.localFaces[index].FaceCenter;
+		//	if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
+		//		_grid.localFaces[index].FaceNormal *= -1;
+		//	};
+
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
+		//};
 
 
-		//Compute dummy cell geometric properties
-		for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
-			int neighbour = _grid.localCells[i]->NeigbourCells[0];
-			Cell& cell = _grid.Cells[neighbour];
-			_grid.localCells[i]->CellVolume = cell.CellVolume;
+		////Compute dummy cell geometric properties
+		//for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
+		//	int neighbour = _grid.localCells[i]->NeigbourCells[0];
+		//	Cell& cell = _grid.Cells[neighbour];
+		//	_grid.localCells[i]->CellVolume = cell.CellVolume;
 
-			//Reflect cell center over boundary face plane
-			Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
-			Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
-			Vector dummyCenter = cell.CellCenter - 2 * dR;
-			_grid.localCells[i]->CellCenter = dummyCenter;
-			//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
-		};
+		//	//Reflect cell center over boundary face plane
+		//	Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
+		//	Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
+		//	Vector dummyCenter = cell.CellCenter - 2 * dR;
+		//	_grid.localCells[i]->CellCenter = dummyCenter;
+		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -636,7 +881,7 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt InitParallelExchange() {
+	turbo_errt InitParallelExchange() {		
 		//Determine values required (TO DO Generalize) closest neighbours for now
 		std::set<int> requiredValuesCells;
 		std::set<int> requiredGradientsCells;
@@ -671,7 +916,7 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Request formation finished");	
 
 		//Init exchange
-		_parallelHelper.InitExchange();
+		_parallelHelper.InitExchange(_gasModels);
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -862,8 +1107,14 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt BindConfiguration() {
+	turbo_errt BindConfiguration(Configuration& configuration) {
+		_configuration = configuration;
 
+		//Synchronize
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished : configuration loaded programmatically");	
+
+		return turbo_errt::TURBO_OK;
 	};
 
 	turbo_errt ReadConfiguration(std::string fname) {
@@ -871,29 +1122,31 @@ public:
 		_configuration.InputCGNSFile = "";
 		_configuration.OutputCGNSFile = "result.cgns";
 
-		//Ideal gas law
-		_configuration.GasModel = CaloricallyPerfect;
+		//Availible gas models
+		_configuration.AddGasModel("Air");	
+		_configuration.AddGasModel("StainlessSteel");
+		_configuration.AddGasModel("Plumbum");
 
-		_configuration.IdealGasConstant = 8.3144621;
-		_configuration.SpecificHeatRatio = 1.4;
-		_configuration.SpecificHeatVolume = 1006.43 / 1.4;
-		_configuration.SpecificHeatPressure = 1006.43;
+		//Air (ideal gas)
+		_configuration.GasModelsConfiguration["Air"].GasModelName = "PerfectGasModel";
+		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("IdealGasConstant", 8.3144621);
+		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatRatio", 1.4);
+		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
+		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
 
-		//Solver settings
-		_simulationType = TimeAccurate;
-		CFL = 0.1;
-		RungeKuttaOrder = 1;
+		//Stainless steel
+		_configuration.GasModelsConfiguration["StainlessSteel"].GasModelName = "LomonosovFortovGasModel";
+		_configuration.GasModelsConfiguration["StainlessSteel"].SetPropertyValue("MaterialIndex", 0);		
 
-		//Run settings
-		MaxIteration = 1000000;
-		MaxTime = 10e-6;
-		SaveSolutionSnapshotIterations = 0;
-		SaveSolutionSnapshotTime = 1e-6;				
+		//Plumbum
+		_configuration.GasModelsConfiguration["Plumbum"].GasModelName = "LomonosovFortovGasModel";
+		_configuration.GasModelsConfiguration["Plumbum"].SetPropertyValue("MaterialIndex", 1);				
 
 		//Boundary conditions				
-		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
@@ -903,12 +1156,11 @@ public:
 		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0); //
 		//_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", 0); //
 		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		/*_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
 		_configuration.BoundaryConditions["OUTLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["WALL_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-
+		_configuration.BoundaryConditions["WALL_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;*/
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -962,7 +1214,7 @@ public:
 			} else {
 				//Attach needed data structures to boundary condition class
 				_boundaryConditions[bcMarker]->setGrid(_grid);
-				_boundaryConditions[bcMarker]->setGasModel(_gasModel);
+				_boundaryConditions[bcMarker]->setGasModel(_gasModels);
 
 				//Load specific configuration parameters
 				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
@@ -1015,18 +1267,23 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt GenerateInitialConditions(InitialConditions::InitialConditions& initConditions) {
+	turbo_errt GenerateInitialConditions(InitialConditions::InitialConditions* initConditions) {
 		//Attach data structures
-		initConditions.setGrid(_grid);
-		initConditions.setGasModel(_gasModel);
-
+		initConditions->setGrid(_grid);
+		initConditions->setGasModel(_gasModels);
+				
 		//For each local cell write initial conditions
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_grid.nCellsLocal; i++) {			
 			Cell* c = _grid.localCells[i];
-			for (int j = 0; j<_gasModel->nConservativeVariables; j++) {
-				std::vector<double> values = initConditions.getInitialValues(*c);
-				Values[i * _gasModel->nConservativeVariables + j] = values[j];
+
+			//Get initial values
+			std::vector<double> values = initConditions->getInitialValues(*c);						
+			for (int j = 0; j<nVariables; j++) {				
+				Values[i * nVariables + j] = values[j];
 			};
+
+			//Get material distribution
+			CellGasModel[i] = initConditions->getInitialGasModelIndex(*c);			
 		};
 
 		//Synchronize		
@@ -1038,8 +1295,8 @@ public:
 	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
 		//Open file
 		_cgnsWriter.OpenFile(fname);
-		int nv = _gasModel->nConservativeVariables;
-		std::vector<std::string> storedFields = _gasModel->GetStoredFieldsNames();
+		int nv = nVariables;
+		std::vector<std::string> storedFields = _gasModels[0]->GetStoredFieldsNames();
 
 		//Write simulation type
 
@@ -1067,8 +1324,9 @@ public:
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Field name " + fieldName);	
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);				
 			for (int i = 0; i<_grid.nCellsLocal; i++) {
+				int nmat = GetCellGasModelIndex(_grid.localCells[i]->GlobalIndex);
 				GasModel::ConservativeVariables U(&Values[i * nv]);
-				std::vector<double> storedValues = _gasModel->GetStoredValuesFromConservative(U);				
+				std::vector<double> storedValues = _gasModels[nmat]->GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
@@ -1106,7 +1364,8 @@ public:
 
 		//Pressure		
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double P = _gasModel->GetPressure(&Values[i * nv + 0]);
+			int nmat = CellGasModel[i];
+			double P = _gasModels[nmat]->GetPressure(&Values[i * nv + 0]);
 			buffer[i] = P;
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer); 
@@ -1121,7 +1380,32 @@ public:
 			double e = E - (u*u + v*v + w*w) / 2.0;	
 			buffer[i] = e;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "EnergyInternal", buffer); 
+		_cgnsWriter.WriteField(_grid, solutionName, "EnergyInternal", buffer);
+
+		//Temperature
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			double ro = Values[i * nv + 0];
+			double u = Values[i * nv + 1] / ro;
+			double v = Values[i * nv + 2] / ro;
+			double w = Values[i * nv + 3] / ro;
+			double E = Values[i * nv + 4] / ro;
+			double e = E - (u*u + v*v + w*w) / 2.0;
+			const double Cv = 130; //Pb temporary
+			buffer[i] = e / Cv;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Temperature", buffer);
+
+		//Material index
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = GetCellGasModelIndex(i);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Material", buffer);
+
+		//Quality
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::Anisotropy(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Anisotropy", buffer);
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
@@ -1134,7 +1418,7 @@ public:
 	};	
 
 	//Compute convective flux and max wave propagation speed throught each face
-	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues) {		
+	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {		
 		//Compute gradients for second order reconstruction
 		/*if (IsSecondOrder) {
 			ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
@@ -1172,8 +1456,17 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "isExternal = ", f.isExternal);
 			
 			std::vector<double> flux;
+
+			//Solution reconstruction
+			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
 			GasModel::ConservativeVariables UL;
 			GasModel::ConservativeVariables UR;
+			UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
+			UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));						
+			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
+
 			//TO DO check for indexes LOCAL vs GLOBAL for cells
 			//UL = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
 			/*msg.str("Reconstruct cell values.");
@@ -1181,46 +1474,33 @@ public:
 			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
 			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
-			UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UL reconstructed");
-			UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));
-			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "UR reconstructed");
-
-			//GasModel::ConservativeVariables UL_ = GasModel::ConservativeVariables(&cellValues[cellIndexLeft * nVariables]);
-			//GasModel::ConservativeVariables UR_;
-			//if (!f.isExternal) {			 
-			//	//If it is local face and both cells local				
-			//	if (cRight.IsDummy) {
-			//		//Dummy cell
-			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Dummy cell");	
-			//		std::vector<BoundaryConditions::BoundaryConditionResultType> resultType = _boundaryConditions[cRight.BCMarker]->bcResultTypes;				
-			//		UR_ = GasModel::ConservativeVariables(_boundaryConditions[cRight.BCMarker]->getDummyValues(UL, f));
-			//	} else {
-			//		//Ordinary cell
-			//		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Local cell");	
-			//		UR_ = GasModel::ConservativeVariables(&cellValues[cellIndexRight * nVariables]);
-			//	};
-			//} else {
-			//	//If it is interprocessor face obtain values from parallel helper
-			//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Requested cell");	
-			//	int globalIndex = cRight.GlobalIndex;
-			//	UR_ = _parallelHelper.RequestedValues[globalIndex];
-			//};
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/						
 
 			//Compute flux
-			RiemannProblemSolutionResult result = rSolver->Solve( UL,  UR, f);			
+			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, ALEindicators[i]);			
+			//Store interface velocity and pressure for ALE
+			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
+			_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
+			//Store wave speeds
+			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
+			//Store flux
+			fluxes[f.GlobalIndex] = result.Fluxes;
+			
+			if (IsDummyCell(f.FaceCell_2)) {
+				//Correct dummy face flux
+				//fluxes[f.GlobalIndex][0] = 0;
+				//fluxes[f.GlobalIndex][1] = 0;
+				//fluxes[f.GlobalIndex][2] = 0;
+				//fluxes[f.GlobalIndex][3] = 0;
+				//fluxes[f.GlobalIndex][4] = 0;
+			};
+
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
 				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
 				<<f.FaceNormal.x<<","<<f.FaceNormal.y<<","<<f.FaceNormal.z<<")";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
-
-			//Store wave speeds
-			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
-
-			//Store flux
-			fluxes[f.GlobalIndex] = result.Fluxes;
+					
 			
 			//Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
 			//if (f.isExternal) {				
@@ -1268,12 +1548,34 @@ public:
 	};	
 
 	////Compute residual for each cell		
-	void ComputeResidual(std::vector<double>& residual, std::vector<double>& cellValues) {		
+	void ComputeResidual(std::vector<double>& residual, std::vector<double>& cellValues) {	
+		//Compute ALE indicator values
+		std::vector<double> ALEindicators(_grid.nFaces, 0);
+		for (Face& f : _grid.localFaces) {
+			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
+				ALEindicators[f.GlobalIndex] = 1; // all move
+			};
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
+				ALEindicators[f.GlobalIndex] = 0;
+				if (nmatL != nmatR) { //move material interface
+					ALEindicators[f.GlobalIndex] = 1;
+				};
+				if (IsDummyCell(f.FaceCell_2)) { // move boundaries
+					ALEindicators[f.GlobalIndex] = 1;
+				};
+			};
+			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
+				ALEindicators[f.GlobalIndex] = 0;
+			};
+		};
+
 		//Compute convective fluxes and max wave speeds
 		for (std::vector<double>& flux : FaceFluxes) {
 			for (double& v : flux) v = 0;
 		};
-		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues);
+		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
 		////Compute gradients
@@ -1281,6 +1583,12 @@ public:
 
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
+
+		//ALE step mesh transformation
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+			//Compute node velocities
+			_ALEmethod.ComputeNodeVelocities();	
+		};		
 
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1296,11 +1604,19 @@ public:
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
-				};				
+				};		
+
+				//Mesh deformation contribution
+				if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+					double sweptVolume = _ALEmethod.CalcSweptVolumeRate(face);
+					for (int j = 0; j<nVariables; j++) {						
+						residual[cellIndex * nVariables + j] += sweptVolume * cellValues[cellIndex * nVariables + j] * fluxDirection;
+					};					
+				};
 			};
 		};
 
-		return;
+ 		return;
 	};
 
 	//Compute spectral radii estimate for each cell
@@ -1378,7 +1694,7 @@ public:
 			double& timeStep = p.second;
 			if (timeStep < stepInfo.TimeStep) stepInfo.TimeStep = timeStep;
 		}
-		stepInfo.TimeStep = _parallelHelper.Min(stepInfo.TimeStep);
+		stepInfo.TimeStep = _parallelHelper.Min(stepInfo.TimeStep);		
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1433,7 +1749,7 @@ public:
 			for (int i = 0; i < nVariables; i++) {
 				Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[nStages-1];
 				stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
-			};			
+			};					
 		};
 
 		//Compute RMS residual		
@@ -1441,6 +1757,15 @@ public:
 			stepInfo.Residual[i] = _parallelHelper.SumDouble(stepInfo.Residual[i]);
 			stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);
 		};
+
+		//ALE step mesh transformation
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
+			//Move mesh
+			_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+
+			//Regenerate geometric entities
+			GenerateGridGeometry();
+		};		
 
 		//Advance total time
 		stepInfo.Time += stepInfo.TimeStep;
@@ -1453,7 +1778,7 @@ public:
 	void ImplicitTimeStep() {
 	};
 	
-	//Compute scalar function gradient in each cell	
+	////Compute scalar function gradient in each cell	
 	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {
 	//	//Allocate memory for gradients
 	//	grads.resize(_grid.nCellsLocal);		
@@ -1471,8 +1796,7 @@ public:
 	//		//Add all neighbours
 	//		for (int j = 0; j<cell.NeigbourCells.size(); j++) {				
 	//			Cell& nCell = _grid.Cells[cell.NeigbourCells[j]];
-	//			std::vector<double> nU;
-	//			if (nCell.
+	//			std::vector<double> nU;				
 	//			if (nCell.IsDummy) {
 	//			};
 	//			if (face.isExternal) {
@@ -1527,8 +1851,8 @@ public:
 				msg<<"Cells = "<<globalIndex;
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 				Cell& cell = _grid.Cells[globalIndex];				
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );
-				return _boundaryConditions[cell.BCMarker]->getDummyValues(Values, cell);
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );				
+				return _boundaryConditions[cell.BCMarker]->getDummyValues(0, Values, cell); //TO DO now boundary always 0 gas model
 			} else {
 				//If proper cell return part of Values array				
 				if (localIndex == -1) {
@@ -1539,13 +1863,42 @@ public:
 					//msg<<"Local Index = "<<localIndex;
 					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
 				};
-				return std::vector<double>(&Values[localIndex * _gasModel->nConservativeVariables], &Values[localIndex * _gasModel->nConservativeVariables] + _gasModel->nConservativeVariables);
+				int nmat = CellGasModel[localIndex];
+				return std::vector<double>(&Values[localIndex * _gasModels[nmat]->nConservativeVariables], &Values[localIndex * _gasModels[nmat]->nConservativeVariables] + _gasModels[nmat]->nConservativeVariables);
 			};
 		} else {
 			//Return result of interprocessor exchange
 			return _parallelHelper.RequestedValues[globalIndex];
 		};
 	};
+
+	//Get cell gas model index
+	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
+		if (IsLocalCell(globalIndex)) {
+			if (IsDummyCell(globalIndex)) {
+				//If dummy cell compute on the go				
+				Cell& cell = _grid.Cells[globalIndex];
+				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
+				int nmat = CellGasModel[nCellIndex]; //Neighbour cell for now
+				//nmat = 0; //Air for now
+				return nmat;
+			} else {
+				//If proper cell return part of Values array				
+				if (localIndex == -1) {
+					//If local index is unknown determine it
+					//Lower perfomance WARNING
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
+				};
+				int nmat = CellGasModel[localIndex];
+				return nmat;
+			};
+		} else {
+			//Return result of interprocessor exchange
+			return _parallelHelper.RequestedGasModelIndex[globalIndex];
+		};
+	};
+
+
 };
 
 #endif

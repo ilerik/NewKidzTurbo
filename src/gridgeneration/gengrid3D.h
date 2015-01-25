@@ -4,7 +4,7 @@
 #include "grid.h"
 #include "cgnslib.h"
 #include "parallelHelper.h"
-#include <assert.h>
+#include <cassert>
 
 inline int GetCartIndex(int i, int j, int k, int N, int M, int K) {	
 	i = i % N;

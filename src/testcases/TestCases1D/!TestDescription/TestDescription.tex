@@ -1,0 +1,42 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage[OT1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\author{Ilya Eriklintsev}
+\title{Riemann problem for the Euler equations test cases description}
+\begin{document}
+\section{Test case motivation}
+Five Riemann problems are selected to test the performance of the Riemann
+solver and the influence of the initial guess for pressure. The tests are
+also used to illustrate some typical wave patterns resulting from the solution
+of the Riemann problem. Table 4.1 shows the data for all five tests in terms
+of primitive variables. In all cases the ratio of specific heats is ? = 1.4. The
+source code for the exact Riemann solver, called HE-E1RPEXACT, is part of
+the library NUMERICA [519]; a listing is given in Sect. 4.9.
+Test 1 is the so called Sod test problem [453]; this is a very mild test and
+its solution consists of a left rarefaction, a contact and a right shock. Fig.
+4.7 shows solution profiles for density, velocity, pressure and specific internal
+energy across the complete wave structure, at time t = 0.25 units. Test 2,
+called the 123 problem, has solution consisting of two strong rarefactions and
+a trivial stationary contact discontinuity; the pressure p? is very small (close
+to vacuum) and this can lead to difficulties in the iteration scheme to find p?
+numerically. Fig. 4.8 shows solution profiles. Test 2 is also useful in assessing
+the performance of numerical methods for low density flows, see Einfeldt et.
+al. [182]. Test 3 is a very severe test problem, the solution of which contains a
+left rarefaction, a contact and a right shock; this test is actually the left half
+of the blast wave problem of Woodward and Colella [584], Fig. 4.9 shows solution
+profiles. Test 4 is the right half of the Woodward and Colella problem; its
+solution contains a left shock, a contact discontinuity and a right rarefaction,
+as shown in Fig. 4.10. Test 5 is made up of the right and left shocks emerging
+from the solution to tests 3 and 4 respectively; its solution represents the collision
+of these two strong shocks and consists of a left facing shock (travelling
+very slowly to the right), a right travelling contact discontinuity and a right
+travelling shock wave. Fig. 4.11 shows solution profiles for Test 5.
+\section{Test case description and setting}
+Current test case composed of five independent tests.
+\section{Expected result and scoring procedure}
+\end{document}

@@ -1,17 +1,14 @@
-#ifndef TURBO_MAINSOLVER_CONFIGURATION_GasModelConfiguration
-#define TURBO_MAINSOLVER_CONFIGURATION_GasModelConfiguration
+#ifndef TURBO_MAINSOLVER_CONFIGURATION_ALEConfiguration
+#define TURBO_MAINSOLVER_CONFIGURATION_ALEConfiguration
 
 #include "cgnslib.h"
 
-class GasModelConfiguration
+class ALEConfiguration
 {
 	std::map<std::string, double> _properties;
 public:
-	//Gas model name (type)
-	std::string GasModelName;
-
-	//CGNS style types
-	ModelType_t GasModelType;
+	//ALE motion type
+	std::string ALEMotionType;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {
