@@ -14,6 +14,7 @@ protected:
 	Configuration _configuration; //Configuration object
 public:
 	//Test parameters
+	static const int nCells;
 	static const double Lx;
 	static const double TimeMax;
 
@@ -29,7 +30,7 @@ public:
 
 	//Prepare computational grid
 	void PrepareGrid() {		
-		_grid = GenGrid1D(_kernel->getParallelHelper(), 4, 0.0, Lx, false);
+		_grid = GenGrid1D(_kernel->getParallelHelper(), nCells, 0.0, Lx, false);
 		_kernel->BindGrid(&_grid);
 	};
 
@@ -38,6 +39,9 @@ public:
 		//Hardcode configuration for now
 		_configuration.InputCGNSFile = "";
 		_configuration.OutputCGNSFile = "result.cgns";
+
+		//Rieman solver settings
+		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Roe;
 
 		//Availible gas models
 		_configuration.AddGasModel("Air");			
@@ -64,7 +68,7 @@ public:
 		//Run settings
 		_configuration.MaxIteration = 1000000;
 		_configuration.MaxTime = TimeMax;
-		_configuration.SaveSolutionSnapshotIterations = 1;
+		_configuration.SaveSolutionSnapshotIterations = 0;
 		_configuration.SaveSolutionSnapshotTime = 0;			
 
 		_kernel->BindConfiguration(_configuration);	
@@ -173,6 +177,7 @@ public:
 }; //TestCase
 
 //Test constant's
+const int TestCase1::nCells = 1000;
 const double TestCase1::Lx = 1.0;
 const double TestCase1::TimeMax = 0.2;
 

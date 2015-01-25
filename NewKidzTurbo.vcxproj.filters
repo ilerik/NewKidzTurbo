@@ -216,6 +216,12 @@
     <ClInclude Include="src\mainsolver\Configuration\ALEConfiguration.h">
       <Filter>Header Files\MainSolver\Configuration</Filter>
     </ClInclude>
+    <ClInclude Include="src\mainsolver\Configuration\RiemannSolverConfiguration.h">
+      <Filter>Header Files\MainSolver\Configuration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h">
+      <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

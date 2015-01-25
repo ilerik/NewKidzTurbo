@@ -330,7 +330,43 @@ public:
 		FacePressure.resize(_grid.nFaces);
 
 		//Solver settings
-		rSolver = new RiemannSolver(_gasModels);			
+		bool isSolverSpecified = false;
+		//Instantiate solver depending on user choice
+		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
+			rSolver = new HLLCSolverGeneralEOS();
+			isSolverSpecified = true;
+		};
+		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
+			rSolver = new Roe3DSolverPerfectGas();
+			isSolverSpecified = true;
+		};
+		if (!isSolverSpecified) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver is not specified.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+		
+		//Try to bind gas models to solver
+		if (!rSolver->BindGasModels(_gasModels)) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver doesn't support specified gas models.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+		//Try to load configuration for Riemann solver
+		if (!rSolver->loadConfiguration(&_logger, _configuration.RiemannSolverConfiguration)) {
+			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver configuration load unsuccesful.");
+			//Halt programm		
+			FinalizeCalculation();
+			Finalize();
+			exit(0);
+		};
+			
+
+		//Simulation settings
 		_simulationType = _configuration.SimulationType;
 		CFL = _configuration.CFL;
 		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
@@ -478,6 +514,9 @@ public:
 		for (std::pair<int, BoundaryConditions::BoundaryCondition*> p : _boundaryConditions) {
 			delete (p.second);
 		};
+
+		//Riemann solver
+		if (rSolver != NULL) delete rSolver;
 
 		//Synchronize
 		_parallelHelper.Barrier();

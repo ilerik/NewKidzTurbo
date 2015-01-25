@@ -157,6 +157,7 @@
     <ClInclude Include="src\mainsolver\Configuration\BoundaryConditionConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GasModelConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
+    <ClInclude Include="src\mainsolver\Configuration\RiemannSolverConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h" />
     <ClInclude Include="src\mainsolver\grid.h" />
     <ClInclude Include="src\mainsolver\kernel.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="src\mainsolver\patch.h" />
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
+    <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />

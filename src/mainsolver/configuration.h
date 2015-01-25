@@ -4,6 +4,7 @@
 #include "BoundaryConditionConfiguration.h"
 #include "GasModelConfiguration.h"
 #include "ALEConfiguration.h"
+#include "RiemannSolverConfiguration.h"
 #include "grid.h"
 
 //Class that represents configuration file methods and structure
@@ -39,6 +40,9 @@ public:
 	
 	//ALE configuration
 	ALEConfiguration ALEConfiguration;
+
+	//Riemann solver configuration
+	RiemannSolverConfiguration RiemannSolverConfiguration;
 
 	//Run settings
 	int MaxIteration; //Maximum number of iterations

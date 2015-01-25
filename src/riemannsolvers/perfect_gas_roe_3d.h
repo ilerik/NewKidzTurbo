@@ -4,31 +4,85 @@
 #include "datatypes.h"
 #include "basetypes.h"
 #include "grid.h"
+#include "RiemannSolver.h"
 #include "GasModel.h"
+#include "PerfectGasModel.h"
 
-class Roe3DSolverPerfectGas {
+class Roe3DSolverPerfectGas : public RiemannSolver {
+	//Internal storage //TO DO remove
+	Vector velocity; //Velocity estimate
+	double MaxEigenvalue; //
+
 	//Required info
-	double gamma;
-	double eps;	
-	double opP;
+	double gamma; //Specific heat ratio (inherited from gas model)
+	double eps;	//Harten entropy correction coefficient (optional, 0 by default)
+	double operatingPressure; //Operating pressure (optional, 0 by default)
 public:	
-	Roe3DSolverPerfectGas(){
-		//Defaults
-		eps = 0.05;
-		gamma = 0;
-		opP = 0;
+	using RiemannSolver::RiemannSolver; //Inherit constructor
+
+	//Check gas models
+	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) {
+		bool isCorrect = true;
+
+		//Pointer to perfect gas model
+		PerfectGasModel* perfectGasModel;
+		std::vector<double> gammas;
+
+		//Only several perfect gas models with common value of gamma allowed
+		for (GasModel* gasModel : gasModels) {
+			//Check if it's perfect gas 
+			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel)) {
+				//and save gamma value
+				gammas.push_back(perfectGasModel->Gamma);
+			} else {
+				//It's not perfect gas model
+				return false;
+			};
+		};
+
+		//Check if all gammas are the same
+		for (int i = 0; i<gammas.size() - 1; i++) {
+			if (gammas[i] != gammas[i-1]) {
+				isCorrect = false;
+				break;
+			};
+		};
+
+		//If everything is ok bind gas models
+		if (isCorrect) {
+			_gasModels = gasModels;
+			//And set gamma
+			gamma = gammas[0];
+		};
+		return isCorrect;
 	};
 
-	void SetGamma(double _g) {
-		gamma = _g;
-	};
+	//Load settings from configuration object
+	bool loadConfiguration(Logger* logger, RiemannSolverConfiguration configuration) {
+		//Load properties
+		std::pair<double, bool> res;
 
-	void SetHartenEps(double _eps) {
-		eps = _eps;
-	};
+		//Load operating pressure
+		res = configuration.GetPropertyValue("OperatingPressure");
+		if (res.second) {
+			operatingPressure = res.first;
+		} else {
+			//Default
+			operatingPressure = 0;
+			logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Roe3DSolverPerfectGas Riemann solver operating pressure is not specified, default value of 0 assumed.");
+		};
 
-	void SetOperatingPressure(double _opP) {
-		opP = _opP;
+		//Load Harten's epsilon
+		res = configuration.GetPropertyValue("HartenEpsilon");
+		if (res.second) {
+			eps = res.first;
+		} else {
+			//Default
+			eps = 0;
+			logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Roe3DSolverPerfectGas Riemann solver Harten's correction epsilon is not specified, default value of 0 assumed.");
+		};
+
+		return true;
 	};
 
 	//Numerical flux
@@ -40,7 +94,7 @@ public:
 		double vy = U.rov/ro;
 		double vz = U.row/ro;
 		double roE = U.roE;	//ro*e
-		double p = (gamma-1.0)*(roE-ro*(vx*vx+vy*vy+vz*vz)/2.0) - opP;		
+		double p = (gamma-1.0)*(roE-ro*(vx*vx+vy*vy+vz*vz)/2.0) - operatingPressure;		
 		double vn = vx*n.x + vy*n.y + vz*n.z;
 
 		/*res[0] = n.x * (ro*vx) + n.y*(ro*vy) + n.z*(ro*vz);		
@@ -89,7 +143,7 @@ public:
 		double ro = sqrt(ro_l*ro_r);          // (Roe averaged) density		
 		double ql  = sqrt(ro_l)/(sqrt(ro_l)+sqrt(ro_r));
 		double qr  = sqrt(ro_r)/(sqrt(ro_l)+sqrt(ro_r));
-		Vector velocity = ql*velocity_l + qr*velocity_r;	// (Roe averaged) velocity	
+		velocity = ql*velocity_l + qr*velocity_r;	// (Roe averaged) velocity	
 		double h  = ql*h_l + qr*h_r;  // (Roe averaged) total enthalpy
 		//Proceed to solution
 		double phi2 = 0.5*(gamma - 1)*(velocity*velocity);
@@ -157,13 +211,10 @@ public:
 		double dro_dT =  - ro / T;
 		double Ur = uw;		
 		double teta = (1.0/(Ur*Ur) - dro_dT/(ro*Cp));*/		
-	
 
 		MaxEigenvalue = eig_max;	
 		return res;
 	};
-
-	
 
 	//fabs() and Harten's entropy correction procedure
 	double Harten(double z, double eps) 
@@ -173,9 +224,19 @@ public:
 		return z;
 	};
 
+	//Solve riemann problem	
+	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f, double ALEindicator) {
+		RiemannProblemSolutionResult result;
+		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
+		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
 
-	//Public properties
-	double MaxEigenvalue;
+		result.Fluxes = ComputeFlux(UL, UR, f);
+		result.MaxEigenvalue = MaxEigenvalue;
+		result.Velocity = velocity;
+		result.Pressure = 0;
+
+		return result;
+	};
 };
 
 #endif
