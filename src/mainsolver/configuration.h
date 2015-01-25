@@ -3,6 +3,8 @@
 
 #include "BoundaryConditionConfiguration.h"
 #include "GasModelConfiguration.h"
+#include "ALEConfiguration.h"
+#include "RiemannSolverConfiguration.h"
 #include "grid.h"
 
 //Class that represents configuration file methods and structure
@@ -32,7 +34,21 @@ public:
 	std::string InitialConditionsSolution;	
 
 	//Simulation parameters
+	SimulationType_t SimulationType; //Simulation type
+	double CFL; //CFL number
+	int RungeKuttaOrder; //Runge-Kutta time stepping scheme order
+	
+	//ALE configuration
+	ALEConfiguration ALEConfiguration;
 
+	//Riemann solver configuration
+	RiemannSolverConfiguration RiemannSolverConfiguration;
+
+	//Run settings
+	int MaxIteration; //Maximum number of iterations
+	double MaxTime;   //Maximum computational time [s]
+	int SaveSolutionSnapshotIterations; //Save solution snapshot after number of iterations
+	double SaveSolutionSnapshotTime;	//Save solution snapshot after time interval
 
 	//Set of equations settings	
 	GoverningEquationsType_t GoverningEquations;

@@ -57,6 +57,7 @@ public:
 		if ((!isCvSet) && (!isCpSet)) {
 			//Error
 			//TO DO
+			throw 1;
 		};
 				
 	};

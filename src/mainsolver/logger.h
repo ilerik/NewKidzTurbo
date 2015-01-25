@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include "parallelHelper.h"
 
 //All possible logger mesage types
@@ -20,11 +21,13 @@ enum class LoggerMessageLevel {
 
 //Implementation of logging mechanism
 class Logger {
+private:
+	Logger& operator=(const Logger& logger); //non copyable
 	int _nProcessors;
 	int _rank;
 	ParallelHelper* _parallelHelper;
 	std::ofstream _output;
-public:	
+public:		
 	int InitLogging(ParallelHelper& parallelHelper, std::string filename) {
 		_parallelHelper = &parallelHelper;
 		_nProcessors = _parallelHelper->getProcessorNumber();
