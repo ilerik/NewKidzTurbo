@@ -58,8 +58,7 @@ public:
 			//Error
 			//TO DO
 			throw 1;
-		};
-				
+		};		
 	};
 };
 
