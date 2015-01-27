@@ -213,19 +213,20 @@ void runImpactShockTest2D(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	/*double M = 2.5;
-	double ro = 0.084;
-	double p = 0.5 * 101.325e3;
-	double gamma = 1.67;
-	double kro = (2*gamma*M*M - (gamma - 1.0)) / (gamma + 1.0);
-	double kp = ((gamma + 1.0) * M * M) / ((gamma - 1.0)*M*M + 2.0);
-	double roShock = ro * kro;
-	double pShock = p * kp;
-	double uShock = sqrt(gamma * pShock / roShock) * M;
-	std::cout<<"roShock = "<<roShock<<std::endl;
-	std::cout<<"uShock = "<<uShock<<std::endl;
-	std::cout<<"pShock = "<<pShock / 101.325e3 <<std::endl;*/
-	return 0;
+	//double M = 2.5;
+	////double ro = 0.084;
+	//double ro = 2.74;
+	//double p = 0.5 * 101.325e3;
+	//double gamma = 1.67;
+	//double kro = (2*gamma*M*M - (gamma - 1.0)) / (gamma + 1.0);
+	//double kp = ((gamma + 1.0) * M * M) / ((gamma - 1.0)*M*M + 2.0);
+	//double roShock = ro * kro;
+	//double pShock = p * kp;
+	//double uShock = sqrt(gamma * pShock / roShock) * M;
+	//std::cout<<"roShock = "<<roShock<<std::endl;
+	//std::cout<<"uShock = "<<uShock<<std::endl;
+	//std::cout<<"pShock = "<<pShock / 101.325e3 <<std::endl;
+	//return 0;
 	TestCasesRMI::TestCase1 test;
 	test.RunTest(&argc, &argv);
 	//TestCases1D::TestCase1 test;

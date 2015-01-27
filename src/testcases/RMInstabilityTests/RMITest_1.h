@@ -171,19 +171,19 @@ public:
 			double ro = 0;
 			double roE = 0;
 			if (y <= yInterface) {
-				//Heavy fluid
-				ro = roHeavy;
+				//Light fluid
+				ro = roLight;
 				v = 0;			
 				e = pressure / ((gamma-1) * ro);
 			};
 			if ((y > yInterface) && (y <= yShockWave)) {
-				//Light fluid at rest
-				ro = roLight;
+				//Heavy fluid at rest
+				ro = roHeavy;
 				v = 0;						
 				e = pressure / ((gamma-1) * ro);
 			};
 			if (y > yShockWave) {
-				//Shock wave in light fluid
+				//Shock wave in heavy fluid
 				ro = roShock;
 				v = -uShock;
 				e = pShock / ((gamma-1) * ro);
@@ -205,13 +205,13 @@ public:
 }; //TestCase
 
 //Test constant's 
-const int TestCase1::nCellsX = 100;
+const int TestCase1::nCellsX = 200;
 const int TestCase1::nCellsY = 800;
 const double TestCase1::xMax = TestCase1::ModesNumber * (TestCase1::lambdaX * 0.5);
 const double TestCase1::xMin = TestCase1::ModesNumber * (-TestCase1::lambdaX * 0.5);
 const double TestCase1::yMax = 3 * 1e-2; //[cm]
 const double TestCase1::yMin = -4 * 1e-2; //[cm]
-const double TestCase1::TimeMax = 0.03 * 1e-3; // [ms]
+const double TestCase1::TimeMax = 0.05 * 1e-3; // [ms]
 
 //Density, pressure and gamma for mixing fluids
 const double TestCase1::atm = 101.325e3; // std atmosphere pressure [Pa]
@@ -222,18 +222,18 @@ const double TestCase1::gamma = 1.67;
 
 //Initial pertrubation parameters
 const int TestCase1::ModesNumber = 1; //Number of modes
-const double TestCase1::a0 = 0.5 * 1e-2; //Pertrubation amplitude [cm] 
+const double TestCase1::a0 = -0.25 * 1e-2; //Pertrubation amplitude [cm] 
 const double TestCase1::lambdaX = 0.8 * 1e-2; //Wave number [cm]
 
 //Shock wave parameters (in lighter fluid)
 const double TestCase1::MachNumber = 2.5;
 const double TestCase1::SoundSpeedLightFluid = std::sqrt(TestCase1::gamma * TestCase1::pressure / TestCase1::roLight);
-//const double TestCase1::pShock = 3.78*atm; //[atm]
-//const double TestCase1::roShock = 0.226; //[kg/m^3]
-//const double TestCase1::uShock = 1580; //[m/s]
 const double TestCase1::pShock = 1.34848*atm; //[atm]
-const double TestCase1::roShock = 0.635663; //[kg/m^3]
-const double TestCase1::uShock = 1497.84; //[m/s]
+const double TestCase1::roShock = 20.7347; //[kg/m^3]
+const double TestCase1::uShock = 262.259; //[m/s]
+//const double TestCase1::pShock = 1.34848*atm; //[atm]
+//const double TestCase1::roShock = 0.635663; //[kg/m^3]
+//const double TestCase1::uShock = 1497.84; //[m/s]
 
 }; //namespace
 
