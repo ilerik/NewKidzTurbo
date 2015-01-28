@@ -67,6 +67,9 @@
     <Filter Include="Header Files\TestCases\TestCases1D">
       <UniqueIdentifier>{2c32ba89-a344-4f0e-94bf-d541f43a8db5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases\RMInstabilityTests">
+      <UniqueIdentifier>{310677d9-61c0-426a-aa4f-72c809867636}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -221,6 +224,9 @@
     </ClInclude>
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h">
+      <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -42,7 +42,7 @@ inline std::vector<double> abs(const std::vector<double>& a) {
 	return res;
 };
 
-const double PI = 3.1459;
+const double PI = std::atan(1)*4;
 
 //Basic type definitions
 //General exception
