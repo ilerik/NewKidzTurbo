@@ -165,7 +165,7 @@ public:
 			double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * x);
 
 			//Position of shock wave (y = 2*a0)
-			double yShockWave = a0;
+			double yShockWave = std::abs(a0);
 				
 			//Values			
 			double ro = 0;
