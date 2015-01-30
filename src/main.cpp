@@ -18,8 +18,8 @@
 #include "testcases\TestCases1D\TestCase1D_ALE_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_2.h"
 #include "testcases\RMInstabilityTests\RMITest_1.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb_1.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
+#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -238,7 +238,8 @@ int main(int argc, char *argv[]) {
 	//TestCases1D::TestCaseALE2 test;
 	//test.RunTest(&argc, &argv);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test;
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
+	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(500);
 	test.RunTest(&argc, &argv);
 	return 0;
 	//runPeriodicTest2D(argc, argv);

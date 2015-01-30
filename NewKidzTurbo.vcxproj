@@ -180,6 +180,7 @@
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
     <ClInclude Include="src\stdafx.h" />
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb_1.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />

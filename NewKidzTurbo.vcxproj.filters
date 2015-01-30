@@ -249,6 +249,9 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h">
       <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
