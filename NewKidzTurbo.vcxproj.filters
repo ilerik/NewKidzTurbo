@@ -237,6 +237,9 @@
     <ClInclude Include="src\ALEmethod\ALEMethod.h">
       <Filter>Header Files\ALEMethod</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

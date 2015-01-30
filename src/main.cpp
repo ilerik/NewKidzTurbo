@@ -16,6 +16,7 @@
 //Test cases
 #include "testcases\TestCases1D\TestCase1D_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_1.h"
+#include "testcases\TestCases1D\TestCase1D_ALE_2.h"
 #include "testcases\RMInstabilityTests\RMITest_1.h"
 
 template< typename T >
@@ -232,7 +233,7 @@ int main(int argc, char *argv[]) {
 	//test.RunTest(&argc, &argv);
 	//TestCases1D::TestCase1 test;
 	//test.RunTest(&argc, &argv);
-	TestCases1D::TestCaseALE1 test;
+	TestCases1D::TestCaseALE2 test;
 	test.RunTest(&argc, &argv);
 	return 0;
 	//runPeriodicTest2D(argc, argv);
