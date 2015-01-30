@@ -1244,16 +1244,20 @@ public:
 
 		//Temperature
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double ro = Values[i * nv + 0];
-			double u = Values[i * nv + 1] / ro;
-			double v = Values[i * nv + 2] / ro;
-			double w = Values[i * nv + 3] / ro;
-			double E = Values[i * nv + 4] / ro;
-			double e = E - (u*u + v*v + w*w) / 2.0;
-			const double Cv = 130; //Pb temporary
-			buffer[i] = e / Cv;
+			int nmat = CellGasModel[i];
+			double T = _gasModels[nmat]->GetTemperature(&Values[i * nv + 0]);
+			buffer[i] = T;
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Temperature", buffer);
+
+		//Phase information
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			int nmat = CellGasModel[i];
+			GasModel::MediumPhase phase = _gasModels[nmat]->GetPhase(&Values[i * nv + 0]);
+			int indicator = phase == GasModel::MediumPhase::AboveMeltingPoint;
+			buffer[i] = indicator;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Phase", buffer);
 
 		//Material index
 		for (int i = 0; i<_grid.nCellsLocal; i++) {

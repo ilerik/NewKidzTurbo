@@ -12,6 +12,8 @@ private:
     //    11 - Cd  12 - Ta    13 - W     14 - UO2     15 - Ti
 	//    16 - Au  17 - LiF   18 - corund 19 - quartz  20 - lix
 	int _nmat; // Index of material
+	double _Cv;
+	double _meltingTemperature;
 public:
 	//Constructor specifies material to use
 	LomonosovFortovGasModel() {
@@ -34,6 +36,21 @@ public:
 		_nmat = res.first;
 		if (!res.second) {
 			//Error TO DO
+			throw 1;
+		};
+
+		res = conf.GetPropertyValue("SpecificHeatVolume");
+		_Cv = res.first;
+		if (!res.second) {
+			//Error TO DO
+			throw 1;
+		};
+
+		res = conf.GetPropertyValue("MeltingTemperature");
+		_meltingTemperature = res.first;
+		if (!res.second) {
+			//Error TO DO
+			throw 1;
 		};
 	};
 
@@ -73,7 +90,26 @@ public:
 		soundspeed *= 1000; //km\s -> m\s	
 	};
 
-	//Get temperature
+	//Obtain medium temperature
+	virtual double GetTemperature(GasModel::ConservativeVariables U) {
+		double ro = U.ro;
+		double u = U.rou / ro;
+		double v = U.rov / ro;
+		double w = U.row / ro;	
+		double e = (U.roE / ro) - (u*u + v*v + w*w) / 2.0;
+		double T = e / _Cv;
+		return T;
+	};
+
+	//Obtain information about phase
+	virtual GasModel::MediumPhase GetPhase(GasModel::ConservativeVariables U) {
+		double T = GetTemperature(U);
+		if (T >= _meltingTemperature) {
+			return GasModel::MediumPhase::AboveMeltingPoint; 
+		} else {
+			return GasModel::MediumPhase::BelowMeltingPoint;
+		};
+	};
 
 	//Get internal energy	
 	struct EOSIdentityParams {

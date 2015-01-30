@@ -73,6 +73,9 @@
     <Filter Include="Header Files\ALEMethod">
       <UniqueIdentifier>{1d206101-17d5-4058-9666-5d6f89c05880}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases\MetalsCollisionTests">
+      <UniqueIdentifier>{b4120931-63de-4a48-91a5-e8a4daa358b5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -239,6 +242,12 @@
     </ClInclude>
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h">
       <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb_1.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
