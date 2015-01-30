@@ -13,7 +13,7 @@ namespace BoundaryConditions {
 	{
 		Dirichlet, //Fixed value
 		Neumann    //Fixed flux
-	};
+	};	
 
 	//Base class for all boundary conditions
 	class BoundaryCondition {
@@ -24,6 +24,9 @@ namespace BoundaryConditions {
 	
 		//Result types
 		std::vector<BoundaryConditionResultType> bcResultTypes;
+
+		//Boundary movement type
+		BoundaryConditionMovementType movementType;
 
 		virtual ~BoundaryCondition() {};
 
@@ -41,7 +44,7 @@ namespace BoundaryConditions {
 			_gasModels = gasModels;
 		};
 
-		//virtual void setRiemannSolver(RiemannSolver& rSolver) = 0;
+		//Load configuration and check if it's applicable and correct
 		virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) = 0;
 	};
 

@@ -83,7 +83,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases;src\testcases\RMInstabilityTests;$(CudaToolkitDir)/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases;src\testcases\RMInstabilityTests;src\ALEmethod;$(CudaToolkitDir)/include</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>src/stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -120,7 +120,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases;src\testcases\RMInstabilityTests;$(CudaToolkitDir)/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>libs\boost_1_55_0;libs\alglib-3.8.0.cpp\cpp\src;libs\cgnslib_3.1.4\src;src\utility;src\mainsolver;src;src\turbulentmodels;src\riemannsolvers;src\gridloading;src\gridgeneration;src\postprocessing;src\linearsolvers;src\mainsolver\Configuration;src\gasmodels;src\initialconditions;src\meshmovement;src\boundaryconditions;libs\blas;libs\MicrosoftMPI\Inc;libs\parmetis-4.0.3\include;libs\parmetis-4.0.3\metis\include;C:\Program Files (x86)\Intel\ComposerXE-2011\mkl\include;C:\Program Files\Intel\MKL\10.2.6.037\include;D:\Libraries\boost_1_57_0;src\testcases\TestCases1D;src\testcases;src\testcases\RMInstabilityTests;src\ALEmethod;$(CudaToolkitDir)/include</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -138,6 +138,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\ALEmethod\ALEMethod.h" />
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
@@ -182,6 +183,7 @@
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />

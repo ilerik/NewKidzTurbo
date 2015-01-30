@@ -70,6 +70,9 @@
     <Filter Include="Header Files\TestCases\RMInstabilityTests">
       <UniqueIdentifier>{310677d9-61c0-426a-aa4f-72c809867636}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\ALEMethod">
+      <UniqueIdentifier>{1d206101-17d5-4058-9666-5d6f89c05880}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -227,6 +230,12 @@
     </ClInclude>
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h">
       <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ALEmethod\ALEMethod.h">
+      <Filter>Header Files\ALEMethod</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

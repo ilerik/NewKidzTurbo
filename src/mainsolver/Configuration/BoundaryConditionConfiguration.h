@@ -1,12 +1,23 @@
 #ifndef TURBO_MAINSOLVER_CONFIGURATION_BoundaryConditionConfiguration
 #define TURBO_MAINSOLVER_CONFIGURATION_BoundaryConditionConfiguration
 
+//Boundary movement type
+enum class BoundaryConditionMovementType {
+	Fixed,
+	FreeSurface,
+	PrescribedMotion
+};
+
+//Boundary condition configuration
 class BoundaryConditionConfiguration
 {
 	std::map<std::string, double> _properties;
 public:
 	//CGNS style boundary condition type
 	BCType_t BoundaryConditionType;
+	
+	//Boundary movement type
+	BoundaryConditionMovementType MovementType;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {

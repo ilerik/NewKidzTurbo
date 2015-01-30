@@ -19,158 +19,12 @@
 #include "LomonosovFortovGasModel.h"
 #include "PerfectGasModel.h"
 #include "meshquality.h"
-
+#include "ALEMethod.h"
 
 //Define error types
 enum turbo_errt {
 	TURBO_OK = 0,
 	TURBO_ERROR = 1
-};
-
-
-//Define availible types of ALE motion
-
-
-//Define ALE integration method
-class ALEMethod {	
-	Grid* _grid;
-
-	// map faceIndex to [0,1] indicator value. 1.0 - F
-	double (*_indicatorFunction)(int); 
-public:
-	//Set pointer to indicator function
-
-	//Set reference to grid
-	void SetGrid(Grid& grid) {
-		_grid = &grid;
-	};
-
-	//Method type
-	enum class ALEMotionType {
-		PureEulerian,
-		PureLagrangian,
-		ALEMaterialInterfaces
-	} ALEMotionType;
-
-	//Velocity of faces and nodes for ALE step
-	std::map<int, Vector> nodesVelocity;
-	std::map<int, Vector> facesVelocity;
-	std::map<int, double> facesPressure; 
-
-	//List of adjacent faces for each node
-	std::map<int, std::vector<int>> adjacentFaces;
-
-	//Compute swept volume
-	double CalcSweptVolumeRate(Face& f) {
-		double volume = 0;
-		if (f.CGNSType == NODE) {
-			Vector v = nodesVelocity[f.FaceNodes[0]];
-			volume = f.FaceSquare * v * f.FaceNormal;
-			return volume;
-		};
-		if (f.CGNSType == BAR_2) {
-			Vector v1 = nodesVelocity[f.FaceNodes[0]];
-			Vector v2 = nodesVelocity[f.FaceNodes[1]];
-			volume = 0.5 * f.FaceSquare * (v1+v2) * f.FaceNormal;
-			return volume;
-		};
-		throw new Exception("Unsupported element type");
-		return 0;
-	};
-
-	//ALE residual correction procedure
-	void Remap(int nVariables, std::vector<double>& residual, std::vector<double>& cellValues, double dt) {
-		//Compute grid motion fluxes through each face
-		for (int cellInd = 0; cellInd < _grid->nCellsLocal; cellInd++) {
-			Cell* c = _grid->localCells[cellInd];
-			for (int faceInd : c->Faces) {
-				Face& f = _grid->localFaces[faceInd];					
-
-				//Compute volume swept by face TO DO generalize
-				double sweptVolume = 0;
-				Vector avgVelocity = Vector(0,0,0);
-				for (int nodeInd : f.FaceNodes) {
-					avgVelocity += nodesVelocity[nodeInd];
-				};
-				avgVelocity /= f.FaceNodes.size();
-				sweptVolume = avgVelocity.mod() * dt;
-
-				//Distribute moving face flux				
-				for (int i = 0; i<nVariables; i++) { 
-					residual += cellValues * sweptVolume;
-				};
-
-				//Vector uR = ;
-				//double roCell = Values[cellInd * nVariables + 0];					
-				//double A = -1.0 * f.FaceSquare;
-				//if (f.FaceCell_1 != c->GlobalIndex) {
-				//	A *= -1; //Reverse flow if normal directed inwards
-				//	//roCell = GetCellValues(f.FaceCell_2)[0];
-				//};
-				////A *= FaceFluxes[f.GlobalIndex][0] / (roCell * un);
-
-				//for (int j = 0; j<nVariables; j++) {
-				//	double dR =  -Values[cellInd * nVariables + j] * un * A;
-				//	residual[cellInd * nVariables + j] += dR; // / _grid.localCells[cellInd]->CellVolume;
-				//};
-			};				
-		};
-	};
-
-	//Compute velocities
-	void ComputeNodeVelocities() {
-		//For each node refresh list of adjacent faces
-		adjacentFaces.clear();
-		for (Face& f : _grid->localFaces) {
-			for (int node : f.FaceNodes) {
-				adjacentFaces[node].push_back(f.GlobalIndex);
-			};
-		};
-
-		//For each node compute velocity
-		for (Node& n : _grid->localNodes) {
-			Vector nodeVelocity; //Resulting node velocity
-			double sumFacesSquare = 0;
-
-			//Matrix consisting of face normals
-			std::vector<double> faceNormals;
-			//Vector of face normal velocities
-			std::vector<double> faceVelocities;
-
-			std::vector<double> velocities;
-			std::vector<Vector> normals;
-			std::vector<double> weights;
-			
-			//LLS approximation
-			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
-				Face& face = _grid->localFaces[faceIndex];
-				Vector faceVelocity = facesVelocity[faceIndex];
-				velocities.push_back(faceVelocity * face.FaceNormal);
-				normals.push_back(face.FaceNormal);
-				weights.push_back(face.FaceSquare);				
-			};
-
-			nodeVelocity = ComputeVelocityByPoints(_grid->gridInfo.CellDimensions, velocities, normals, weights);
-
-			//Store node velocity
-			nodesVelocity[n.GlobalIndex] = nodeVelocity;
-		};		
-	};
-
-	//Move mesh
-	void MoveMesh(double timestep) {
-		for (std::pair<int, Vector> pair : nodesVelocity) {
-			int nodeInd = pair.first;
-			Vector v = pair.second;
-			_grid->localNodes[nodeInd].P += v * timestep;
-		};
-	};
-
-	//Remeshing procedure
-	void Remesh() {
-
-	};
-
 };
 
 //Step info
@@ -375,6 +229,9 @@ public:
 		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
 		};
+		if (_configuration.ALEConfiguration.ALEMotionType == "ALEMaterialInterfaces") {
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::ALEMaterialInterfaces;		
+		};		
 		if (_configuration.ALEConfiguration.ALEMotionType == "Lagrangian") {		
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;				
 		}		
@@ -1218,6 +1075,9 @@ public:
 
 				//Load specific configuration parameters
 				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
+
+				//Set and check mesh movement type (TO DO check for consistency with ALE settings)
+				_boundaryConditions[bcMarker]->movementType = bcConfig.MovementType;
 			};
 		};
 
@@ -1418,7 +1278,12 @@ public:
 	};	
 
 	//Compute convective flux and max wave propagation speed throught each face
-	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {		
+	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {
+		//Nullify all fluxes
+		for (std::vector<double>& flux : fluxes) {
+			for (double& v : flux) v = 0;
+		};
+
 		//Compute gradients for second order reconstruction
 		/*if (IsSecondOrder) {
 			ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
@@ -1474,26 +1339,24 @@ public:
 			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
 			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/						
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/		
 
-			//Compute flux
-			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, ALEindicators[i]);			
+			//Determine face velocity
+			Vector faceVelocityAverage = Vector(0,0,0);
+			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {			
+				faceVelocityAverage = _ALEmethod.facesVelocity[f.GlobalIndex];
+			};
+
+			//Compute flux			
+			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, faceVelocityAverage);			
 			//Store interface velocity and pressure for ALE
-			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
-			_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
+			//_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
+			//_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 			//Store flux
 			fluxes[f.GlobalIndex] = result.Fluxes;
-			
-			if (IsDummyCell(f.FaceCell_2)) {
-				//Correct dummy face flux
-				//fluxes[f.GlobalIndex][0] = 0;
-				//fluxes[f.GlobalIndex][1] = 0;
-				//fluxes[f.GlobalIndex][2] = 0;
-				//fluxes[f.GlobalIndex][3] = 0;
-				//fluxes[f.GlobalIndex][4] = 0;
-			};
+		
 
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
@@ -1554,27 +1417,72 @@ public:
 		for (Face& f : _grid.localFaces) {
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
-				ALEindicators[f.GlobalIndex] = 1; // all move
-			};
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
-				ALEindicators[f.GlobalIndex] = 0;
-				if (nmatL != nmatR) { //move material interface
+			if (!IsDummyCell(f.FaceCell_2)) {
+				//Determine ALE movement indicators for inner cells
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
+					ALEindicators[f.GlobalIndex] = 1; // all move
+				};
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
+					ALEindicators[f.GlobalIndex] = 0;
+					if (nmatL != nmatR) { //move material interface
+						ALEindicators[f.GlobalIndex] = 1;
+					};				
+				};
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
+					ALEindicators[f.GlobalIndex] = 0;
+				};
+			} else {
+				//Determine ALE movement indicators for boundaries
+				BoundaryConditionMovementType movementType = GetCellBoundaryCondition(f.FaceCell_2)->movementType;
+				if (movementType == BoundaryConditionMovementType::Fixed) {
+					ALEindicators[f.GlobalIndex] = 0;
+				};
+				if (movementType == BoundaryConditionMovementType::FreeSurface) {
 					ALEindicators[f.GlobalIndex] = 1;
 				};
-				if (IsDummyCell(f.FaceCell_2)) { // move boundaries
-					ALEindicators[f.GlobalIndex] = 1;
-				};
-			};
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
-				ALEindicators[f.GlobalIndex] = 0;
 			};
 		};
 
-		//Compute convective fluxes and max wave speeds
-		for (std::vector<double>& flux : FaceFluxes) {
-			for (double& v : flux) v = 0;
+		//ALE step determine mesh motion
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+			//Compute face velocities
+			_ALEmethod.facesVelocity.clear();
+			for (Face& f : _grid.localFaces) {
+				int ALEindicator = ALEindicators[f.GlobalIndex];
+				if (ALEindicator == 0) continue; //Skip face that don't participate in obligatory motion
+				int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+				int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+				GasModel::ConservativeVariables UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
+				GasModel::ConservativeVariables UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));															
+				Vector faceVelocity = _ALEmethod.ComputeFaceVelocity(_gasModels[nmatL], UL, _gasModels[nmatR], UR, f, ALEindicator);
+				_ALEmethod.facesVelocity[f.GlobalIndex] = faceVelocity;
+			};
+
+			//Compute moving nodes velocities
+			_ALEmethod.ComputeMovingNodesVelocities();
+
+			//Impose boundary movement
+			for (Face& f : _grid.localFaces) {
+				if (!_grid.IsBoundaryFace(f)) continue;
+				BoundaryConditionMovementType movementType = GetFaceBoundaryCondition(f)->movementType;
+				if (movementType == BoundaryConditionMovementType::Fixed) {
+					//Each node must stick to its place
+					for (int nodeIndex : f.FaceNodes) _ALEmethod.nodesVelocity[nodeIndex] = Vector(0,0,0);
+				};
+			};
+
+			//Compute velocities of all other nodes
+			_ALEmethod.ComputeFreeNodesVelocities();
+
+			//Compute new face velocities
+			for (Face& f : _grid.localFaces) {
+				_ALEmethod.facesVelocity[f.GlobalIndex] = _ALEmethod.ComputeFaceVelocityByNodes(f);
+			};
+			
 		};
+
+
+		//Compute convective fluxes and max wave speeds		
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
@@ -1583,12 +1491,6 @@ public:
 
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
-
-		//ALE step mesh transformation
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-			//Compute node velocities
-			_ALEmethod.ComputeNodeVelocities();	
-		};		
 
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1606,9 +1508,9 @@ public:
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
 				};		
 
-				//Mesh deformation contribution
+				//Mesh deformation contribution (GCL part statisfied explicitly)
 				if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-					double sweptVolume = _ALEmethod.CalcSweptVolumeRate(face);
+					double sweptVolume = _ALEmethod.facesVelocity[face.GlobalIndex] * face.FaceNormal * face.FaceSquare;
 					for (int j = 0; j<nVariables; j++) {						
 						residual[cellIndex * nVariables + j] += sweptVolume * cellValues[cellIndex * nVariables + j] * fluxDirection;
 					};					
@@ -1835,7 +1737,16 @@ public:
 	};
 
 	inline bool IsDummyCell(int globalIndex) {
-		return _grid.Cells[globalIndex].IsDummy;
+		return _grid.IsDummyCell(globalIndex);
+	};
+
+	inline bool IsBoundaryFace(Face& face) {
+		return _grid.IsBoundaryFace(face);
+	};
+
+	inline BoundaryConditions::BoundaryCondition* GetFaceBoundaryCondition(Face& face) {
+		if (!IsBoundaryFace(face)) throw 1; //TO DO check
+		return GetCellBoundaryCondition(face.FaceCell_2);
 	};
 
 	//Get cell values
@@ -1870,6 +1781,13 @@ public:
 			//Return result of interprocessor exchange
 			return _parallelHelper.RequestedValues[globalIndex];
 		};
+	};
+
+	//Get cell boundary condition reference
+	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
+		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
+		Cell& cell = _grid.Cells[globalIndex];						
+		return _boundaryConditions[cell.BCMarker];
 	};
 
 	//Get cell gas model index

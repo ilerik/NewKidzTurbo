@@ -10,6 +10,9 @@
 //Impelementation of mesh movement algorithms
 class MeshMovement {
 public:
+	void IDWComputeDisplacements(Grid& grid, std::set<int> ) {
+	};
+
 	void IDWMove(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
 		assert(displacements.size() == nodes.size());
 

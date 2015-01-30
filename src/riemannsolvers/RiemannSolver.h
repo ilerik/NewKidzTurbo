@@ -32,7 +32,7 @@ public:
 	virtual bool loadConfiguration(Logger* logger, RiemannSolverConfiguration configuration) = 0;
 
 	//Solve riemann problem	
-	virtual RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f, double ALEindicator) = 0;
+	virtual RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f, Vector faceVelocity) = 0;
 };
 
 #endif

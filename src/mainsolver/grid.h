@@ -194,6 +194,15 @@ public:
 	int nFaces; //number of local faces
 	std::vector<Face> localFaces; // only local faces
 
+	//Utility functions
+	inline bool IsDummyCell(int globalIndex) {
+		return Cells[globalIndex].IsDummy;
+	};
+
+	inline bool IsBoundaryFace(Face& face) {
+		return IsDummyCell(face.FaceCell_2);
+	};
+
 	//partitioning info
 	std::vector<int> cellsPartitioning; // map from cell number index to processor rank
 	std::vector<int> localCellIndexes;  // indexes of local non dummy cells
