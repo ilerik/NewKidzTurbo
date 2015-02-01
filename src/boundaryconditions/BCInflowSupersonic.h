@@ -17,7 +17,7 @@ public:
 		Face& face = _grid->localFaces[dummyCell.Faces[0]];
 		//Obtain neighbour cell
 		int nCellIndex = _grid->cellsGlobalToLocal[face.FaceCell_1];
-		int nVariables = _gasModels[nmat]->nConservativeVariables;
+		int nVariables = _gasModels[_nmat]->nConservativeVariables;
 
 		//Compute dummy values
 		std::vector<double> res(nVariables);	
@@ -31,8 +31,10 @@ public:
 
 	void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
 		//Read configuration
-		if (_gasModels[_nmat]->GasModelName == "LomonosovFortovGasModel") {
-			std::pair<double, bool> propertyValue;
+		std::pair<double, bool> propertyValue;
+
+		if ((_gasModels[_nmat]->GasModelName == "LomonosovFortovGasModel") || (_gasModels[_nmat]->GasModelName == "PerfectGas"))
+		{
 			propertyValue = bcConfig.GetPropertyValue("Density");
 			Density = propertyValue.first;
 			propertyValue = bcConfig.GetPropertyValue("VelocityX");
@@ -44,6 +46,7 @@ public:
 			propertyValue = bcConfig.GetPropertyValue("InternalEnergy");
 			InternalEnergy = propertyValue.first;
 		};
+
 	}; 
 
 };

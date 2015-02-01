@@ -1058,7 +1058,7 @@ public:
 			};
 			if (bcType == BCType_t::BCInflowSupersonic) {
 				BoundaryConditions::BCInflowSupersonic* bc = new BoundaryConditions::BCInflowSupersonic();
-				_boundaryConditions[bcMarker] = bc; 
+				_boundaryConditions[bcMarker] = bc;
 				bcTypeCheckPassed = true;
 			};
 
@@ -1360,6 +1360,12 @@ public:
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 			//Store flux
 			fluxes[f.GlobalIndex] = result.Fluxes;
+
+			//If it's material interface
+			if (nmatL != nmatR) {
+				result.Fluxes[0] = 0;
+				assert(result.Fluxes[0] == 0);
+			};
 		
 
 			/*msg.str("");		
@@ -1628,17 +1634,33 @@ public:
 			alpha.push_back(0.5052);
 			alpha.push_back(1.0);
 		};
+
+		stepInfo.Residual = std::vector<double>(5, 0.0);	
 		
 		//Time stepping
-		for (int stage = 0; stage<nStages-1; stage++) {			
+		for (int stage = 0; stage<nStages; stage++) {
+			//ALE step mesh transformation
+			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
+				//Move mesh
+				_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+
+				//Regenerate geometric entities
+				GenerateGridGeometry();
+			};		
+
 			for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 			{
 				Cell* cell = _grid.localCells[cellIndex];			
 				//Update values
 				for (int i = 0; i < nVariables; i++) {
 					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[stage];
+					stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
 				};
 			};
+			//Synchronize
+			_parallelHelper.Barrier();
+
+			if (stage == nStages - 1) break;
 
 			//Compute new residual
 			ComputeResidual(Residual, Values);
@@ -1646,32 +1668,14 @@ public:
 			_parallelHelper.Barrier();
 		};
 
-		//Compute new result and residual
-		stepInfo.Residual = std::vector<double>(5, 0.0);		
-		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
-		{
-			Cell* cell = _grid.localCells[cellIndex];			
-			//Update values
-			for (int i = 0; i < nVariables; i++) {
-				Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[nStages-1];
-				stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
-			};					
-		};
+	
 
+		//Compute new result and residual
 		//Compute RMS residual		
 		for (int i = 0; i<nVariables; i++) {
 			stepInfo.Residual[i] = _parallelHelper.SumDouble(stepInfo.Residual[i]);
 			stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);
 		};
-
-		//ALE step mesh transformation
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
-			//Move mesh
-			_ALEmethod.MoveMesh(stepInfo.TimeStep);			
-
-			//Regenerate geometric entities
-			GenerateGridGeometry();
-		};		
 
 		//Advance total time
 		stepInfo.Time += stepInfo.TimeStep;

@@ -97,7 +97,8 @@ public:
 		double v = U.rov / ro;
 		double w = U.row / ro;	
 		double e = (U.roE / ro) - (u*u + v*v + w*w) / 2.0;
-		double T = e / _Cv;
+		double TBase = 300; // [K]
+		double T = e / _Cv + TBase;
 		return T;
 	};
 

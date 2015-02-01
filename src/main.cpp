@@ -20,6 +20,7 @@
 #include "testcases\RMInstabilityTests\RMITest_1.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
+#include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -239,6 +240,7 @@ int main(int argc, char *argv[]) {
 	//test.RunTest(&argc, &argv);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test;
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
 	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(500);
 	test.RunTest(&argc, &argv);
 	return 0;

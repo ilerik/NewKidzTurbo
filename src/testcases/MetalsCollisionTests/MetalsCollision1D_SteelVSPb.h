@@ -1,5 +1,5 @@
-#ifndef TURBO_TestCases_MetalsCollision_MetalsCollision1DSteelVSSteel
-#define TURBO_TestCases_MetalsCollision_MetalsCollision1DSteelVSSteel
+#ifndef TURBO_TestCases_MetalsCollision_MetalsCollision1DSteelVSPb
+#define TURBO_TestCases_MetalsCollision_MetalsCollision1DSteelVSPb
 
 #include "TestCase.h"
 #include "gengrid1D.h"
@@ -9,7 +9,7 @@ namespace TestCasesMetalsImpact {
 //Numerical test for ALE method from Luo et al 2004
 //The well-known Sod shocktube problem is considered in this test case, whose solution contains 
 //simultaneously a shock wave, a contact discontinuity, and an expansion fan.
-class TestCaseMetalsImpact_1D_SteelVSSteel: public TestCase {
+class TestCaseMetalsImpact_1D_SteelVSPb: public TestCase {
 protected:
 	Kernel* _kernel; //Computational kernel object
 	Grid _grid;					  //Grid object	
@@ -23,13 +23,15 @@ public:
 
 	//Left state density, material index for EOS5 and velocity
 	static const double roSteel;
-	static const int nmet;
+	static const int nmetSteel;
+	static const double roPb;
+	static const int nmetPb;
 
 	//Impact relative speed
 	double uImpact;
 
 	//Parametrized constructor
-	TestCaseMetalsImpact_1D_SteelVSSteel(double _uImpact) {
+	TestCaseMetalsImpact_1D_SteelVSPb(double _uImpact) {
 		uImpact = _uImpact;
 	};
 
@@ -53,15 +55,15 @@ public:
 		//Stainless steel
 		_configuration.AddGasModel("StainlessSteelLeft");
 		_configuration.GasModelsConfiguration["StainlessSteelLeft"].GasModelName = "LomonosovFortovGasModel";
-		_configuration.GasModelsConfiguration["StainlessSteelLeft"].SetPropertyValue("MaterialIndex", nmet);
+		_configuration.GasModelsConfiguration["StainlessSteelLeft"].SetPropertyValue("MaterialIndex", nmetSteel);
 		_configuration.GasModelsConfiguration["StainlessSteelLeft"].SetPropertyValue("SpecificHeatVolume", 510); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
 		_configuration.GasModelsConfiguration["StainlessSteelLeft"].SetPropertyValue("MeltingTemperature", 1800); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI 
 
-		_configuration.AddGasModel("StainlessSteelRight");
-		_configuration.GasModelsConfiguration["StainlessSteelRight"].GasModelName = "LomonosovFortovGasModel";
-		_configuration.GasModelsConfiguration["StainlessSteelRight"].SetPropertyValue("MaterialIndex", nmet);
-		_configuration.GasModelsConfiguration["StainlessSteelRight"].SetPropertyValue("SpecificHeatVolume", 510); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
-		_configuration.GasModelsConfiguration["StainlessSteelRight"].SetPropertyValue("MeltingTemperature", 1800); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI 
+		_configuration.AddGasModel("PlumbumRight");
+		_configuration.GasModelsConfiguration["PlumbumRight"].GasModelName = "LomonosovFortovGasModel";
+		_configuration.GasModelsConfiguration["PlumbumRight"].SetPropertyValue("MaterialIndex", nmetPb);
+		_configuration.GasModelsConfiguration["PlumbumRight"].SetPropertyValue("SpecificHeatVolume", 130); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
+		_configuration.GasModelsConfiguration["PlumbumRight"].SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI 
 
 		//Air (ideal gas)
 		_configuration.AddGasModel("Air");
@@ -81,8 +83,8 @@ public:
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.2;
-		_configuration.RungeKuttaOrder = 1;		
+		_configuration.CFL = 0.3;
+		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
@@ -175,7 +177,7 @@ public:
 			int nmat = getInitialGasModelIndex(cell); //get material index
 
 			std::vector<double> initValues;		
-			double uCenterMass = 0; //uImpact * (LLeft * roSteel) / (LLeft * roSteel + LRight * roSteel);
+			double uCenterMass = 0; //uImpact * (LLeft * roSteel) / (LLeft * roSteel + LRight * roPb);
 			double uL = uImpact - uCenterMass;
 			double uR = -uCenterMass;
 
@@ -194,15 +196,17 @@ public:
 			//Values
 			double u = 0;
 			double roE = 0;		
-			double ro = roSteel;
+			double ro = 0;
 			if (x <= 0) {
-				u = uL;			
+				u = uL;	
+				ro = roSteel;
 			} else {
-				u = uR;						
+				u = uR;
+				ro = roPb;
 			};
 
 			//Outside is air
-			double atm = 1e5;
+			double atm = 1.1e5;
 			double gamma = 1.4;
 			if ((x <= - LLeft) || (x >= LRight)) {
 				ro = 1.225;
@@ -226,14 +230,16 @@ public:
 }; //TestCase
 
 //Test constant's
-const int TestCaseMetalsImpact_1D_SteelVSSteel::nCells = 1000;
-const double TestCaseMetalsImpact_1D_SteelVSSteel::LLeft = 15e-2; // 15 cm;
-const double TestCaseMetalsImpact_1D_SteelVSSteel::LRight = 15e-2; // 15 cm;
-const double TestCaseMetalsImpact_1D_SteelVSSteel::TimeMax = 100e-6; // 100 mks
+const int TestCaseMetalsImpact_1D_SteelVSPb::nCells = 1000;
+const double TestCaseMetalsImpact_1D_SteelVSPb::LLeft = 15e-2; // 15 cm;
+const double TestCaseMetalsImpact_1D_SteelVSPb::LRight = 15e-2; // 15 cm;
+const double TestCaseMetalsImpact_1D_SteelVSPb::TimeMax = 100e-6; // 100 mks
 
-//Density and material index for EOS5 and velocity
-const double TestCaseMetalsImpact_1D_SteelVSSteel::roSteel = 1000 * 1.0 / 0.127; //SI	for stainless steel;
-const int TestCaseMetalsImpact_1D_SteelVSSteel::nmet = 0;
+//Density and material index for EOS5
+const double TestCaseMetalsImpact_1D_SteelVSPb::roSteel = 1000 * 1.0 / 0.127; //SI	for stainless steel;
+const int TestCaseMetalsImpact_1D_SteelVSPb::nmetSteel = 0;
+const double TestCaseMetalsImpact_1D_SteelVSPb::roPb = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
+const int TestCaseMetalsImpact_1D_SteelVSPb::nmetPb = 1;
 
 }; //namespace
 
