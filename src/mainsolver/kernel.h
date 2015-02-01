@@ -36,6 +36,31 @@ public:
 	std::vector<double> Residual;	
 };
 
+//Forward declaration
+class Kernel;
+
+//Base class for storing activity executed after each computational step
+class StepHistoryLogger {
+protected:
+	Kernel* _kernel;
+	Logger* _logger;
+	Grid* _grid;
+	ParallelHelper* _parallelHelper;
+	std::vector<GasModel*>* _gasModels;	
+public:
+	void setStepHistoryLoggerReferences(Kernel* kernel, Logger* logger, Grid* grid, ParallelHelper* parallelHelper, std::vector<GasModel*>* gasModels) {
+		_kernel = kernel;
+		_logger = logger;
+		_grid = grid;
+		_parallelHelper = parallelHelper;
+		_gasModels = gasModels;
+	};
+
+	virtual void Init() = 0;
+	virtual void SaveHistory() = 0;
+	virtual void Finalize() = 0;
+};
+
 //Calculation kernel
 class Kernel {
 private:
@@ -48,6 +73,9 @@ private:
 	//Helper for CGNS i\o
 	GridLoading::CGNSReader _cgnsReader;
 	PostProcessing::CGNSWriter _cgnsWriter;
+
+	//History logger object
+	StepHistoryLogger* _stepHistoryLogger;
 
 	//Grid data
 	Grid _grid;
@@ -108,10 +136,33 @@ private:
 	std::vector<Vector> GradientP;
 
 public:
+	//Accessors
+
 	//Parallel helper
-	ParallelHelper* getParallelHelper() {
+	inline ParallelHelper* getParallelHelper() {
 		return &_parallelHelper;
-	};	
+	};
+
+	//Step info
+	inline StepInfo* getStepInfo() {
+		return &stepInfo;
+	};
+
+	//History logger
+	inline void setStepHistoryLogger(StepHistoryLogger* logger) {
+		//Delete if exists
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Finalize();
+			delete _stepHistoryLogger;
+		};
+
+		//Properly attach object to kernel
+		_stepHistoryLogger = logger;
+		_stepHistoryLogger->setStepHistoryLoggerReferences(this, &_logger, &_grid, &_parallelHelper, &_gasModels);
+
+		//Synchronize
+		_parallelHelper.Barrier();
+	};
 
 	//Initialize computational kernel
 	turbo_errt Initilize(int *argc, char **argv[]) {		
@@ -128,6 +179,9 @@ public:
 			//Initialize cgns i\o subsystem
 			_cgnsReader.Init(_logger, _parallelHelper);
 			_cgnsWriter.Init(_logger, _parallelHelper);
+
+			//No default history logger
+			_stepHistoryLogger = NULL;
 		} catch (...) {
 			//Exception was thrown but shouldnt
 			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Kernel initialization failed");
@@ -260,7 +314,12 @@ public:
 		};
 
 		//Init parallel exchange
-		InitParallelExchange();		
+		InitParallelExchange();	
+
+		//Initialize history logger
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Init();
+		};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -329,6 +388,8 @@ public:
 				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
 
+			//Save history
+			if (_stepHistoryLogger != NULL) _stepHistoryLogger->SaveHistory();
 
 			//Convergence criteria
 			if (stepInfo.Iteration == MaxIteration) {
@@ -366,7 +427,8 @@ public:
 	};
 
 	turbo_errt FinalizeCalculation() {
-		//Free memory				
+		//Free memory		
+
 		//Boundary conditions
 		for (std::pair<int, BoundaryConditions::BoundaryCondition*> p : _boundaryConditions) {
 			delete (p.second);
@@ -374,6 +436,12 @@ public:
 
 		//Riemann solver
 		if (rSolver != NULL) delete rSolver;
+
+		//History logging
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Finalize();
+			delete _stepHistoryLogger;
+		};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1040,11 +1108,26 @@ public:
 
 				//Skip missing boundary condition
 				continue;
-			}								
+			};
+
+			
+			
 			
 			//Initialize boundary conditions
 			bool bcTypeCheckPassed = false;
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
+
+			std::string mName = bcConfig.MaterialName;
+			if (_configuration.GasModelNameToIndex.find(mName) == std::end(_configuration.GasModelNameToIndex)) {
+				//Material name unspecified
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified material name " + mName + ", for boundary condition :" + bcName);	
+
+				//Synchronize
+				_parallelHelper.Barrier();
+				return turbo_errt::TURBO_ERROR;
+			};
+			int materialIndex = _configuration.GasModelNameToIndex[mName];
+
 			BCType_t bcType = bcConfig.BoundaryConditionType;
 			if (bcType == BCType_t::BCSymmetryPlane) {				
 				BoundaryConditions::BCSymmetryPlane* bc = new BoundaryConditions::BCSymmetryPlane();
@@ -1072,6 +1155,7 @@ public:
 				//Attach needed data structures to boundary condition class
 				_boundaryConditions[bcMarker]->setGrid(_grid);
 				_boundaryConditions[bcMarker]->setGasModel(_gasModels);
+				_boundaryConditions[bcMarker]->setMaterialIndex(materialIndex);
 
 				//Load specific configuration parameters
 				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
@@ -1270,6 +1354,14 @@ public:
 			buffer[i] = MeshQuality::Anisotropy(_grid, *_grid.localCells[i]);
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Anisotropy", buffer);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSize(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "LinearSize", buffer);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSizeRatio(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "LinearSizeRatio", buffer);
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
@@ -1757,6 +1849,42 @@ public:
 		return GetCellBoundaryCondition(face.FaceCell_2);
 	};
 
+	//Get cell boundary condition reference
+	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
+		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
+		Cell& cell = _grid.Cells[globalIndex];						
+		return _boundaryConditions[cell.BCMarker];
+	};
+
+	//Get cell gas model index
+	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
+		if (IsLocalCell(globalIndex)) {
+			if (IsDummyCell(globalIndex)) {
+				//If dummy cell compute on the go				
+				Cell& cell = _grid.Cells[globalIndex];
+				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
+
+				//IF dummy get from boundary condition
+				int nmat = _boundaryConditions[cell.BCMarker]->_nmat;
+				//int nmat = CellGasModel[nCellIndex]; //Neighbour cell for now
+				//nmat = 0; //Air for now
+				return nmat;
+			} else {
+				//If proper cell return part of Values array				
+				if (localIndex == -1) {
+					//If local index is unknown determine it
+					//Lower perfomance WARNING
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
+				};
+				int nmat = CellGasModel[localIndex];
+				return nmat;
+			};
+		} else {
+			//Return result of interprocessor exchange
+			return _parallelHelper.RequestedGasModelIndex[globalIndex];
+		};
+	};
+
 	//Get cell values
 	inline std::vector<double> GetCellValues(int globalIndex, int localIndex = -1) {
 		/*std::stringstream msg;
@@ -1790,41 +1918,6 @@ public:
 			return _parallelHelper.RequestedValues[globalIndex];
 		};
 	};
-
-	//Get cell boundary condition reference
-	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
-		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
-		Cell& cell = _grid.Cells[globalIndex];						
-		return _boundaryConditions[cell.BCMarker];
-	};
-
-	//Get cell gas model index
-	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
-		if (IsLocalCell(globalIndex)) {
-			if (IsDummyCell(globalIndex)) {
-				//If dummy cell compute on the go				
-				Cell& cell = _grid.Cells[globalIndex];
-				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
-				int nmat = CellGasModel[nCellIndex]; //Neighbour cell for now
-				//nmat = 0; //Air for now
-				return nmat;
-			} else {
-				//If proper cell return part of Values array				
-				if (localIndex == -1) {
-					//If local index is unknown determine it
-					//Lower perfomance WARNING
-					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
-				};
-				int nmat = CellGasModel[localIndex];
-				return nmat;
-			};
-		} else {
-			//Return result of interprocessor exchange
-			return _parallelHelper.RequestedGasModelIndex[globalIndex];
-		};
-	};
-
-
 };
 
 #endif

@@ -26,6 +26,9 @@ public:
 	static const int nmetSteel;
 	static const double roPb;
 	static const int nmetPb;
+	static const double roAir;
+	static const int nmetAir;
+
 
 	//Impact relative speed
 	double uImpact;
@@ -37,7 +40,7 @@ public:
 
 	//Prepare computational grid
 	void PrepareGrid() {		
-		_grid = GenGrid1D(_kernel->getParallelHelper(), nCells, -2 * LLeft, 2 * LRight, false);
+		_grid = GenGrid1D(_kernel->getParallelHelper(), nCells, -LLeft, LRight, false);
 		_kernel->BindGrid(&_grid);
 	};
 
@@ -66,6 +69,8 @@ public:
 		_configuration.GasModelsConfiguration["PlumbumRight"].SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI 
 
 		//Air (ideal gas)
+		double atm = 1.1e5;
+		double gamma = 1.4;
 		_configuration.AddGasModel("Air");
 		_configuration.GasModelsConfiguration["Air"].GasModelName = "PerfectGasModel";
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("IdealGasConstant", 8.3144621);
@@ -73,17 +78,34 @@ public:
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
 
-		//Boundary conditions				
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
-		//_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::FreeSurface;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
-		//_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::FreeSurface;
+		//Boundary conditions
+		//Left
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		//_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::FreeSurface;
+		_configuration.BoundaryConditions["left"].MaterialName = "Air";
+		_configuration.BoundaryConditions["left"].SetPropertyValue("Density", roAir);
+		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", 0);
+		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0);
+		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0);
+		_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", atm / ((gamma - 1.0) * roAir));
+
+		//Right
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		//_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::FreeSurface;
+		_configuration.BoundaryConditions["right"].MaterialName = "Air";
+		_configuration.BoundaryConditions["right"].SetPropertyValue("Density", roAir);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityX", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityY", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityZ", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", atm / ((gamma - 1.0) * roAir));
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.3;
+		_configuration.CFL = 0.5;
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
@@ -111,6 +133,9 @@ public:
 
 		//Set parameters
 		PrepareConfiguration();
+
+		//Set history logger
+		_kernel->setStepHistoryLogger(new TestCaseHistoryLogger());
 		
 		//Initialize calculation
 		_kernel->InitCalculation();
@@ -141,6 +166,87 @@ public:
 		_kernel->Finalize();
 	};
 
+	//History logger object
+	class TestCaseHistoryLogger : public StepHistoryLogger {
+	private:
+		std::ofstream historyFile;
+	public:
+		virtual void Init() {
+			if (_parallelHelper->IsMaster()) {
+				historyFile.open("history.dat", std::ofstream::out);
+				historyFile<<"VARIABLES = ";
+				historyFile<<"\""<<"Time"<<"\" ";
+				historyFile<<"\""<<"Iteration"<<"\" ";
+				historyFile<<"\""<<"TimeStep"<<"\" ";
+				historyFile<<"\""<<"MeltedZoneWidth"<<"\" ";
+				historyFile<<"\""<<"TotalMeltedVolume"<<"\" ";
+				historyFile<<std::endl;
+			};
+
+			//Sync
+			_parallelHelper->Barrier();
+		};
+
+		virtual void Finalize() {
+			if (_parallelHelper->IsMaster()) {
+				historyFile.close();
+			};
+
+			//Sync
+			_parallelHelper->Barrier();
+		};
+
+		virtual void SaveHistory() {
+			StepInfo* info =_kernel->getStepInfo();
+			int iteration = info->Iteration;
+			double time = info->Time;
+			double timeStep = info->TimeStep;
+			double meltedZoneWidth = 0;
+			double totalMeltedVolume = 0;
+			double minPbCoordinate = 1000;
+			double maxPbCoordinate = -1000;
+			double minPbNotMeltedCoordinate = 1000;
+			for (int cellIndex = 0; cellIndex < _grid->nCellsLocal; cellIndex++) {
+				Cell* cell = _grid->localCells[cellIndex];
+				int cellGlobalIndex = cell->GlobalIndex;
+				double coordinate =  cell->CellCenter.x;
+				double volume = cell->CellVolume;
+				int nmat = _kernel->GetCellGasModelIndex(cellGlobalIndex, cellIndex);
+				GasModel::MediumPhase phase = _gasModels->at(nmat)->GetPhase(_kernel->GetCellValues(cellGlobalIndex, cellIndex));
+
+				//Total volume of fluid above melting point
+				if (phase == GasModel::MediumPhase::AboveMeltingPoint) totalMeltedVolume += volume;
+
+				//Width of melted zone from Steel\Pb interface into Pb
+				if (nmat == nmetPb) {
+					if (coordinate < minPbCoordinate) minPbCoordinate = coordinate;
+					if (coordinate > maxPbCoordinate) maxPbCoordinate = coordinate;
+					if ((phase == GasModel::MediumPhase::BelowMeltingPoint) && (coordinate < minPbNotMeltedCoordinate)) minPbNotMeltedCoordinate = coordinate;
+				};
+			};
+
+			//Aggregate computed values
+			minPbCoordinate = _parallelHelper->Min(minPbCoordinate);
+			maxPbCoordinate = _parallelHelper->Max(maxPbCoordinate);
+			minPbNotMeltedCoordinate = _parallelHelper->Min(minPbNotMeltedCoordinate);
+			minPbNotMeltedCoordinate = min(maxPbCoordinate, minPbNotMeltedCoordinate);
+			meltedZoneWidth = minPbNotMeltedCoordinate - minPbCoordinate;
+
+			//Output
+			if (_parallelHelper->IsMaster()) {
+				historyFile<<time<<" ";
+				historyFile<<iteration<<" ";
+				historyFile<<timeStep<<" ";
+				historyFile<<meltedZoneWidth<<" ";
+				historyFile<<totalMeltedVolume<<" ";
+				historyFile<<std::endl;
+			};
+
+			//Sync
+			_parallelHelper->Barrier();
+		};
+	};
+
 	//Specify initial conditions
 	//Sod's shock tube
 	class TestCaseInitialConditions : public InitialConditions::InitialConditions
@@ -160,14 +266,14 @@ public:
 			double z = cell.CellCenter.z;
 
 			//Outside is air
-			if (x <= - LLeft) return 2;
-			if (x >= LRight) return 2;
+			if (x < - LLeft) return nmetAir;
+			if (x > LRight) return nmetAir;
 
 			//Split in 2 halfs
 			if (x <= 0) {
-				return 0; //First
+				return nmetSteel; //First
 			} else {
-				return 1; //Second
+				return nmetPb; //Second
 			};		
 
 			return 0;
@@ -208,8 +314,8 @@ public:
 			//Outside is air
 			double atm = 1.1e5;
 			double gamma = 1.4;
-			if ((x <= - LLeft) || (x >= LRight)) {
-				ro = 1.225;
+			if ((x < - LLeft) || (x > LRight)) {
+				ro = roAir;
 				u = 0;
 				e = atm / ((gamma - 1.0) * ro);
 			};
@@ -240,6 +346,8 @@ const double TestCaseMetalsImpact_1D_SteelVSPb::roSteel = 1000 * 1.0 / 0.127; //
 const int TestCaseMetalsImpact_1D_SteelVSPb::nmetSteel = 0;
 const double TestCaseMetalsImpact_1D_SteelVSPb::roPb = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
 const int TestCaseMetalsImpact_1D_SteelVSPb::nmetPb = 1;
+const double TestCaseMetalsImpact_1D_SteelVSPb::roAir = 1.225; //SI Air
+const int TestCaseMetalsImpact_1D_SteelVSPb::nmetAir = 2;
 
 }; //namespace
 

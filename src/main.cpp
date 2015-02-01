@@ -152,117 +152,76 @@ void runImpactShockTest(int argc, char *argv[]) {
 	_kernel.Finalize();	
 };
 
-void runImpactShockTest2D(int argc, char *argv[]) {
-	Kernel _kernel;
-	const double PI = 3.14159265359;
-	
-	_kernel.Initilize(&argc, &argv);
-	double L = 15e-3; // 15 mm; 
-	double xMin = -3*L;
-	double xMax = L;
-	double yMin = -L;
-	double yMax = L;
-	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 100, xMin, xMax, yMin, yMax, 1.0, 1.0, false, false); //Change grid size here
-	//Modify grid for initial disturbances
-	double A = 1e-4;
-	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution(-A,A);
-	std::vector<int> nodes;
-	std::vector<Vector> displacements;
-	for (Node& n : _grid.localNodes) {
-		//Distortion
-		if ((n.P.x == 0) && (std::abs(n.P.y) != L)) {
-			double delta = distribution(generator);
-			Vector dr(delta, 0, 0);
-			nodes.push_back(n.GlobalIndex);
-			displacements.push_back(dr);
-		};
-
-		//Unmovable borders
-		if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
-			nodes.push_back(n.GlobalIndex);
-			displacements.push_back(Vector(0,0,0));
-		};
-	};
-
-	_kernel.BindGrid(&_grid);
-	_kernel.GenerateGridGeometry();
-	MeshMovement _moveHelper;
-	_moveHelper.IDWMove(_grid, nodes, displacements); 
-	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
-
-	//Fill in configuration
-	_kernel.ReadConfiguration(""); //Change run parameters here
-	_kernel.InitCalculation();
-
-	//Initial conditions
-	//double ro0 = 1;
-	double roPb = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
-	double roSteel = 1000 * 1.0 / 0.127; // SI	for stainless steel	
-	double V = 500; //m/s
-	//ImpactShockInitialConditions ic(V, 0, roSteel, 0, roPb);
-	ImpactShockInitialConditions ic(V, 1, roSteel, 2, roPb);
-	//ImpactShockInitialConditions ic(V, 1, roSteel, 1, roSteel);
-	//ImpactShockInitialConditions ic(V, 2, roPb, 2, roPb);
-	_kernel.GenerateInitialConditions(&ic);	
-
-	//Run test
-	_kernel.RunCalculation();
-	_kernel.FinalizeCalculation();
-
-	//Output result
-	_kernel.SaveGrid("result.cgns");
-	_kernel.SaveSolution("result.cgns", "Solution");
-	_kernel.Finalize();	
-};
+//void runImpactShockTest2D(int argc, char *argv[]) {
+//	Kernel _kernel;
+//	const double PI = 3.14159265359;
+//	
+//	_kernel.Initilize(&argc, &argv);
+//	double L = 15e-3; // 15 mm; 
+//	double xMin = -3*L;
+//	double xMax = L;
+//	double yMin = -L;
+//	double yMax = L;
+//	Grid _grid = GenGrid2D(_kernel.getParallelHelper(), 200, 100, xMin, xMax, yMin, yMax, 1.0, 1.0, false, false); //Change grid size here
+//	//Modify grid for initial disturbances
+//	double A = 1e-4;
+//	std::default_random_engine generator;
+//	std::uniform_real_distribution<double> distribution(-A,A);
+//	std::vector<int> nodes;
+//	std::vector<Vector> displacements;
+//	for (Node& n : _grid.localNodes) {
+//		//Distortion
+//		if ((n.P.x == 0) && (std::abs(n.P.y) != L)) {
+//			double delta = distribution(generator);
+//			Vector dr(delta, 0, 0);
+//			nodes.push_back(n.GlobalIndex);
+//			displacements.push_back(dr);
+//		};
+//
+//		//Unmovable borders
+//		if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+//			nodes.push_back(n.GlobalIndex);
+//			displacements.push_back(Vector(0,0,0));
+//		};
+//	};
+//
+//	_kernel.BindGrid(&_grid);
+//	_kernel.GenerateGridGeometry();
+//	MeshMovement _moveHelper;
+//	_moveHelper.IDWMove(_grid, nodes, displacements); 
+//	//_kernel.LoadGrid("C:\\Users\\Ilya\\Downloads\\cilindr5.11(1).cgns");
+//
+//	//Fill in configuration
+//	_kernel.ReadConfiguration(""); //Change run parameters here
+//	_kernel.InitCalculation();
+//
+//	//Initial conditions
+//	//double ro0 = 1;
+//	double roPb = 1000 * 1.0 / 0.88200003E-01; // SI	for Pb
+//	double roSteel = 1000 * 1.0 / 0.127; // SI	for stainless steel	
+//	double V = 500; //m/s
+//	//ImpactShockInitialConditions ic(V, 0, roSteel, 0, roPb);
+//	ImpactShockInitialConditions ic(V, 1, roSteel, 2, roPb);
+//	//ImpactShockInitialConditions ic(V, 1, roSteel, 1, roSteel);
+//	//ImpactShockInitialConditions ic(V, 2, roPb, 2, roPb);
+//	_kernel.GenerateInitialConditions(&ic);	
+//
+//	//Run test
+//	_kernel.RunCalculation();
+//	_kernel.FinalizeCalculation();
+//
+//	//Output result
+//	_kernel.SaveGrid("result.cgns");
+//	_kernel.SaveSolution("result.cgns", "Solution");
+//	_kernel.Finalize();	
+//};
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//double M = 2.5;
-	////double ro = 0.084;
-	//double ro = 2.74;
-	//double p = 0.5 * 101.325e3;
-	//double gamma = 1.67;
-	//double kro = (2*gamma*M*M - (gamma - 1.0)) / (gamma + 1.0);
-	//double kp = ((gamma + 1.0) * M * M) / ((gamma - 1.0)*M*M + 2.0);
-	//double roShock = ro * kro;
-	//double pShock = p * kp;
-	//double uShock = sqrt(gamma * pShock / roShock) * M;
-	//std::cout<<"roShock = "<<roShock<<std::endl;
-	//std::cout<<"uShock = "<<uShock<<std::endl;
-	//std::cout<<"pShock = "<<pShock / 101.325e3 <<std::endl;
-	//return 0;
-	//TestCasesRMI::TestCase1 test;
-	//test.RunTest(&argc, &argv);
-	//TestCases1D::TestCase1 test;
-	//test.RunTest(&argc, &argv);
-	//TestCases1D::TestCaseALE2 test;
-	//test.RunTest(&argc, &argv);
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test;
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(500);
+	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(550);
 	test.RunTest(&argc, &argv);
 	return 0;
-	//runPeriodicTest2D(argc, argv);
-	//runSodTest(argc, argv);
-	//runShearLayer(argc, argv);
 
-	runImpactShockTest(argc, argv);
- 	//runImpactShockTest2D(argc, argv);
-
-	//LomonosovFortovGasModel gasModel(1);
-	//double P;
-	//double c;
-	//bool nonPhysical;
-	//double ro = 1./0.88200003E-01;
-	//double e = 0;	
-	//double Gr = 0;
-	//gasModel.EOSE5(ro, e, P, c, Gr, nonPhysical);
-	//double P_SI = 1e5;
-	//double ro_SI = ro * 1000;
-	////e = gasModel.FindInternalEnergy(ro_SI, P_SI);
-	//std::cout<<"Pressure = "<<P<<"\n";
-	////std::cout<<"Energy = "<<e<<"\n";
-	return 0;	
 };

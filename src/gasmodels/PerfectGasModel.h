@@ -6,6 +6,13 @@
 //Gas model base class
 class PerfectGasModel : public GasModel {
 public:	
+	//Constructor
+	PerfectGasModel() {
+		//Model information
+		GasModelName = "PerfectGasModel";
+		GasModelType = ModelType_t::CaloricallyPerfect;		
+	};
+
 	//Medium properties
 	double Gamma;
 	double Cv;

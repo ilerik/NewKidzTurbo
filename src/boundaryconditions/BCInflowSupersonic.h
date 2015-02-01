@@ -33,7 +33,7 @@ public:
 		//Read configuration
 		std::pair<double, bool> propertyValue;
 
-		if ((_gasModels[_nmat]->GasModelName == "LomonosovFortovGasModel") || (_gasModels[_nmat]->GasModelName == "PerfectGas"))
+		if ((_gasModels[_nmat]->GasModelName == "LomonosovFortovGasModel") || (_gasModels[_nmat]->GasModelName == "PerfectGasModel"))
 		{
 			propertyValue = bcConfig.GetPropertyValue("Density");
 			Density = propertyValue.first;
@@ -45,8 +45,10 @@ public:
 			Velocity.z = propertyValue.first;
 			propertyValue = bcConfig.GetPropertyValue("InternalEnergy");
 			InternalEnergy = propertyValue.first;
+			return;
 		};
 
+		throw new Exception("Unsupported gas model for boundary condition");
 	}; 
 
 };
