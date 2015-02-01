@@ -19,6 +19,9 @@ public:
 	//Boundary movement type
 	BoundaryConditionMovementType MovementType;
 
+	//Boundary condition material name
+	std::string MaterialName;
+
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {
 		return _properties.find(name) != _properties.end();

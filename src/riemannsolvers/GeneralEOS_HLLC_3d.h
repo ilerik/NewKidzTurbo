@@ -73,7 +73,10 @@ public:
 		double phiRoe = takeRoeAverage(roLRoot, roRRoot, phiL, phiR); //Roe averaged phi (Hu et al (25))
 		double GrRoe = takeRoeAverage(roLRoot, roRRoot, GrL, GrR); //Roe averaged Gruneisen coefficient (Hu et al (25))
 		double cRoe = phiRoe + GrRoe * pOverRoRoe; //Roe averaged sound speed (Hu et al (16))
+		//cRoe = sqrt(cRoe);
+		//cRoe = takeRoeAverage(roLRoot, roRRoot, cL, cR); //TO DO check
 		cRoe = sqrt(cRoe);
+		assert(cRoe > 0);
 
 		//Wave speeds for two waves (Hu et al (12))
 		double SL = min(uL - cL, uRoe - cRoe); //bl

@@ -44,6 +44,10 @@ namespace BoundaryConditions {
 			_gasModels = gasModels;
 		};
 
+		virtual void setMaterialIndex(int nmat) {
+			_nmat = nmat;
+		};
+
 		//Load configuration and check if it's applicable and correct
 		virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) = 0;
 	};

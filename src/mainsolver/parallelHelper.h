@@ -167,6 +167,13 @@ public:
 		return res;
 	};
 
+	//Maximum
+	inline double Max(double x) {
+		double res;
+		MPI_Allreduce(&x, &res, 1, MPI_LONG_DOUBLE, MPI_MAX, _comm);
+		return res;
+	};
+
 
 public:
 	//Problem oriented routines and data
