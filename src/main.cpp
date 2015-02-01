@@ -218,9 +218,7 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(550);
+	TestCasesRMI::TestCase1 test;
 	test.RunTest(&argc, &argv);
 	return 0;
 

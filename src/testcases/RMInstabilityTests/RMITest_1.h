@@ -44,6 +44,40 @@ public:
 	//Prepare computational grid
 	void PrepareGrid() {		
 		_grid = GenGrid2D(_kernel->getParallelHelper(), nCellsX, nCellsY, xMin, xMax, yMin, yMax, 1.0, 1.0, true, false);
+
+		MeshMovement moveHelper;
+		//Modify grid for initial disturbances
+		double A = 1e-4;
+		std::default_random_engine generator;
+		std::uniform_real_distribution<double> distribution(-A,A);
+		std::vector<int> nodes;
+		std::vector<Vector> displacements;
+		for (Node& n : _grid.localNodes) {
+			//Unmovable borders
+			if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+				nodes.push_back(n.GlobalIndex);
+				displacements.push_back(Vector(0,0,0));
+			} else {
+				//Random distortion
+				/*if (n.P.x == 0) {
+					double delta = distribution(generator);
+					Vector dr(delta, 0, 0);
+					nodes.push_back(n.GlobalIndex);
+					displacements.push_back(dr);
+				};*/
+				// Harmonic
+				if (n.P.y == 0) {
+					double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * n.P.x);
+					double delta = yInterface;
+					Vector dr(0, delta, 0);
+					nodes.push_back(n.GlobalIndex);
+					displacements.push_back(dr);
+				};
+			};			
+		};
+
+		//moveHelper.IDWMoveNodes(_grid, nodes, displacements);
+
 		_kernel->BindGrid(&_grid);
 	};
 
@@ -54,29 +88,42 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Roe;
+		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 
 		//Availible gas models
-		_configuration.AddGasModel("Air");			
+			
+		//He (ideal gas)
+		_configuration.AddGasModel("He");
+		_configuration.GasModelsConfiguration["He"].GasModelName = "PerfectGasModel";
+		_configuration.GasModelsConfiguration["He"].SetPropertyValue("IdealGasConstant", 8.3144621);
+		_configuration.GasModelsConfiguration["He"].SetPropertyValue("SpecificHeatRatio", gamma);
+		_configuration.GasModelsConfiguration["He"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
+		_configuration.GasModelsConfiguration["He"].SetPropertyValue("SpecificHeatPressure", 1006.43);		
 
-		//Air (ideal gas)
-		_configuration.GasModelsConfiguration["Air"].GasModelName = "PerfectGasModel";
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("IdealGasConstant", 8.3144621);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatRatio", gamma);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);			
+		//Xe (ideal gas)
+		_configuration.AddGasModel("Xe");
+		_configuration.GasModelsConfiguration["Xe"].GasModelName = "PerfectGasModel";
+		_configuration.GasModelsConfiguration["Xe"].SetPropertyValue("IdealGasConstant", 8.3144621);
+		_configuration.GasModelsConfiguration["Xe"].SetPropertyValue("SpecificHeatRatio", gamma);
+		_configuration.GasModelsConfiguration["Xe"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
+		_configuration.GasModelsConfiguration["Xe"].SetPropertyValue("SpecificHeatPressure", 1006.43);	
 
 		//Boundary conditions				
 		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["top"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["top"].MaterialName = "He";
 		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+		_configuration.BoundaryConditions["bottom"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["bottom"].MaterialName = "Xe";
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.1;
-		_configuration.RungeKuttaOrder = 1;		
+		_configuration.CFL = 0.5;
+		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
-		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
+		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";
+		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
 
 		//Run settings
 		_configuration.MaxIteration = 1000000;
@@ -104,6 +151,8 @@ public:
 
 		//Initial conditions
 		_kernel->GenerateInitialConditions(new TestCaseInitialConditions());	
+
+		_kernel->SaveGrid("grid.cgns");
 
 		//Run computational cycle
 		_kernel->RunCalculation();
@@ -140,6 +189,9 @@ public:
 			double x = cell.CellCenter.x;
 			double y = cell.CellCenter.y;
 			double z = cell.CellCenter.z;
+
+			//Position of inteface (y = 0)
+			double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * x);
 		
 			return 0; 
 		};
@@ -171,19 +223,19 @@ public:
 			double ro = 0;
 			double roE = 0;
 			if (y <= yInterface) {
-				//Light fluid
-				ro = roLight;
+				//Heavy fluid
+				ro = roHeavy;
 				v = 0;			
 				e = pressure / ((gamma-1) * ro);
 			};
 			if ((y > yInterface) && (y <= yShockWave)) {
-				//Heavy fluid at rest
-				ro = roHeavy;
+				//Light fluid at rest
+				ro = roLight;
 				v = 0;						
 				e = pressure / ((gamma-1) * ro);
 			};
 			if (y > yShockWave) {
-				//Shock wave in heavy fluid
+				//Shock wave in light fluid
 				ro = roShock;
 				v = -uShock;
 				e = pShock / ((gamma-1) * ro);
@@ -205,8 +257,8 @@ public:
 }; //TestCase
 
 //Test constant's 
-const int TestCase1::nCellsX = 200;
-const int TestCase1::nCellsY = 800;
+const int TestCase1::nCellsX = 100;
+const int TestCase1::nCellsY = 400;
 const double TestCase1::xMax = TestCase1::ModesNumber * (TestCase1::lambdaX * 0.5);
 const double TestCase1::xMin = TestCase1::ModesNumber * (-TestCase1::lambdaX * 0.5);
 const double TestCase1::yMax = 3 * 1e-2; //[cm]
@@ -222,18 +274,15 @@ const double TestCase1::gamma = 1.67;
 
 //Initial pertrubation parameters
 const int TestCase1::ModesNumber = 1; //Number of modes
-const double TestCase1::a0 = -0.25 * 1e-2; //Pertrubation amplitude [cm] 
+const double TestCase1::a0 = 0.5 * 1e-2; //Pertrubation amplitude [cm] 
 const double TestCase1::lambdaX = 0.8 * 1e-2; //Wave number [cm]
 
 //Shock wave parameters (in lighter fluid)
 const double TestCase1::MachNumber = 2.5;
 const double TestCase1::SoundSpeedLightFluid = std::sqrt(TestCase1::gamma * TestCase1::pressure / TestCase1::roLight);
 const double TestCase1::pShock = 1.34848*atm; //[atm]
-const double TestCase1::roShock = 20.7347; //[kg/m^3]
-const double TestCase1::uShock = 262.259; //[m/s]
-//const double TestCase1::pShock = 1.34848*atm; //[atm]
-//const double TestCase1::roShock = 0.635663; //[kg/m^3]
-//const double TestCase1::uShock = 1497.84; //[m/s]
+const double TestCase1::roShock = 0.635663; //[kg/m^3]
+const double TestCase1::uShock = 1497.84; //[m/s]
 
 }; //namespace
 
