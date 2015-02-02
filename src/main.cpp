@@ -18,6 +18,7 @@
 #include "testcases\TestCases1D\TestCase1D_ALE_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_2.h"
 #include "testcases\RMInstabilityTests\RMITest_1.h"
+#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
@@ -218,7 +219,8 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	TestCasesRMI::TestCase1 test;
+	//TestCasesRMI::TestCase1 test;
+	TestCasesRMI::TestCaseALE1 test;
 	test.RunTest(&argc, &argv);
 	return 0;
 

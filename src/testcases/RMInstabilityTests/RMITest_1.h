@@ -44,17 +44,36 @@ public:
 	//Prepare computational grid
 	void PrepareGrid() {		
 		_grid = GenGrid2D(_kernel->getParallelHelper(), nCellsX, nCellsY, xMin, xMax, yMin, yMax, 1.0, 1.0, true, false);
+		_kernel->BindGrid(&_grid);
+		return;
+
+		_kernel->PartitionGrid(_grid);
+		_kernel->GenerateGridGeometry(_grid);
 
 		MeshMovement moveHelper;
+		int nDeformationSteps = 2;
+
 		//Modify grid for initial disturbances
 		double A = 1e-4;
 		std::default_random_engine generator;
 		std::uniform_real_distribution<double> distribution(-A,A);
 		std::vector<int> nodes;
 		std::vector<Vector> displacements;
+
+		//Determine coordinate of nodes closest to shock front
+		double yInterfacePosition = 0;
+		double yInterfaceNodes = yMin;
+		double yShockWave = 1.5 * std::abs(a0);
+		double yShockWaveNodes = 0;
+		for (Node& n : _grid.localNodes) {
+			if (std::abs(n.P.y - yShockWave) < std::abs(yShockWave - yShockWaveNodes)) yShockWaveNodes = n.P.y;
+			if (std::abs(n.P.y - yInterfacePosition) < std::abs(yInterfaceNodes - yInterfacePosition)) yInterfaceNodes = n.P.y;
+		};
+
 		for (Node& n : _grid.localNodes) {
 			//Unmovable borders
-			if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+			//if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+			if ((n.P.y== yMin) || (std::abs(n.P.y - yMax) < 1e-10)) {
 				nodes.push_back(n.GlobalIndex);
 				displacements.push_back(Vector(0,0,0));
 			} else {
@@ -66,19 +85,29 @@ public:
 					displacements.push_back(dr);
 				};*/
 				// Harmonic
-				if (n.P.y == 0) {
-					double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * n.P.x);
+				if ((std::abs(n.P.y - yInterfaceNodes) < 1e-10)) {
+					double yInterface = yInterfacePosition + a0 * std::cos((2*PI / lambdaX) * n.P.x);
 					double delta = yInterface;
 					Vector dr(0, delta, 0);
 					nodes.push_back(n.GlobalIndex);
-					displacements.push_back(dr);
+					displacements.push_back(dr / nDeformationSteps);
 				};
+				//Fixed straight shock front
+				if ((std::abs(n.P.y - yShockWaveNodes) < 1e-10)) {
+					double delta = yShockWaveNodes - yShockWave;
+					Vector dr(0, delta, 0);
+					nodes.push_back(n.GlobalIndex);
+					displacements.push_back(dr / nDeformationSteps);
+				}
 			};			
 		};
 
-		//moveHelper.IDWMoveNodes(_grid, nodes, displacements);
+		for (int i = 0; i<nDeformationSteps; i++) {
+			moveHelper.IDWMoveNodes(_grid, nodes, displacements);
+		};
 
 		_kernel->BindGrid(&_grid);
+
 	};
 
 	//Prepare configuration object and set all parameters
@@ -192,8 +221,12 @@ public:
 
 			//Position of inteface (y = 0)
 			double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * x);
-		
-			return 0; 
+
+			if (y <= yInterface) {
+				return 1;
+			} else {
+				return 0;
+			};
 		};
 
 		virtual std::vector<double> getInitialValues(const Cell& cell) {
@@ -217,7 +250,7 @@ public:
 			double yInterface = 0 + a0 * std::cos((2*PI / lambdaX) * x);
 
 			//Position of shock wave (y = 2*a0)
-			double yShockWave = std::abs(a0);
+			double yShockWave = 1.5 * std::abs(a0);
 				
 			//Values			
 			double ro = 0;
@@ -258,7 +291,7 @@ public:
 
 //Test constant's 
 const int TestCase1::nCellsX = 100;
-const int TestCase1::nCellsY = 400;
+const int TestCase1::nCellsY = 350;
 const double TestCase1::xMax = TestCase1::ModesNumber * (TestCase1::lambdaX * 0.5);
 const double TestCase1::xMin = TestCase1::ModesNumber * (-TestCase1::lambdaX * 0.5);
 const double TestCase1::yMax = 3 * 1e-2; //[cm]
@@ -274,7 +307,7 @@ const double TestCase1::gamma = 1.67;
 
 //Initial pertrubation parameters
 const int TestCase1::ModesNumber = 1; //Number of modes
-const double TestCase1::a0 = 0.5 * 1e-2; //Pertrubation amplitude [cm] 
+const double TestCase1::a0 = 0.25 * 1e-2; //Pertrubation amplitude [cm] 
 const double TestCase1::lambdaX = 0.8 * 1e-2; //Wave number [cm]
 
 //Shock wave parameters (in lighter fluid)
