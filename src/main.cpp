@@ -220,7 +220,7 @@ void runImpactShockTest(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {	
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(550);
+	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
 	test.RunTest(&argc, &argv);
 	return 0;
 
