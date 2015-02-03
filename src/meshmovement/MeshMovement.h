@@ -20,12 +20,6 @@ public:
 		double Ldef = 1e-2;
 		double alpha = 0.1;
 		double a = 3.0;
-		double lambdaX = 0.8 * 1e-2; //Wave number [cm]
-		int ModesNumber = 1; //Number of modes
-		double xMax = ModesNumber * (lambdaX * 0.5);
-		double xMin = ModesNumber * (-lambdaX * 0.5);
-		double period = xMax - xMin;
-		if ((drx) > (period / 2.0)) d_r.x = (period / 2.0) - d_r.x;
 		dr = d_r.mod();
 		//double a = 2.5;
 		double b = 5;
@@ -40,6 +34,12 @@ public:
 		const std::unordered_set<int> freeNodes, 
 		std::map<int, Vector>& freeNodesDisplacements) 
 	{
+		double lambdaX = 0.8 * 1e-2; //Wave number [cm]
+		int ModesNumber = 1; //Number of modes
+		double xMax = ModesNumber * (lambdaX * 0.5);
+		double xMin = ModesNumber * (-lambdaX * 0.5);
+		double period = xMax - xMin;
+
 		//assert(movingNodesDisplacements.size() == movingNodes.size());
 		//For all nodes allocate memory to store rotation and displacements
 		std::map<int, Vector> dR;
@@ -121,11 +121,17 @@ public:
 				Node& nb = grid.localNodes[movingNodeIndex];
 				Vector bb = b[movingNodeIndex];
 				RotationMatrix M = R[movingNodeIndex];			
-				Vector dr = ni.P - nb.P;
-				double w = W(dr);	//TO DO					
-				Vector displ = (M * ni.P + bb - ni.P);			
+				Vector dr = ni.P - nb.P;			
+				//Vector displ = (M * ni.P + bb - ni.P);
+				Vector displ = dR[movingNodeIndex];
+				/*if ((dr.x) > (period / 2.0)) {
+					dr.x = (period / 2.0) - dr.x;
+				};
+				if ((displ.x) > (period / 2.0)) {
+					displ.x = (period / 2.0) - displ.x;
+				};*/
+				double w = W(dr);	//TO DO		
 				dR[nodeIndex] += w * displ; 
-				//dR[nodeIndex] += w * dR[movingNodeIndex];
 				sum += w; //			
 			}					
 			dR[nodeIndex] /= sum;	
