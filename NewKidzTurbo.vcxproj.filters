@@ -257,6 +257,7 @@
     </ClInclude>
     <ClInclude Include="src\utility\DSUClusteredSet.h">
       <Filter>Header Files\Utility</Filter>
+	</ClInclude>
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h">
       <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
     </ClInclude>
