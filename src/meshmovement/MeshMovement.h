@@ -6,19 +6,42 @@
 #include "meshquality.h"
 #include "geomfunctions.h"
 #include <cassert>
+#include <unordered_set>
 
 //Impelementation of mesh movement algorithms
 class MeshMovement {
 public:
+	//Weighting Function
+	double W(Vector d_r) {	
+		double dr = d_r.mod();
+		double drx = d_r.x;
+		if (abs(dr) < 1e-15) return 1;
+		double Ai = 1;
+		double Ldef = 1e-2;
+		double alpha = 0.1;
+		double a = 3.0;
+		dr = d_r.mod();
+		//double a = 2.5;
+		double b = 5;
+		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));
+		return res;
+	};
+
+
 	void IDWComputeDisplacements(Grid& grid, 
 		const std::unordered_set<int> movingNodes, 
 		std::map<int, Vector>& movingNodesDisplacements, 
 		const std::unordered_set<int> freeNodes, 
 		std::map<int, Vector>& freeNodesDisplacements) 
 	{
-		assert(movingNodesDisplacements.size() == movingNodes.size());
+		double lambdaX = 0.8 * 1e-2; //Wave number [cm]
+		int ModesNumber = 1; //Number of modes
+		double xMax = ModesNumber * (lambdaX * 0.5);
+		double xMin = ModesNumber * (-lambdaX * 0.5);
+		double period = xMax - xMin;
+
+		//assert(movingNodesDisplacements.size() == movingNodes.size());
 		//For all nodes allocate memory to store rotation and displacements
-		freeNodesDisplacements.clear();
 		std::map<int, Vector> dR;
 		std::map<int, Vector> b;
 		std::map<int, RotationMatrix> R;
@@ -26,6 +49,7 @@ public:
 
 		//For all nodes
 		for (int movingNodeIndex : movingNodes) {
+			if (movingNodesDisplacements.find(movingNodeIndex) == movingNodesDisplacements.end()) throw new Exception("Displacement for node is absent");
 			dR[movingNodeIndex] = movingNodesDisplacements[movingNodeIndex];
 		};
 				
@@ -41,7 +65,7 @@ public:
 			};
 
 			if (isMovingFace) for (int& faceNodeIndex : f.FaceNodes) {
-				bFaces[i].insert(faceNodeIndex);
+				bFaces[faceNodeIndex].insert(i);
 			};
 		};	
 		//std::cout<<"N="<<nodes.size()<<", Nb="<<bNodes.size()<<'\n';
@@ -52,7 +76,7 @@ public:
 			counter++;		
 			Node& node = grid.localNodes[nodeIndex];
 			Vector Displacement = dR[nodeIndex];
-			Vector new_normal;
+			Vector newNormal;
 			Vector normal;
 			int k = 0;
 			//Iterate through all neighbour faces
@@ -67,19 +91,18 @@ public:
 				};
 				Vector n = CalcNormal(points);
 				if (f.FaceNormal * n > 0) {
-					new_normal += n;
+					newNormal += n;
 				} else {
-					new_normal -= n;
+					newNormal -= n;
 				};			
 				normal += f.FaceNormal / f.FaceNormal.mod();
 				k++;
 			};				
-			Vector r = new_normal;
-			new_normal /= new_normal.mod();		
-			normal /= k;
+			Vector r = newNormal;
+			newNormal /= newNormal.mod();		
 			normal /= normal.mod();
 	//		std::cout<<"Rotation : "<<counter<<" normal" << normal.mod() << "\n";
-			RotationMatrix M = CalcRotation(normal, new_normal);
+			RotationMatrix M = CalcRotation(normal, newNormal);
 			R[nodeIndex] = M;
 			b[nodeIndex] = node.P + Displacement - M * node.P;			
 		};
@@ -98,11 +121,18 @@ public:
 				Node& nb = grid.localNodes[movingNodeIndex];
 				Vector bb = b[movingNodeIndex];
 				RotationMatrix M = R[movingNodeIndex];			
-				Vector dr = ni.P - nb.P;
-				double w = 1; //W(dr);	TO DO					
-				Vector displ = (M * ni.P + bb - ni.P);			
-				dR[nodeIndex] += w * displ;			
-				sum += w;
+				Vector dr = ni.P - nb.P;			
+				//Vector displ = (M * ni.P + bb - ni.P);
+				Vector displ = dR[movingNodeIndex];
+				/*if ((dr.x) > (period / 2.0)) {
+					dr.x = (period / 2.0) - dr.x;
+				};
+				if ((displ.x) > (period / 2.0)) {
+					displ.x = (period / 2.0) - displ.x;
+				};*/
+				double w = W(dr);	//TO DO		
+				dR[nodeIndex] += w * displ; 
+				sum += w; //			
 			}					
 			dR[nodeIndex] /= sum;	
 

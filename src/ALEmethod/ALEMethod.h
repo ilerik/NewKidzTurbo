@@ -3,11 +3,13 @@
 
 #include "grid.h"
 #include "utilityfunctions.h"
+#include "MeshMovement.h"
 #include <unordered_set>
 
 //Define ALE integration method
 class ALEMethod {	
 	Grid* _grid;
+	MeshMovement _moveHelper;
 
 	// map faceIndex to [0,1] indicator value. 1.0 - F
 	double (*_indicatorFunction)(int); 
@@ -225,6 +227,9 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
+		_moveHelper.IDWComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+		return;
+
 		//TO DO 1D implementation temporary
 		std::vector<double> coordinates;
 		std::map<double, Vector> velocitiesByCoordinate;

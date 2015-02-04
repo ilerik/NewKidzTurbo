@@ -1,5 +1,5 @@
-#ifndef TURBO_TestCases_RMInstabilityTests_TestCase1
-#define TURBO_TestCases_RMInstabilityTests_TestCase1
+#ifndef TURBO_TestCases_RMInstabilityTests_TestCaseALE1
+#define TURBO_TestCases_RMInstabilityTests_TestCaseALE1
 
 #include "TestCase.h"
 #include "gengrid2D.h"
@@ -7,7 +7,7 @@
 namespace TestCasesRMI {
 
 //Base class for all automated tests
-class TestCase1 : public TestCase {
+class TestCaseALE1 : public TestCase {
 protected:
 	Kernel* _kernel; //Computational kernel object
 	Grid _grid;					  //Grid object	
@@ -44,9 +44,6 @@ public:
 	//Prepare computational grid
 	void PrepareGrid() {		
 		_grid = GenGrid2D(_kernel->getParallelHelper(), nCellsX, nCellsY, xMin, xMax, yMin, yMax, 1.0, 1.0, true, false);
-		_kernel->BindGrid(&_grid);
-		return;
-
 		_kernel->PartitionGrid(_grid);
 		_kernel->GenerateGridGeometry(_grid);
 
@@ -92,18 +89,29 @@ public:
 					nodes.push_back(n.GlobalIndex);
 					displacements.push_back(dr / nDeformationSteps);
 				};
-				//Fixed straight shock front
-				if ((std::abs(n.P.y - yShockWaveNodes) < 1e-10)) {
-					double delta = yShockWaveNodes - yShockWave;
-					Vector dr(0, delta, 0);
-					nodes.push_back(n.GlobalIndex);
-					displacements.push_back(dr / nDeformationSteps);
-				}
+				
 			};			
 		};
 
 		for (int i = 0; i<nDeformationSteps; i++) {
 			moveHelper.IDWMoveNodes(_grid, nodes, displacements);
+		};
+
+		//Fixed straight shock front
+		for (Node& n : _grid.localNodes) {
+			//Unmovable borders
+			//if ((n.P.x == xMin) || (n.P.x == xMax) || (n.P.y== yMin) || (n.P.y == yMax)) {
+			if ((n.P.y== yMin) || (std::abs(n.P.y - yMax) < 1e-10)) {
+				nodes.push_back(n.GlobalIndex);
+				displacements.push_back(Vector(0,0,0));
+			} else {
+				if ((std::abs(n.P.y - yShockWaveNodes) < 1e-10)) {
+					double delta = yShockWaveNodes - yShockWave;
+					Vector dr(0, delta, 0);
+					nodes.push_back(n.GlobalIndex);
+					displacements.push_back(dr / nDeformationSteps);
+				};
+			};
 		};
 
 		_kernel->BindGrid(&_grid);
@@ -151,8 +159,8 @@ public:
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
-		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
+		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
 
 		//Run settings
 		_configuration.MaxIteration = 1000000;
@@ -290,32 +298,32 @@ public:
 }; //TestCase
 
 //Test constant's 
-const int TestCase1::nCellsX = 100;
-const int TestCase1::nCellsY = 350;
-const double TestCase1::xMax = TestCase1::ModesNumber * (TestCase1::lambdaX * 0.5);
-const double TestCase1::xMin = TestCase1::ModesNumber * (-TestCase1::lambdaX * 0.5);
-const double TestCase1::yMax = 3 * 1e-2; //[cm]
-const double TestCase1::yMin = -4 * 1e-2; //[cm]
-const double TestCase1::TimeMax = 0.05 * 1e-3; // [ms]
+const int TestCaseALE1::nCellsX = 40;
+const int TestCaseALE1::nCellsY = 175;
+const double TestCaseALE1::xMax = TestCaseALE1::ModesNumber * (TestCaseALE1::lambdaX * 0.5);
+const double TestCaseALE1::xMin = TestCaseALE1::ModesNumber * (-TestCaseALE1::lambdaX * 0.5);
+const double TestCaseALE1::yMax = 3 * 1e-2; //[cm]
+const double TestCaseALE1::yMin = -4 * 1e-2; //[cm]
+const double TestCaseALE1::TimeMax = 0.05 * 1e-3; // [ms]
 
 //Density, pressure and gamma for mixing fluids
-const double TestCase1::atm = 101.325e3; // std atmosphere pressure [Pa]
-const double TestCase1::roHeavy = 2.74; //xenon [kg/m^3]
-const double TestCase1::roLight = 0.084; //helium [kg/m^3]
-const double TestCase1::pressure = 0.5*atm; //[atm]
-const double TestCase1::gamma = 1.67;
+const double TestCaseALE1::atm = 101.325e3; // std atmosphere pressure [Pa]
+const double TestCaseALE1::roHeavy = 2.74; //xenon [kg/m^3]
+const double TestCaseALE1::roLight = 0.084; //helium [kg/m^3]
+const double TestCaseALE1::pressure = 0.5*atm; //[atm]
+const double TestCaseALE1::gamma = 1.67;
 
 //Initial pertrubation parameters
-const int TestCase1::ModesNumber = 1; //Number of modes
-const double TestCase1::a0 = 0.25 * 1e-2; //Pertrubation amplitude [cm] 
-const double TestCase1::lambdaX = 0.8 * 1e-2; //Wave number [cm]
+const int TestCaseALE1::ModesNumber = 1; //Number of modes
+const double TestCaseALE1::a0 = 0.25 * 1e-2; //Pertrubation amplitude [cm] 
+const double TestCaseALE1::lambdaX = 0.8 * 1e-2; //Wave number [cm]
 
 //Shock wave parameters (in lighter fluid)
-const double TestCase1::MachNumber = 2.5;
-const double TestCase1::SoundSpeedLightFluid = std::sqrt(TestCase1::gamma * TestCase1::pressure / TestCase1::roLight);
-const double TestCase1::pShock = 1.34848*atm; //[atm]
-const double TestCase1::roShock = 0.635663; //[kg/m^3]
-const double TestCase1::uShock = 1497.84; //[m/s]
+const double TestCaseALE1::MachNumber = 2.5;
+const double TestCaseALE1::SoundSpeedLightFluid = std::sqrt(TestCaseALE1::gamma * TestCaseALE1::pressure / TestCaseALE1::roLight);
+const double TestCaseALE1::pShock = 1.34848*atm; //[atm]
+const double TestCaseALE1::roShock = 0.635663; //[kg/m^3]
+const double TestCaseALE1::uShock = 1497.84; //[m/s]
 
 }; //namespace
 

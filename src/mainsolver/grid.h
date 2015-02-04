@@ -199,6 +199,10 @@ public:
 		return Cells[globalIndex].IsDummy;
 	};
 
+	inline int GetCellPart(int globalIndex) {
+		return cellsPartitioning[globalIndex];
+	};
+
 	inline bool IsBoundaryFace(Face& face) {
 		return IsDummyCell(face.FaceCell_2);
 	};

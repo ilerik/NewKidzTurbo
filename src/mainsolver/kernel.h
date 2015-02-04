@@ -452,8 +452,8 @@ public:
 	//Load grid from CGNS file
 	turbo_errt LoadGrid(std::string filename) {
 		_grid = _cgnsReader.LoadGrid(filename);
-		PartitionGrid();
-		GenerateGridGeometry();
+		PartitionGrid(_grid);
+		GenerateGridGeometry(_grid);
 		return TURBO_OK;
 	};	
 
@@ -469,13 +469,13 @@ public:
 	//Bind existing grid to kernel
 	turbo_errt BindGrid(Grid* grid) {
 		_grid = *grid;
-		PartitionGrid();
-		GenerateGridGeometry();
+		PartitionGrid(_grid);
+		GenerateGridGeometry(_grid);
 		return TURBO_OK;
 	};
 
 	//Partion loaded grid
-	turbo_errt PartitionGrid() {
+	turbo_errt PartitionGrid(Grid& grid) {
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Grid partitioning started");	
 
 		//Partitioning settings
@@ -520,33 +520,33 @@ public:
 
 		/* This is an array of size equal to the number of locally-stored vertices. Upon successful completion the
 		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
-		std::vector<idx_t> part(_grid.nCellsLocal);
+		std::vector<idx_t> part(grid.nCellsLocal);
 		std::ostringstream msg;
 		msg.str(std::string());
 		msg<<"vdist[] = \n";
-		for (int i = 0; i<=_nProcessors; i++) msg<<_grid.vdist[i]<<" ";
+		for (int i = 0; i<=_nProcessors; i++) msg<<grid.vdist[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
 		msg.str(std::string());
 		msg<<"xadj[] = \n";
-		for (int i = 0; i<_grid.xadj.size(); i++) msg<<_grid.xadj[i]<<" ";
+		for (int i = 0; i<grid.xadj.size(); i++) msg<<grid.xadj[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
 		msg.str(std::string());
 		msg<<"adjncy[] = \n";
-		for (int i = 0; i<_grid.adjncy.size(); i++) msg<<_grid.adjncy[i]<<" ";
+		for (int i = 0; i<grid.adjncy.size(); i++) msg<<grid.adjncy[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
 		_parallelHelper.Barrier();
-		if (_nProcessors < _grid.nProperCells) { //Make sure that partitioning is needed
-			int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], _grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
+		if (_nProcessors < grid.nProperCells) { //Make sure that partitioning is needed
+			int result = ParMETIS_V3_PartKway(&grid.vdist[0], &grid.xadj[0], grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
 			if (result != METIS_OK) {
 				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
 				return TURBO_ERROR;
@@ -556,7 +556,7 @@ public:
 		//Gather partitioning on every processor
 		std::vector<int> recvcounts(_nProcessors);
 		for (int i = 0; i<_nProcessors; i++) {
-			recvcounts[i] = _grid.vdist[i+1] - _grid.vdist[i];
+			recvcounts[i] = grid.vdist[i+1] - grid.vdist[i];
 		};
 		
 		/*msg.clear();
@@ -569,33 +569,33 @@ public:
 		msg<<"\n";
 
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
-		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
+		_parallelHelper.Allgatherv( part, recvcounts, grid.cellsPartitioning);
 
 		//Debug partitioning
 		/*for (int i = 0; i<_nProcessors; i++) {
-			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
+			for (int j = grid.vdist[i]; j< grid.vdist[i+1]; j++) grid.cellsPartitioning[j] = i;
 		};		*/
-		//for (int i = 10; i<51; i++) _grid.cellsPartitioning[i] = 0;
+		//for (int i = 10; i<51; i++) grid.cellsPartitioning[i] = 0;
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Otput result information		
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Partitioning edgecut = ", edgecut);		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCells = ", _grid.nCells);		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nProperCells = ", _grid.nProperCells);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCells = ", grid.nCells);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nProperCells = ", grid.nProperCells);		
 		
 		//Add dummy cells
-		for (int i = _grid.nProperCells; i<_grid.nCells; i++) {
-			Cell* cell = &_grid.Cells[i];
+		for (int i = grid.nProperCells; i<grid.nCells; i++) {
+			Cell* cell = &grid.Cells[i];
 			int neigbour = cell->NeigbourCells[0];
-			int p = _grid.cellsPartitioning[neigbour];
-			_grid.cellsPartitioning.push_back(p);			
+			int p = grid.cellsPartitioning[neigbour];
+			grid.cellsPartitioning.push_back(p);			
 		};
 
 		//Otput cells partitioning
 		/*msg.clear();
 		msg<<"Partitioning = [ ";
-		for (int p : _grid.cellsPartitioning) {
+		for (int p : grid.cellsPartitioning) {
 			msg<<p<<" ";
 		};
 		msg<<"]\n";
@@ -604,27 +604,27 @@ public:
 
 		//Extract local cells indexes		
 		int count = 0;
-		_grid.localCells.clear();
-		_grid.localCellIndexes.clear();
-		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (!_grid.Cells[i].IsDummy)) {
-				_grid.localCells.push_back(&_grid.Cells[i]);
-				_grid.localCellIndexes.push_back(i);				
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
+		grid.localCells.clear();
+		grid.localCellIndexes.clear();
+		for (int i = 0; i<grid.nCells; i++) {
+			if ((grid.cellsPartitioning[i] == _rank) && (!grid.Cells[i].IsDummy)) {
+				grid.localCells.push_back(&grid.Cells[i]);
+				grid.localCellIndexes.push_back(i);				
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.Cells[i].getInfo());
 			};
 		};		
-		_grid.nCellsLocal = _grid.localCellIndexes.size(); //Without dummy cells
-		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (_grid.Cells[i].IsDummy)) {
-				_grid.localCells.push_back(&_grid.Cells[i]);
-				_grid.localCellIndexes.push_back(i);
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
+		grid.nCellsLocal = grid.localCellIndexes.size(); //Without dummy cells
+		for (int i = 0; i<grid.nCells; i++) {
+			if ((grid.cellsPartitioning[i] == _rank) && (grid.Cells[i].IsDummy)) {
+				grid.localCells.push_back(&grid.Cells[i]);
+				grid.localCellIndexes.push_back(i);
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.Cells[i].getInfo());
 			};
 		};		
 
 		//Otput result
 		msg.str(std::string());
-		msg<<"Number of local cells = "<<_grid.nCellsLocal;
+		msg<<"Number of local cells = "<<grid.nCellsLocal;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 
 		//Synchronize		
@@ -636,33 +636,33 @@ public:
 
 	//Load required geometric grid data to appropriate data structures
 	//Provided we have partioned grid
-	turbo_errt GenerateGridGeometry() {
+	turbo_errt GenerateGridGeometry(Grid& grid) {
 		//return turbo_errt::TURBO_OK;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation started");
 
 		//Create local cells
-		_grid.localCells.resize(_grid.localCellIndexes.size());		
-		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {	
-			int cellGlobalIndex = _grid.localCellIndexes[i];
+		grid.localCells.resize(grid.localCellIndexes.size());		
+		for (int i = 0; i < grid.localCellIndexes.size(); i++) {	
+			int cellGlobalIndex = grid.localCellIndexes[i];
 			int cellLocalIndex = i;
-			_grid.localCells[i] = &_grid.Cells[cellGlobalIndex];	
-			_grid.localCells[i]->Faces.clear();
-			_grid.cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
+			grid.localCells[i] = &grid.Cells[cellGlobalIndex];	
+			grid.localCells[i]->Faces.clear();
+			grid.cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
 		};
 
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", _grid.localCellIndexes.size());		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", grid.nCellsLocal);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", grid.localCellIndexes.size());		
 
 		//Create faces		
-		_grid.localFaces.clear();
+		grid.localFaces.clear();
 		int faceIndex = 0;
 		std::map<std::set<int>, int> faces;	//Face nodes to face index		
-		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {
+		for (int i = 0; i < grid.localCellIndexes.size(); i++) {
 			//Generate all faces for the cell
-			Cell* cell = _grid.localCells[i];		
+			Cell* cell = grid.localCells[i];		
 			std::vector<Face> newFaces;
 			if (!cell->IsDummy) {
-				newFaces = _grid.ObtainFaces(cell);
+				newFaces = grid.ObtainFaces(cell);
 			} else {
 				Face boundaryFace;
 				boundaryFace.CGNSType = cell->CGNSType;
@@ -680,22 +680,22 @@ public:
 				if ( result.second ) {	
 					face.GlobalIndex = faceIndex;
 					result.first->second = face.GlobalIndex;
-					_grid.localFaces.push_back(face);
-					_grid.localFaces[faceIndex].isExternal = true;
-					//_grid.localFaces[faceIndex].FaceCell_1 = i;
-					_grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
-					_grid.localCells[i]->Faces.push_back(face.GlobalIndex);
+					grid.localFaces.push_back(face);
+					grid.localFaces[faceIndex].isExternal = true;
+					//grid.localFaces[faceIndex].FaceCell_1 = i;
+					grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
+					grid.localCells[i]->Faces.push_back(face.GlobalIndex);
 					faceIndex++;
 				} else {					
 					int fIndex = result.first->second;
-					_grid.localFaces[fIndex].isExternal = false;
+					grid.localFaces[fIndex].isExternal = false;
 					if (cell->IsDummy) {
-						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+						grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					} else {
-						//_grid.localFaces[faceIndex].FaceCell_2 = i;
-						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+						//grid.localFaces[faceIndex].FaceCell_2 = i;
+						grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					};
-					_grid.localCells[i]->Faces.push_back(fIndex);
+					grid.localCells[i]->Faces.push_back(fIndex);
 				};
 			};
 		};
@@ -704,22 +704,22 @@ public:
 		std::stringstream msg;
 		msg.clear();
 		int nExternal = 0;
-		for (Face& face : _grid.localFaces) if (face.isExternal) {
+		for (Face& face : grid.localFaces) if (face.isExternal) {
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
 			int faceNodes = face.FaceNodes.size();
 			//msg<<"faceNodes = "<<faceNodes<<"\n";
-			Cell& cell = _grid.Cells[face.FaceCell_1];
+			Cell& cell = grid.Cells[face.FaceCell_1];
 			for (int nCellID : cell.NeigbourCells) {
 				//msg<<"nCellID = "<<faceNodes<<"\n";
-				Cell& nCell = _grid.Cells[nCellID];
+				Cell& nCell = grid.Cells[nCellID];
 				int nCommonNodes = 0;
 				std::set<int> cellNodes;
 				for (int cellNodeID : nCell.Nodes) {
 					cellNodes.insert(cellNodeID);
 					//Handle periodic
-					if (_grid.periodicNodesIdentityList.find(cellNodeID) != _grid.periodicNodesIdentityList.end()) {
-						cellNodes.insert(_grid.periodicNodesIdentityList[cellNodeID].begin(), _grid.periodicNodesIdentityList[cellNodeID].end());
+					if (grid.periodicNodesIdentityList.find(cellNodeID) != grid.periodicNodesIdentityList.end()) {
+						cellNodes.insert(grid.periodicNodesIdentityList[cellNodeID].begin(), grid.periodicNodesIdentityList[cellNodeID].end());
 					};
 					//msg<<"cellNodeID = "<<cellNodeID<<"\n";
 				};
@@ -729,7 +729,7 @@ public:
 				};
 				if (nCommonNodes == faceNodes) {
 					//We found second cell
-					if (IsLocalCell(nCellID)) {
+					if (grid.GetCellPart(nCellID) == _parallelHelper.getRank()) {
 						face.isExternal = false;
 					} else {
 						face.isExternal = true; nExternal++;
@@ -741,33 +741,33 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
-		_grid.nFaces = faceIndex;	
+		grid.nFaces = faceIndex;	
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
-		_grid.UpdateGeometricProperties();
+		grid.UpdateGeometricProperties();
 
 		////Generate face geometric properties			
-		//for (Face& face : _grid.localFaces) {
+		//for (Face& face : grid.localFaces) {
 		//	int index = face.GlobalIndex;						
-		//	_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		//	grid.ComputeGeometricProperties(&grid.localFaces[index]);
 		//};
 
 		////Update cells geometric properties
-		//for (int i = 0; i < _grid.nCellsLocal; i++) {
-		//	_grid.ComputeGeometricProperties(_grid.localCells[i]);
-		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//for (int i = 0; i < grid.nCellsLocal; i++) {
+		//	grid.ComputeGeometricProperties(grid.localCells[i]);
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.localCells[i]->getInfo());
 		//};	
 
 		////Orient face normals			
-		//for (Face& face : _grid.localFaces) {
+		//for (Face& face : grid.localFaces) {
 		//	int index = face.GlobalIndex;									
 
 		//	//If boundary face make sure dummy if FaceCell_2
-		//	if (face.FaceCell_1 >= _grid.nProperCells) {
+		//	if (face.FaceCell_1 >= grid.nProperCells) {
 		//		//Swap
 		//		int tmp = face.FaceCell_1;
 		//		face.FaceCell_1 = face.FaceCell_2;
@@ -775,10 +775,10 @@ public:
 		//	};
 
 		//	//Orient normal
-		//	Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
-		//	Vector faceCenter = _grid.localFaces[index].FaceCenter;
-		//	if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
-		//		_grid.localFaces[index].FaceNormal *= -1;
+		//	Vector cellCenter = grid.Cells[grid.localFaces[index].FaceCell_1].CellCenter;
+		//	Vector faceCenter = grid.localFaces[index].FaceCenter;
+		//	if (((cellCenter - faceCenter) * grid.localFaces[index].FaceNormal) > 0) {
+		//		grid.localFaces[index].FaceNormal *= -1;
 		//	};
 
 		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
@@ -786,17 +786,17 @@ public:
 
 
 		////Compute dummy cell geometric properties
-		//for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
-		//	int neighbour = _grid.localCells[i]->NeigbourCells[0];
-		//	Cell& cell = _grid.Cells[neighbour];
-		//	_grid.localCells[i]->CellVolume = cell.CellVolume;
+		//for (int i = grid.nCellsLocal; i < grid.localCells.size(); i++) {			
+		//	int neighbour = grid.localCells[i]->NeigbourCells[0];
+		//	Cell& cell = grid.Cells[neighbour];
+		//	grid.localCells[i]->CellVolume = cell.CellVolume;
 
 		//	//Reflect cell center over boundary face plane
-		//	Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
+		//	Face& face = grid.localFaces[ grid.localCells[i]->Faces[0]];
 		//	Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
 		//	Vector dummyCenter = cell.CellCenter - 2 * dR;
-		//	_grid.localCells[i]->CellCenter = dummyCenter;
-		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//	grid.localCells[i]->CellCenter = dummyCenter;
+		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.localCells[i]->getInfo());
 		//};
 
 		//Synchronize
@@ -1737,7 +1737,7 @@ public:
 				_ALEmethod.MoveMesh(stepInfo.TimeStep);			
 
 				//Regenerate geometric entities
-				GenerateGridGeometry();
+				GenerateGridGeometry(_grid);
 			};		
 
 			for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1833,7 +1833,7 @@ public:
 	//};
 
 	inline bool IsLocalCell(int globalIndex) {
-		return _grid.cellsPartitioning[globalIndex] == _parallelHelper.getRank();
+		return _grid.GetCellPart(globalIndex) == _parallelHelper.getRank();
 	};
 
 	inline bool IsDummyCell(int globalIndex) {
