@@ -193,6 +193,7 @@
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />
     <ClInclude Include="src\utility\basetypes.h" />
     <ClInclude Include="src\utility\datatypes.h" />
+    <ClInclude Include="src\utility\DSUClusteredSet.h" />
     <ClInclude Include="src\utility\geomfunctions.h" />
     <ClInclude Include="src\utility\meshquality.h" />
     <ClInclude Include="src\utility\utilityfunctions.h" />

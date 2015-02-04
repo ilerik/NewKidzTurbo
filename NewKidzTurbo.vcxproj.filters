@@ -255,6 +255,9 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h">
       <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
+    <ClInclude Include="src\utility\DSUClusteredSet.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

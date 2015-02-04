@@ -2,6 +2,7 @@
 #define TURBO_TestCases_MetalsCollision_MetalsCollision1DSteelVSPb
 
 #include "TestCase.h"
+#include "DSUClusteredSet.h"
 #include "gengrid1D.h"
 
 namespace TestCasesMetalsImpact {
@@ -117,7 +118,7 @@ public:
 		_configuration.MaxIteration = 1000000;
 		_configuration.MaxTime = TimeMax;
 		_configuration.SaveSolutionSnapshotIterations = 0;
-		_configuration.SaveSolutionSnapshotTime = TimeMax / 100;			
+		_configuration.SaveSolutionSnapshotTime = TimeMax / 80;			
 
 		_kernel->BindConfiguration(_configuration);	
 
@@ -180,6 +181,10 @@ public:
 				historyFile<<"\""<<"TimeStep"<<"\" ";
 				historyFile<<"\""<<"MeltedZoneWidth"<<"\" ";
 				historyFile<<"\""<<"TotalMeltedVolume"<<"\" ";
+				historyFile<<"\""<<"xMin"<<"\" ";
+				historyFile<<"\""<<"xMax"<<"\" ";
+				historyFile<<"\""<<"xInterface"<<"\" ";
+				historyFile<<"\""<<"avgMeltedZoneTemperature"<<"\" ";
 				historyFile<<std::endl;
 			};
 
@@ -196,6 +201,14 @@ public:
 			_parallelHelper->Barrier();
 		};
 
+		bool IsMelted(const int cellGlobalIndex) {
+			int cellIndex = -1;
+			int nmat = _kernel->GetCellGasModelIndex(cellGlobalIndex, cellIndex);
+			GasModel::MediumPhase phase = _gasModels->at(nmat)->GetPhase(_kernel->GetCellValues(cellGlobalIndex, cellIndex));			
+			return phase == GasModel::MediumPhase::AboveMeltingPoint;
+		};
+		
+
 		virtual void SaveHistory() {
 			StepInfo* info =_kernel->getStepInfo();
 			int iteration = info->Iteration;
@@ -206,31 +219,101 @@ public:
 			double minPbCoordinate = 1000;
 			double maxPbCoordinate = -1000;
 			double minPbNotMeltedCoordinate = 1000;
+			std::map<int, GasModel::MediumPhase> phases;
+			std::map<int, int> nmats;
+			std::vector<int> cellsIndexes;
 			for (int cellIndex = 0; cellIndex < _grid->nCellsLocal; cellIndex++) {
 				Cell* cell = _grid->localCells[cellIndex];
 				int cellGlobalIndex = cell->GlobalIndex;
+				cellsIndexes.push_back(cellGlobalIndex);
 				double coordinate =  cell->CellCenter.x;
 				double volume = cell->CellVolume;
 				int nmat = _kernel->GetCellGasModelIndex(cellGlobalIndex, cellIndex);
 				GasModel::MediumPhase phase = _gasModels->at(nmat)->GetPhase(_kernel->GetCellValues(cellGlobalIndex, cellIndex));
+				phases[cellGlobalIndex] = phase;
+				nmats[cellGlobalIndex] = nmat;
 
 				//Total volume of fluid above melting point
-				if (phase == GasModel::MediumPhase::AboveMeltingPoint) totalMeltedVolume += volume;
-
-				//Width of melted zone from Steel\Pb interface into Pb
-				if (nmat == nmetPb) {
-					if (coordinate < minPbCoordinate) minPbCoordinate = coordinate;
-					if (coordinate > maxPbCoordinate) maxPbCoordinate = coordinate;
-					if ((phase == GasModel::MediumPhase::BelowMeltingPoint) && (coordinate < minPbNotMeltedCoordinate)) minPbNotMeltedCoordinate = coordinate;
+				if (phase == GasModel::MediumPhase::AboveMeltingPoint) {				
+					totalMeltedVolume += volume;
 				};
 			};
 
-			//Aggregate computed values
-			minPbCoordinate = _parallelHelper->Min(minPbCoordinate);
-			maxPbCoordinate = _parallelHelper->Max(maxPbCoordinate);
-			minPbNotMeltedCoordinate = _parallelHelper->Min(minPbNotMeltedCoordinate);
-			minPbNotMeltedCoordinate = min(maxPbCoordinate, minPbNotMeltedCoordinate);
-			meltedZoneWidth = minPbNotMeltedCoordinate - minPbCoordinate;
+			//Initalize DSU structure
+			DSUClusteredSet<int> meltedCells;			
+			meltedCells.InitSet(cellsIndexes);
+
+			//Iterate through all faces
+			double xMin = 1000; bool isXMinSet = false;
+			double xMax = 1000; bool isXMaxSet = false;
+			double xInterface = 1000; bool isXInterfaceSet = false;
+			for (Face& face : _grid->localFaces) {
+				bool isMeltedL = (phases[face.FaceCell_1] == GasModel::MediumPhase::AboveMeltingPoint);
+				bool isMeltedR = (phases[face.FaceCell_2] == GasModel::MediumPhase::AboveMeltingPoint);
+				bool isReversed = (face.FaceNormal.x < 0);
+				int nmatL = nmats[face.FaceCell_1];
+				int nmatR = nmats[face.FaceCell_2];
+				double faceX = face.FaceCenter.x;
+				if (_grid->IsBoundaryFace(face)) continue;
+				if (nmatL != nmatR) {
+					xInterface = faceX;
+				};
+
+				//Merge cells
+				if ((isMeltedL && isMeltedR)) meltedCells.Union(face.FaceCell_1, face.FaceCell_2);
+				if ((!isMeltedL && !isMeltedR)) meltedCells.Union(face.FaceCell_1, face.FaceCell_2);
+			};
+
+			//Process clusters
+			std::function<bool(int)> ptr = std::bind(&TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb::TestCaseHistoryLogger::IsMelted, this, std::placeholders::_1);
+			std::vector< std::vector<int*> > clusters = meltedCells.GetClusters(ptr);
+			int biggestCluster = -1;
+			double biggestClusterLenght = 0;
+			double biggestClusterAvgTemperature = 0;
+			for (int i = 0; i < clusters.size(); i++) {
+				double sumS = 0;
+				double sumTS = 0;
+				double xBegin = 1000;
+				double xEnd = -1000;
+				for (int j = 0; j < clusters[i].size(); j++) {
+					int cellGlobalIndex = *clusters[i][j];
+					int cellIndex = _grid->cellsGlobalToLocal[cellGlobalIndex];
+					Cell* cell = _grid->localCells[cellIndex];
+					double x =  cell->CellCenter.x;
+					double S = cell->CellVolume;
+					int nmat = nmats[cellGlobalIndex];
+					double T = _gasModels->at(nmat)->GetTemperature(_kernel->GetCellValues(cellGlobalIndex, cellIndex));
+
+					//Determine coordinates
+					for (int faceIndex : cell->Faces) {
+						Face& face = _grid->localFaces[faceIndex];
+						double faceX = face.FaceCenter.x;
+						if (xBegin > faceX) xBegin = faceX;
+						if (xEnd < faceX) xEnd = faceX;
+					};
+
+					//Average of temperature
+					sumS += S;
+					sumTS += T * S;
+				};
+				double avgT = sumTS / sumS;
+
+				//Choose the biggest cluster
+				if (sumS > biggestClusterLenght) {
+					biggestClusterLenght = sumS;
+					biggestClusterAvgTemperature = avgT;
+					biggestCluster = i;
+					xMax = xEnd;
+					xMin = xBegin;
+				};
+			};
+
+			if (biggestCluster == -1) {
+				xMax = xMin = xInterface;
+			};
+
+			//Compute other quantities
+			meltedZoneWidth = xMax - xMin;
 
 			//Output
 			if (_parallelHelper->IsMaster()) {
@@ -239,6 +322,10 @@ public:
 				historyFile<<timeStep<<" ";
 				historyFile<<meltedZoneWidth<<" ";
 				historyFile<<totalMeltedVolume<<" ";
+				historyFile<<xMin<<" ";
+				historyFile<<xMax<<" ";
+				historyFile<<xInterface<<" ";
+				historyFile<<biggestClusterAvgTemperature<<" ";
 				historyFile<<std::endl;
 			};
 
@@ -283,9 +370,8 @@ public:
 			int nmat = getInitialGasModelIndex(cell); //get material index
 
 			std::vector<double> initValues;		
-			double uCenterMass = 0; //uImpact * (LLeft * roSteel) / (LLeft * roSteel + LRight * roPb);
-			double uL = uImpact - uCenterMass;
-			double uR = -uCenterMass;
+			double uL = 0;
+			double uR = -uImpact;
 
 			//Other velocities
 			double v = 0;
@@ -337,9 +423,9 @@ public:
 
 //Test constant's
 const int TestCaseMetalsImpact_1D_SteelVSPb::nCells = 1000;
-const double TestCaseMetalsImpact_1D_SteelVSPb::LLeft = 15e-2; // 15 cm;
-const double TestCaseMetalsImpact_1D_SteelVSPb::LRight = 15e-2; // 15 cm;
-const double TestCaseMetalsImpact_1D_SteelVSPb::TimeMax = 100e-6; // 100 mks
+const double TestCaseMetalsImpact_1D_SteelVSPb::LLeft = 15e-3; // 15 mm;
+const double TestCaseMetalsImpact_1D_SteelVSPb::LRight = 15e-3; // 15 mm;
+const double TestCaseMetalsImpact_1D_SteelVSPb::TimeMax = 8e-6; // 10 mks
 
 //Density and material index for EOS5
 const double TestCaseMetalsImpact_1D_SteelVSPb::roSteel = 1000 * 1.0 / 0.127; //SI	for stainless steel;
