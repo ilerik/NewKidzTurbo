@@ -227,8 +227,8 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
-		_moveHelper.IDWComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
-		return;
+		//_moveHelper.IDWComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+		//return;
 
 		//TO DO 1D implementation temporary
 		std::vector<double> coordinates;
