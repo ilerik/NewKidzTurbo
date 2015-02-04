@@ -255,10 +255,13 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h">
       <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
+<<<<<<< HEAD
     <ClInclude Include="src\utility\DSUClusteredSet.h">
       <Filter>Header Files\Utility</Filter>
+=======
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h">
       <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
+>>>>>>> erik.ALE.RMI.2D.test
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

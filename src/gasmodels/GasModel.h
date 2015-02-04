@@ -52,22 +52,22 @@ public:
 			roE = value[4];
 		};
 	};
-	
-	//Medium properties
-	double Gamma;
-	double Cv;
-	double Cp;	
-	double R;		
+		
 
 	//Obtain medium pressure
-	virtual double GetPressure(GasModel::ConservativeVariables U) {
-		double ro = U.ro;
-		double u = U.rou / ro;
-		double v = U.rov / ro;
-		double w = U.row / ro;		
-		double P = (U.roE - ro*(u*u + v*v + w*w) / 2.0) * (Gamma - 1.0);
-		return P;
+	virtual double GetPressure(GasModel::ConservativeVariables U) = 0;
+
+	//Obtain medium temperature
+	virtual double GetTemperature(GasModel::ConservativeVariables U) = 0;
+
+	//Availible phase types
+	enum class MediumPhase {
+		BelowMeltingPoint,
+		AboveMeltingPoint
 	};
+
+	//Obtain information about phase
+	virtual MediumPhase GetPhase(GasModel::ConservativeVariables U) = 0;
 
 	//Obtain medium pressure, soundspeed, Gruneisen coefficient and adiabatic exponent values
 	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0;

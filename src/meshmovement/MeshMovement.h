@@ -6,27 +6,41 @@
 #include "meshquality.h"
 #include "geomfunctions.h"
 #include <cassert>
+#include <unordered_set>
 
 //Impelementation of mesh movement algorithms
 class MeshMovement {
 public:
-	void IDWMove(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
-		assert(displacements.size() == nodes.size());
+	//Weighting Function
+	double W(Vector d_r) {	
+		double dr = d_r.mod();
+		double drx = d_r.x;
+		if (abs(dr) < 1e-15) return 1;
+		double Ai = 1;
+		double Ldef = 1e-2;
+		double alpha = 0.1;
+		double a = 3.0;
+		dr = d_r.mod();
+		//double a = 2.5;
+		double b = 5;
+		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));
+		return res;
+	};
 
-		//Determine set of boundary nodes
-		std::set<int> bNodes(nodes.begin(), nodes.end());
 
-		//Determine set of inner nodes		
-		std::set<int> iNodes;
-		int cb = 0;
-		for (int i = 0; i < grid.localNodes.size(); i++) {
-			if (i == nodes[cb]) {
-				cb++;
-				continue;
-			};
-			iNodes.insert(i);
-		};		
+	void IDWComputeDisplacements(Grid& grid, 
+		const std::unordered_set<int> movingNodes, 
+		std::map<int, Vector>& movingNodesDisplacements, 
+		const std::unordered_set<int> freeNodes, 
+		std::map<int, Vector>& freeNodesDisplacements) 
+	{
+		double lambdaX = 0.8 * 1e-2; //Wave number [cm]
+		int ModesNumber = 1; //Number of modes
+		double xMax = ModesNumber * (lambdaX * 0.5);
+		double xMin = ModesNumber * (-lambdaX * 0.5);
+		double period = xMax - xMin;
 
+		//assert(movingNodesDisplacements.size() == movingNodes.size());
 		//For all nodes allocate memory to store rotation and displacements
 		std::map<int, Vector> dR;
 		std::map<int, Vector> b;
@@ -34,9 +48,9 @@ public:
 		std::map<int, std::set<int> > bFaces;
 
 		//For all nodes
-		for (int i = 0; i<nodes.size(); i++) {
-			int nodeIndex = nodes[i];
-			dR[nodeIndex] = displacements[i];
+		for (int movingNodeIndex : movingNodes) {
+			if (movingNodesDisplacements.find(movingNodeIndex) == movingNodesDisplacements.end()) throw new Exception("Displacement for node is absent");
+			dR[movingNodeIndex] = movingNodesDisplacements[movingNodeIndex];
 		};
 				
 		//For each moving node determine neighbour boundary faces	
@@ -44,64 +58,25 @@ public:
 			Face& f = grid.localFaces[i];
 			bool isMovingFace = true;
 			for (int& faceNodeIndex : f.FaceNodes) {
-				if (bNodes.find(faceNodeIndex) == bNodes.end()) {
+				if (movingNodes.find(faceNodeIndex) == movingNodes.end()) {
 					isMovingFace = false;
 					break;
 				};
 			};
 
 			if (isMovingFace) for (int& faceNodeIndex : f.FaceNodes) {
-				bFaces[i].insert(faceNodeIndex);
+				bFaces[faceNodeIndex].insert(i);
 			};
 		};	
-		std::cout<<"N="<<nodes.size()<<", Nb="<<bNodes.size()<<'\n';
-
-		//Build kd-tree search index for boundary nodes
-		/*
-		const int nD = 2;
-		int n = 0;
-		std::unordered_map<int, int> indexMap;
-		flann::Matrix<double> bCoords(new double[bNodes.size() * nD], bNodes.size(), nD);
-		for (std::set<int>::iterator it = bNodes.begin(); it != bNodes.end(); it++) {
-			//if (Displ.find(*it) == Displ.cend()) continue;
-			Node& node = grid.nodes[*it];
-			bCoords[n][0] = node.P.x;
-			bCoords[n][1] = node.P.y;
-			indexMap[n] = node.GlobalIndex;
-			n++;
-		};
-
-		flann::Index< flann::L2<double> > index(bCoords, flann::KDTreeSingleIndexParams(4));
-		index.buildIndex();                                                                                                   
-		*/		
+		//std::cout<<"N="<<nodes.size()<<", Nb="<<bNodes.size()<<'\n';
 	
-		/*
-		// do a knn search for every inner node, using 128 checks
-		int nq = iNodes.size();
-		std::vector< std::vector<int> > indices;
-		std::vector<std::vector<double> > dists;
-		flann::Matrix<double> query(new double[nq * nD], nq, nD);
-
-		n = 0;
-		for (std::set<int>::iterator it = iNodes.begin(); it != iNodes.end(); it++) {
-			Node& node = grid.nodes[*it];
-			query[n][0] = node.P.x;
-			query[n][1] = node.P.y;
-			n++;
-		};
-	
-
-		int knn = 50; //number of neighbours used to compute displacement
-		index.knnSearch(query, indices, dists, knn, flann::SearchParams(128));
-		*/
-	
-		//Iterate through all boundary nodes compute rotation
+		//Iterate through all moving nodes compute rotation
 		int counter = 0;
-		for (int nodeIndex : bNodes) {
+		for (int nodeIndex : movingNodes) {
 			counter++;		
 			Node& node = grid.localNodes[nodeIndex];
 			Vector Displacement = dR[nodeIndex];
-			Vector new_normal;
+			Vector newNormal;
 			Vector normal;
 			int k = 0;
 			//Iterate through all neighbour faces
@@ -116,72 +91,96 @@ public:
 				};
 				Vector n = CalcNormal(points);
 				if (f.FaceNormal * n > 0) {
-					new_normal += n;
+					newNormal += n;
 				} else {
-					new_normal -= n;
+					newNormal -= n;
 				};			
 				normal += f.FaceNormal / f.FaceNormal.mod();
 				k++;
 			};				
-			Vector r = new_normal;
-			new_normal /= new_normal.mod();		
-			normal /= k;
+			Vector r = newNormal;
+			newNormal /= newNormal.mod();		
 			normal /= normal.mod();
 	//		std::cout<<"Rotation : "<<counter<<" normal" << normal.mod() << "\n";
-			RotationMatrix M = CalcRotation(normal, new_normal);
+			RotationMatrix M = CalcRotation(normal, newNormal);
 			R[nodeIndex] = M;
 			b[nodeIndex] = node.P + Displacement - M * node.P;			
 		};
 
-		//Compute displacement for inner nodes
-		//n = 0;
+		//Compute displacement for free nodes
 		counter = 0;
 		double percent = 0;
-		for (int nodeIndex : iNodes) {
+		for (int nodeIndex : freeNodes) {
 			counter++;		
-			//if (1.0 * counter / iNodes.size() >=  percent) {		
-			//	std::cout<<"Interpolation : "<<percent * 100<<"% complete\n";
-			//	percent += 0.01;
-			//};
 			Node& ni = grid.localNodes[nodeIndex];
 			std::vector<Vector> displacements;
 			dR[nodeIndex] = Vector(0,0,0);
 			double sum = 0;		
 
-			//knn-boosted version
-			/*
-			for (int i=0; i<indices[n].size(); i++) {			
-				Node& nb = grid.nodes[indexMap[indices[n][i]]];
-				Vector b = *(Vector *)nb.Data["b"];
-				RotationMatrix M = *(RotationMatrix *)nb.Data["R"];			
-				Vector dr = ni.P - nb.P;
-				double w = W(dr);						
-				Vector displ = (M * ni.P + b - ni.P);			
-				*(Vector *)ni.Data["dR"] += w * displ;			
-				sum += w;
-			}					
-			*(Vector *)ni.Data["dR"] /= sum;
-			n++;
-			*/
-			//Old version
-		
-			for (int movingNodeIndex : bNodes) {			
+			for (int movingNodeIndex : movingNodes) {			
 				Node& nb = grid.localNodes[movingNodeIndex];
 				Vector bb = b[movingNodeIndex];
 				RotationMatrix M = R[movingNodeIndex];			
-				Vector dr = ni.P - nb.P;
-				double w = 1; //W(dr);	TO DO					
-				Vector displ = (M * ni.P + bb - ni.P);			
-				dR[nodeIndex] += w * displ;			
-				sum += w;
+				Vector dr = ni.P - nb.P;			
+				//Vector displ = (M * ni.P + bb - ni.P);
+				Vector displ = dR[movingNodeIndex];
+				/*if ((dr.x) > (period / 2.0)) {
+					dr.x = (period / 2.0) - dr.x;
+				};
+				if ((displ.x) > (period / 2.0)) {
+					displ.x = (period / 2.0) - displ.x;
+				};*/
+				double w = W(dr);	//TO DO		
+				dR[nodeIndex] += w * displ; 
+				sum += w; //			
 			}					
-			dR[nodeIndex] /= sum;		
+			dR[nodeIndex] /= sum;	
+
+			//Save result
+			freeNodesDisplacements[nodeIndex] = dR[nodeIndex];
 		};
+
+		//Sync
+	};
+
+	void IDWMoveNodes(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
+		assert(displacements.size() == nodes.size());
+
+		//Determine set of boundary nodes
+		std::unordered_set<int> movingNodes(nodes.begin(), nodes.end());
+
+		//Determine set of inner nodes		
+		std::unordered_set<int> freeNodes;
+		int cb = 0;
+		for (int i = 0; i < grid.localNodes.size(); i++) {
+			if (i == nodes[cb]) {
+				cb++;
+				continue;
+			};
+			freeNodes.insert(i);
+		};		
+
+		//For all nodes allocate memory to store rotation and displacements
+		std::map<int, Vector> dRmoving;
+		std::map<int, Vector> dRfree;
+
+		//For boundary nodes
+		for (int i = 0; i<nodes.size(); i++) {
+			int movingNodeIndex = nodes[i];
+			Vector displacement = displacements[i];
+			dRmoving[movingNodeIndex] = displacement;
+		};
+
+		//Compute displacements
+		IDWComputeDisplacements(grid, movingNodes, dRmoving, freeNodes, dRfree);
 
 		//Change grid according to displacements	
 		//Nodes first
-		for (int i = 0;i < grid.localNodes.size(); i++) {
-			grid.localNodes[i].P += dR[i];
+		for (int i : freeNodes) {
+			grid.localNodes[i].P += dRfree[i];
+		};
+		for (int i : movingNodes) {
+			grid.localNodes[i].P += dRmoving[i];
 		};
 
 		//Recalculate Face normals and other grid geometric properties

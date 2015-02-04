@@ -6,7 +6,7 @@
 namespace BoundaryConditions {
 
 class BCOutflowSupersonic : public BoundaryCondition {
-public:	
+public:
 	virtual std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) {
 		//Obtain face
 		if (dummyCell.Faces.size() != 1) throw new Exception("Dummy cell has more than one face");

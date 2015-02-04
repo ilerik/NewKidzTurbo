@@ -6,6 +6,13 @@
 //Gas model base class
 class PerfectGasModel : public GasModel {
 public:	
+	//Constructor
+	PerfectGasModel() {
+		//Model information
+		GasModelName = "PerfectGasModel";
+		GasModelType = ModelType_t::CaloricallyPerfect;		
+	};
+
 	//Medium properties
 	double Gamma;
 	double Cv;
@@ -32,7 +39,23 @@ public:
 		pressure = (ro * e) * (Gamma - 1.0);
 		soundspeed = sqrt((Gamma - 1.0) * (e + pressure/ro));
 		gruneisen = Gamma - 1.0;		
-	};		
+	};
+
+	//Obtain medium temperature
+	virtual double GetTemperature(GasModel::ConservativeVariables U) {
+		double ro = U.ro;
+		double u = U.rou / ro;
+		double v = U.rov / ro;
+		double w = U.row / ro;	
+		double e = (U.roE / ro) - (u*u + v*v + w*w) / 2.0;
+		double T = e / Cv;
+		return T;
+	};
+
+	//Obtain information about phase
+	virtual GasModel::MediumPhase GetPhase(GasModel::ConservativeVariables U) {
+		return GasModel::MediumPhase::BelowMeltingPoint;
+	};
 
 
 	//Read configuration

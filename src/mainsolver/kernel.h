@@ -19,158 +19,12 @@
 #include "LomonosovFortovGasModel.h"
 #include "PerfectGasModel.h"
 #include "meshquality.h"
-
+#include "ALEMethod.h"
 
 //Define error types
 enum turbo_errt {
 	TURBO_OK = 0,
 	TURBO_ERROR = 1
-};
-
-
-//Define availible types of ALE motion
-
-
-//Define ALE integration method
-class ALEMethod {	
-	Grid* _grid;
-
-	// map faceIndex to [0,1] indicator value. 1.0 - F
-	double (*_indicatorFunction)(int); 
-public:
-	//Set pointer to indicator function
-
-	//Set reference to grid
-	void SetGrid(Grid& grid) {
-		_grid = &grid;
-	};
-
-	//Method type
-	enum class ALEMotionType {
-		PureEulerian,
-		PureLagrangian,
-		ALEMaterialInterfaces
-	} ALEMotionType;
-
-	//Velocity of faces and nodes for ALE step
-	std::map<int, Vector> nodesVelocity;
-	std::map<int, Vector> facesVelocity;
-	std::map<int, double> facesPressure; 
-
-	//List of adjacent faces for each node
-	std::map<int, std::vector<int>> adjacentFaces;
-
-	//Compute swept volume
-	double CalcSweptVolumeRate(Face& f) {
-		double volume = 0;
-		if (f.CGNSType == NODE) {
-			Vector v = nodesVelocity[f.FaceNodes[0]];
-			volume = f.FaceSquare * v * f.FaceNormal;
-			return volume;
-		};
-		if (f.CGNSType == BAR_2) {
-			Vector v1 = nodesVelocity[f.FaceNodes[0]];
-			Vector v2 = nodesVelocity[f.FaceNodes[1]];
-			volume = 0.5 * f.FaceSquare * (v1+v2) * f.FaceNormal;
-			return volume;
-		};
-		throw new Exception("Unsupported element type");
-		return 0;
-	};
-
-	//ALE residual correction procedure
-	void Remap(int nVariables, std::vector<double>& residual, std::vector<double>& cellValues, double dt) {
-		//Compute grid motion fluxes through each face
-		for (int cellInd = 0; cellInd < _grid->nCellsLocal; cellInd++) {
-			Cell* c = _grid->localCells[cellInd];
-			for (int faceInd : c->Faces) {
-				Face& f = _grid->localFaces[faceInd];					
-
-				//Compute volume swept by face TO DO generalize
-				double sweptVolume = 0;
-				Vector avgVelocity = Vector(0,0,0);
-				for (int nodeInd : f.FaceNodes) {
-					avgVelocity += nodesVelocity[nodeInd];
-				};
-				avgVelocity /= f.FaceNodes.size();
-				sweptVolume = avgVelocity.mod() * dt;
-
-				//Distribute moving face flux				
-				for (int i = 0; i<nVariables; i++) { 
-					residual += cellValues * sweptVolume;
-				};
-
-				//Vector uR = ;
-				//double roCell = Values[cellInd * nVariables + 0];					
-				//double A = -1.0 * f.FaceSquare;
-				//if (f.FaceCell_1 != c->GlobalIndex) {
-				//	A *= -1; //Reverse flow if normal directed inwards
-				//	//roCell = GetCellValues(f.FaceCell_2)[0];
-				//};
-				////A *= FaceFluxes[f.GlobalIndex][0] / (roCell * un);
-
-				//for (int j = 0; j<nVariables; j++) {
-				//	double dR =  -Values[cellInd * nVariables + j] * un * A;
-				//	residual[cellInd * nVariables + j] += dR; // / _grid.localCells[cellInd]->CellVolume;
-				//};
-			};				
-		};
-	};
-
-	//Compute velocities
-	void ComputeNodeVelocities() {
-		//For each node refresh list of adjacent faces
-		adjacentFaces.clear();
-		for (Face& f : _grid->localFaces) {
-			for (int node : f.FaceNodes) {
-				adjacentFaces[node].push_back(f.GlobalIndex);
-			};
-		};
-
-		//For each node compute velocity
-		for (Node& n : _grid->localNodes) {
-			Vector nodeVelocity; //Resulting node velocity
-			double sumFacesSquare = 0;
-
-			//Matrix consisting of face normals
-			std::vector<double> faceNormals;
-			//Vector of face normal velocities
-			std::vector<double> faceVelocities;
-
-			std::vector<double> velocities;
-			std::vector<Vector> normals;
-			std::vector<double> weights;
-			
-			//LLS approximation
-			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
-				Face& face = _grid->localFaces[faceIndex];
-				Vector faceVelocity = facesVelocity[faceIndex];
-				velocities.push_back(faceVelocity * face.FaceNormal);
-				normals.push_back(face.FaceNormal);
-				weights.push_back(face.FaceSquare);				
-			};
-
-			nodeVelocity = ComputeVelocityByPoints(_grid->gridInfo.CellDimensions, velocities, normals, weights);
-
-			//Store node velocity
-			nodesVelocity[n.GlobalIndex] = nodeVelocity;
-		};		
-	};
-
-	//Move mesh
-	void MoveMesh(double timestep) {
-		for (std::pair<int, Vector> pair : nodesVelocity) {
-			int nodeInd = pair.first;
-			Vector v = pair.second;
-			_grid->localNodes[nodeInd].P += v * timestep;
-		};
-	};
-
-	//Remeshing procedure
-	void Remesh() {
-
-	};
-
 };
 
 //Step info
@@ -180,6 +34,31 @@ public:
 	double TimeStep;	
 	int Iteration;
 	std::vector<double> Residual;	
+};
+
+//Forward declaration
+class Kernel;
+
+//Base class for storing activity executed after each computational step
+class StepHistoryLogger {
+protected:
+	Kernel* _kernel;
+	Logger* _logger;
+	Grid* _grid;
+	ParallelHelper* _parallelHelper;
+	std::vector<GasModel*>* _gasModels;	
+public:
+	void setStepHistoryLoggerReferences(Kernel* kernel, Logger* logger, Grid* grid, ParallelHelper* parallelHelper, std::vector<GasModel*>* gasModels) {
+		_kernel = kernel;
+		_logger = logger;
+		_grid = grid;
+		_parallelHelper = parallelHelper;
+		_gasModels = gasModels;
+	};
+
+	virtual void Init() = 0;
+	virtual void SaveHistory() = 0;
+	virtual void Finalize() = 0;
 };
 
 //Calculation kernel
@@ -194,6 +73,9 @@ private:
 	//Helper for CGNS i\o
 	GridLoading::CGNSReader _cgnsReader;
 	PostProcessing::CGNSWriter _cgnsWriter;
+
+	//History logger object
+	StepHistoryLogger* _stepHistoryLogger;
 
 	//Grid data
 	Grid _grid;
@@ -254,10 +136,33 @@ private:
 	std::vector<Vector> GradientP;
 
 public:
+	//Accessors
+
 	//Parallel helper
-	ParallelHelper* getParallelHelper() {
+	inline ParallelHelper* getParallelHelper() {
 		return &_parallelHelper;
-	};	
+	};
+
+	//Step info
+	inline StepInfo* getStepInfo() {
+		return &stepInfo;
+	};
+
+	//History logger
+	inline void setStepHistoryLogger(StepHistoryLogger* logger) {
+		//Delete if exists
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Finalize();
+			delete _stepHistoryLogger;
+		};
+
+		//Properly attach object to kernel
+		_stepHistoryLogger = logger;
+		_stepHistoryLogger->setStepHistoryLoggerReferences(this, &_logger, &_grid, &_parallelHelper, &_gasModels);
+
+		//Synchronize
+		_parallelHelper.Barrier();
+	};
 
 	//Initialize computational kernel
 	turbo_errt Initilize(int *argc, char **argv[]) {		
@@ -274,6 +179,9 @@ public:
 			//Initialize cgns i\o subsystem
 			_cgnsReader.Init(_logger, _parallelHelper);
 			_cgnsWriter.Init(_logger, _parallelHelper);
+
+			//No default history logger
+			_stepHistoryLogger = NULL;
 		} catch (...) {
 			//Exception was thrown but shouldnt
 			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Kernel initialization failed");
@@ -375,6 +283,9 @@ public:
 		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
 		};
+		if (_configuration.ALEConfiguration.ALEMotionType == "ALEMaterialInterfaces") {
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::ALEMaterialInterfaces;		
+		};		
 		if (_configuration.ALEConfiguration.ALEMotionType == "Lagrangian") {		
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;				
 		}		
@@ -403,7 +314,12 @@ public:
 		};
 
 		//Init parallel exchange
-		InitParallelExchange();		
+		InitParallelExchange();	
+
+		//Initialize history logger
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Init();
+		};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -472,6 +388,8 @@ public:
 				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
 
+			//Save history
+			if (_stepHistoryLogger != NULL) _stepHistoryLogger->SaveHistory();
 
 			//Convergence criteria
 			if (stepInfo.Iteration == MaxIteration) {
@@ -509,7 +427,8 @@ public:
 	};
 
 	turbo_errt FinalizeCalculation() {
-		//Free memory				
+		//Free memory		
+
 		//Boundary conditions
 		for (std::pair<int, BoundaryConditions::BoundaryCondition*> p : _boundaryConditions) {
 			delete (p.second);
@@ -517,6 +436,12 @@ public:
 
 		//Riemann solver
 		if (rSolver != NULL) delete rSolver;
+
+		//History logging
+		if (_stepHistoryLogger != NULL) {
+			_stepHistoryLogger->Finalize();
+			delete _stepHistoryLogger;
+		};
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -527,8 +452,8 @@ public:
 	//Load grid from CGNS file
 	turbo_errt LoadGrid(std::string filename) {
 		_grid = _cgnsReader.LoadGrid(filename);
-		PartitionGrid();
-		GenerateGridGeometry();
+		PartitionGrid(_grid);
+		GenerateGridGeometry(_grid);
 		return TURBO_OK;
 	};	
 
@@ -544,13 +469,13 @@ public:
 	//Bind existing grid to kernel
 	turbo_errt BindGrid(Grid* grid) {
 		_grid = *grid;
-		PartitionGrid();
-		GenerateGridGeometry();
+		PartitionGrid(_grid);
+		GenerateGridGeometry(_grid);
 		return TURBO_OK;
 	};
 
 	//Partion loaded grid
-	turbo_errt PartitionGrid() {
+	turbo_errt PartitionGrid(Grid& grid) {
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Grid partitioning started");	
 
 		//Partitioning settings
@@ -595,33 +520,33 @@ public:
 
 		/* This is an array of size equal to the number of locally-stored vertices. Upon successful completion the
 		partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
-		std::vector<idx_t> part(_grid.nCellsLocal);
+		std::vector<idx_t> part(grid.nCellsLocal);
 		std::ostringstream msg;
 		msg.str(std::string());
 		msg<<"vdist[] = \n";
-		for (int i = 0; i<=_nProcessors; i++) msg<<_grid.vdist[i]<<" ";
+		for (int i = 0; i<=_nProcessors; i++) msg<<grid.vdist[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
 		msg.str(std::string());
 		msg<<"xadj[] = \n";
-		for (int i = 0; i<_grid.xadj.size(); i++) msg<<_grid.xadj[i]<<" ";
+		for (int i = 0; i<grid.xadj.size(); i++) msg<<grid.xadj[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		msg.clear();
 		msg.str(std::string());
 		msg<<"adjncy[] = \n";
-		for (int i = 0; i<_grid.adjncy.size(); i++) msg<<_grid.adjncy[i]<<" ";
+		for (int i = 0; i<grid.adjncy.size(); i++) msg<<grid.adjncy[i]<<" ";
 		msg<<"\n";
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Call partitioning function		
 		MPI_Comm _comm = _parallelHelper.getComm();
 		_parallelHelper.Barrier();
-		if (_nProcessors < _grid.nProperCells) { //Make sure that partitioning is needed
-			int result = ParMETIS_V3_PartKway(&_grid.vdist[0], &_grid.xadj[0], _grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
+		if (_nProcessors < grid.nProperCells) { //Make sure that partitioning is needed
+			int result = ParMETIS_V3_PartKway(&grid.vdist[0], &grid.xadj[0], grid.adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
 			if (result != METIS_OK) {
 				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "ParMETIS_V3_PartKway failed.");
 				return TURBO_ERROR;
@@ -631,7 +556,7 @@ public:
 		//Gather partitioning on every processor
 		std::vector<int> recvcounts(_nProcessors);
 		for (int i = 0; i<_nProcessors; i++) {
-			recvcounts[i] = _grid.vdist[i+1] - _grid.vdist[i];
+			recvcounts[i] = grid.vdist[i+1] - grid.vdist[i];
 		};
 		
 		/*msg.clear();
@@ -644,33 +569,33 @@ public:
 		msg<<"\n";
 
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
-		_parallelHelper.Allgatherv( part, recvcounts, _grid.cellsPartitioning);
+		_parallelHelper.Allgatherv( part, recvcounts, grid.cellsPartitioning);
 
 		//Debug partitioning
 		/*for (int i = 0; i<_nProcessors; i++) {
-			for (int j = _grid.vdist[i]; j< _grid.vdist[i+1]; j++) _grid.cellsPartitioning[j] = i;
+			for (int j = grid.vdist[i]; j< grid.vdist[i+1]; j++) grid.cellsPartitioning[j] = i;
 		};		*/
-		//for (int i = 10; i<51; i++) _grid.cellsPartitioning[i] = 0;
+		//for (int i = 10; i<51; i++) grid.cellsPartitioning[i] = 0;
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Good.");	
 
 		//Otput result information		
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Partitioning edgecut = ", edgecut);		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCells = ", _grid.nCells);		
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nProperCells = ", _grid.nProperCells);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCells = ", grid.nCells);		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nProperCells = ", grid.nProperCells);		
 		
 		//Add dummy cells
-		for (int i = _grid.nProperCells; i<_grid.nCells; i++) {
-			Cell* cell = &_grid.Cells[i];
+		for (int i = grid.nProperCells; i<grid.nCells; i++) {
+			Cell* cell = &grid.Cells[i];
 			int neigbour = cell->NeigbourCells[0];
-			int p = _grid.cellsPartitioning[neigbour];
-			_grid.cellsPartitioning.push_back(p);			
+			int p = grid.cellsPartitioning[neigbour];
+			grid.cellsPartitioning.push_back(p);			
 		};
 
 		//Otput cells partitioning
 		/*msg.clear();
 		msg<<"Partitioning = [ ";
-		for (int p : _grid.cellsPartitioning) {
+		for (int p : grid.cellsPartitioning) {
 			msg<<p<<" ";
 		};
 		msg<<"]\n";
@@ -679,27 +604,27 @@ public:
 
 		//Extract local cells indexes		
 		int count = 0;
-		_grid.localCells.clear();
-		_grid.localCellIndexes.clear();
-		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (!_grid.Cells[i].IsDummy)) {
-				_grid.localCells.push_back(&_grid.Cells[i]);
-				_grid.localCellIndexes.push_back(i);				
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
+		grid.localCells.clear();
+		grid.localCellIndexes.clear();
+		for (int i = 0; i<grid.nCells; i++) {
+			if ((grid.cellsPartitioning[i] == _rank) && (!grid.Cells[i].IsDummy)) {
+				grid.localCells.push_back(&grid.Cells[i]);
+				grid.localCellIndexes.push_back(i);				
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.Cells[i].getInfo());
 			};
 		};		
-		_grid.nCellsLocal = _grid.localCellIndexes.size(); //Without dummy cells
-		for (int i = 0; i<_grid.nCells; i++) {
-			if ((_grid.cellsPartitioning[i] == _rank) && (_grid.Cells[i].IsDummy)) {
-				_grid.localCells.push_back(&_grid.Cells[i]);
-				_grid.localCellIndexes.push_back(i);
-				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.Cells[i].getInfo());
+		grid.nCellsLocal = grid.localCellIndexes.size(); //Without dummy cells
+		for (int i = 0; i<grid.nCells; i++) {
+			if ((grid.cellsPartitioning[i] == _rank) && (grid.Cells[i].IsDummy)) {
+				grid.localCells.push_back(&grid.Cells[i]);
+				grid.localCellIndexes.push_back(i);
+				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.Cells[i].getInfo());
 			};
 		};		
 
 		//Otput result
 		msg.str(std::string());
-		msg<<"Number of local cells = "<<_grid.nCellsLocal;
+		msg<<"Number of local cells = "<<grid.nCellsLocal;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 
 		//Synchronize		
@@ -711,33 +636,33 @@ public:
 
 	//Load required geometric grid data to appropriate data structures
 	//Provided we have partioned grid
-	turbo_errt GenerateGridGeometry() {
+	turbo_errt GenerateGridGeometry(Grid& grid) {
 		//return turbo_errt::TURBO_OK;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation started");
 
 		//Create local cells
-		_grid.localCells.resize(_grid.localCellIndexes.size());		
-		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {	
-			int cellGlobalIndex = _grid.localCellIndexes[i];
+		grid.localCells.resize(grid.localCellIndexes.size());		
+		for (int i = 0; i < grid.localCellIndexes.size(); i++) {	
+			int cellGlobalIndex = grid.localCellIndexes[i];
 			int cellLocalIndex = i;
-			_grid.localCells[i] = &_grid.Cells[cellGlobalIndex];	
-			_grid.localCells[i]->Faces.clear();
-			_grid.cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
+			grid.localCells[i] = &grid.Cells[cellGlobalIndex];	
+			grid.localCells[i]->Faces.clear();
+			grid.cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
 		};
 
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", _grid.localCellIndexes.size());		
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", grid.nCellsLocal);
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal + dummyLocal = ", grid.localCellIndexes.size());		
 
 		//Create faces		
-		_grid.localFaces.clear();
+		grid.localFaces.clear();
 		int faceIndex = 0;
 		std::map<std::set<int>, int> faces;	//Face nodes to face index		
-		for (int i = 0; i < _grid.localCellIndexes.size(); i++) {
+		for (int i = 0; i < grid.localCellIndexes.size(); i++) {
 			//Generate all faces for the cell
-			Cell* cell = _grid.localCells[i];		
+			Cell* cell = grid.localCells[i];		
 			std::vector<Face> newFaces;
 			if (!cell->IsDummy) {
-				newFaces = _grid.ObtainFaces(cell);
+				newFaces = grid.ObtainFaces(cell);
 			} else {
 				Face boundaryFace;
 				boundaryFace.CGNSType = cell->CGNSType;
@@ -755,22 +680,22 @@ public:
 				if ( result.second ) {	
 					face.GlobalIndex = faceIndex;
 					result.first->second = face.GlobalIndex;
-					_grid.localFaces.push_back(face);
-					_grid.localFaces[faceIndex].isExternal = true;
-					//_grid.localFaces[faceIndex].FaceCell_1 = i;
-					_grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
-					_grid.localCells[i]->Faces.push_back(face.GlobalIndex);
+					grid.localFaces.push_back(face);
+					grid.localFaces[faceIndex].isExternal = true;
+					//grid.localFaces[faceIndex].FaceCell_1 = i;
+					grid.localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
+					grid.localCells[i]->Faces.push_back(face.GlobalIndex);
 					faceIndex++;
 				} else {					
 					int fIndex = result.first->second;
-					_grid.localFaces[fIndex].isExternal = false;
+					grid.localFaces[fIndex].isExternal = false;
 					if (cell->IsDummy) {
-						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+						grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					} else {
-						//_grid.localFaces[faceIndex].FaceCell_2 = i;
-						_grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+						//grid.localFaces[faceIndex].FaceCell_2 = i;
+						grid.localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
 					};
-					_grid.localCells[i]->Faces.push_back(fIndex);
+					grid.localCells[i]->Faces.push_back(fIndex);
 				};
 			};
 		};
@@ -779,22 +704,22 @@ public:
 		std::stringstream msg;
 		msg.clear();
 		int nExternal = 0;
-		for (Face& face : _grid.localFaces) if (face.isExternal) {
+		for (Face& face : grid.localFaces) if (face.isExternal) {
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
 			int faceNodes = face.FaceNodes.size();
 			//msg<<"faceNodes = "<<faceNodes<<"\n";
-			Cell& cell = _grid.Cells[face.FaceCell_1];
+			Cell& cell = grid.Cells[face.FaceCell_1];
 			for (int nCellID : cell.NeigbourCells) {
 				//msg<<"nCellID = "<<faceNodes<<"\n";
-				Cell& nCell = _grid.Cells[nCellID];
+				Cell& nCell = grid.Cells[nCellID];
 				int nCommonNodes = 0;
 				std::set<int> cellNodes;
 				for (int cellNodeID : nCell.Nodes) {
 					cellNodes.insert(cellNodeID);
 					//Handle periodic
-					if (_grid.periodicNodesIdentityList.find(cellNodeID) != _grid.periodicNodesIdentityList.end()) {
-						cellNodes.insert(_grid.periodicNodesIdentityList[cellNodeID].begin(), _grid.periodicNodesIdentityList[cellNodeID].end());
+					if (grid.periodicNodesIdentityList.find(cellNodeID) != grid.periodicNodesIdentityList.end()) {
+						cellNodes.insert(grid.periodicNodesIdentityList[cellNodeID].begin(), grid.periodicNodesIdentityList[cellNodeID].end());
 					};
 					//msg<<"cellNodeID = "<<cellNodeID<<"\n";
 				};
@@ -804,7 +729,7 @@ public:
 				};
 				if (nCommonNodes == faceNodes) {
 					//We found second cell
-					if (IsLocalCell(nCellID)) {
+					if (grid.GetCellPart(nCellID) == _parallelHelper.getRank()) {
 						face.isExternal = false;
 					} else {
 						face.isExternal = true; nExternal++;
@@ -816,33 +741,33 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
 		};
 
-		_grid.nFaces = faceIndex;	
+		grid.nFaces = faceIndex;	
 
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Debug
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faces ", nExternal);				
 
-		_grid.UpdateGeometricProperties();
+		grid.UpdateGeometricProperties();
 
 		////Generate face geometric properties			
-		//for (Face& face : _grid.localFaces) {
+		//for (Face& face : grid.localFaces) {
 		//	int index = face.GlobalIndex;						
-		//	_grid.ComputeGeometricProperties(&_grid.localFaces[index]);
+		//	grid.ComputeGeometricProperties(&grid.localFaces[index]);
 		//};
 
 		////Update cells geometric properties
-		//for (int i = 0; i < _grid.nCellsLocal; i++) {
-		//	_grid.ComputeGeometricProperties(_grid.localCells[i]);
-		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//for (int i = 0; i < grid.nCellsLocal; i++) {
+		//	grid.ComputeGeometricProperties(grid.localCells[i]);
+		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.localCells[i]->getInfo());
 		//};	
 
 		////Orient face normals			
-		//for (Face& face : _grid.localFaces) {
+		//for (Face& face : grid.localFaces) {
 		//	int index = face.GlobalIndex;									
 
 		//	//If boundary face make sure dummy if FaceCell_2
-		//	if (face.FaceCell_1 >= _grid.nProperCells) {
+		//	if (face.FaceCell_1 >= grid.nProperCells) {
 		//		//Swap
 		//		int tmp = face.FaceCell_1;
 		//		face.FaceCell_1 = face.FaceCell_2;
@@ -850,10 +775,10 @@ public:
 		//	};
 
 		//	//Orient normal
-		//	Vector cellCenter = _grid.Cells[_grid.localFaces[index].FaceCell_1].CellCenter;
-		//	Vector faceCenter = _grid.localFaces[index].FaceCenter;
-		//	if (((cellCenter - faceCenter) * _grid.localFaces[index].FaceNormal) > 0) {
-		//		_grid.localFaces[index].FaceNormal *= -1;
+		//	Vector cellCenter = grid.Cells[grid.localFaces[index].FaceCell_1].CellCenter;
+		//	Vector faceCenter = grid.localFaces[index].FaceCenter;
+		//	if (((cellCenter - faceCenter) * grid.localFaces[index].FaceNormal) > 0) {
+		//		grid.localFaces[index].FaceNormal *= -1;
 		//	};
 
 		//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, face.getInfo());
@@ -861,17 +786,17 @@ public:
 
 
 		////Compute dummy cell geometric properties
-		//for (int i = _grid.nCellsLocal; i < _grid.localCells.size(); i++) {			
-		//	int neighbour = _grid.localCells[i]->NeigbourCells[0];
-		//	Cell& cell = _grid.Cells[neighbour];
-		//	_grid.localCells[i]->CellVolume = cell.CellVolume;
+		//for (int i = grid.nCellsLocal; i < grid.localCells.size(); i++) {			
+		//	int neighbour = grid.localCells[i]->NeigbourCells[0];
+		//	Cell& cell = grid.Cells[neighbour];
+		//	grid.localCells[i]->CellVolume = cell.CellVolume;
 
 		//	//Reflect cell center over boundary face plane
-		//	Face& face = _grid.localFaces[ _grid.localCells[i]->Faces[0]];
+		//	Face& face = grid.localFaces[ grid.localCells[i]->Faces[0]];
 		//	Vector dR = ((cell.CellCenter - face.FaceCenter) * face.FaceNormal) * face.FaceNormal / face.FaceNormal.mod();
 		//	Vector dummyCenter = cell.CellCenter - 2 * dR;
-		//	_grid.localCells[i]->CellCenter = dummyCenter;
-		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, _grid.localCells[i]->getInfo());
+		//	grid.localCells[i]->CellCenter = dummyCenter;
+		//	//s_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, grid.localCells[i]->getInfo());
 		//};
 
 		//Synchronize
@@ -1183,11 +1108,26 @@ public:
 
 				//Skip missing boundary condition
 				continue;
-			}								
+			};
+
+			
+			
 			
 			//Initialize boundary conditions
 			bool bcTypeCheckPassed = false;
 			BoundaryConditionConfiguration& bcConfig = _configuration.BoundaryConditions[bcName];
+
+			std::string mName = bcConfig.MaterialName;
+			if (_configuration.GasModelNameToIndex.find(mName) == std::end(_configuration.GasModelNameToIndex)) {
+				//Material name unspecified
+				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Unspecified material name " + mName + ", for boundary condition :" + bcName);	
+
+				//Synchronize
+				_parallelHelper.Barrier();
+				return turbo_errt::TURBO_ERROR;
+			};
+			int materialIndex = _configuration.GasModelNameToIndex[mName];
+
 			BCType_t bcType = bcConfig.BoundaryConditionType;
 			if (bcType == BCType_t::BCSymmetryPlane) {				
 				BoundaryConditions::BCSymmetryPlane* bc = new BoundaryConditions::BCSymmetryPlane();
@@ -1201,7 +1141,7 @@ public:
 			};
 			if (bcType == BCType_t::BCInflowSupersonic) {
 				BoundaryConditions::BCInflowSupersonic* bc = new BoundaryConditions::BCInflowSupersonic();
-				_boundaryConditions[bcMarker] = bc; 
+				_boundaryConditions[bcMarker] = bc;
 				bcTypeCheckPassed = true;
 			};
 
@@ -1215,9 +1155,13 @@ public:
 				//Attach needed data structures to boundary condition class
 				_boundaryConditions[bcMarker]->setGrid(_grid);
 				_boundaryConditions[bcMarker]->setGasModel(_gasModels);
+				_boundaryConditions[bcMarker]->setMaterialIndex(materialIndex);
 
 				//Load specific configuration parameters
 				_boundaryConditions[bcMarker]->loadConfiguration(bcConfig);
+
+				//Set and check mesh movement type (TO DO check for consistency with ALE settings)
+				_boundaryConditions[bcMarker]->movementType = bcConfig.MovementType;
 			};
 		};
 
@@ -1384,16 +1328,20 @@ public:
 
 		//Temperature
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double ro = Values[i * nv + 0];
-			double u = Values[i * nv + 1] / ro;
-			double v = Values[i * nv + 2] / ro;
-			double w = Values[i * nv + 3] / ro;
-			double E = Values[i * nv + 4] / ro;
-			double e = E - (u*u + v*v + w*w) / 2.0;
-			const double Cv = 130; //Pb temporary
-			buffer[i] = e / Cv;
+			int nmat = CellGasModel[i];
+			double T = _gasModels[nmat]->GetTemperature(&Values[i * nv + 0]);
+			buffer[i] = T;
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Temperature", buffer);
+
+		//Phase information
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			int nmat = CellGasModel[i];
+			GasModel::MediumPhase phase = _gasModels[nmat]->GetPhase(&Values[i * nv + 0]);
+			int indicator = phase == GasModel::MediumPhase::AboveMeltingPoint;
+			buffer[i] = indicator;
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "Phase", buffer);
 
 		//Material index
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
@@ -1406,6 +1354,14 @@ public:
 			buffer[i] = MeshQuality::Anisotropy(_grid, *_grid.localCells[i]);
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "Anisotropy", buffer);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSize(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "LinearSize", buffer);
+		for (int i = 0; i<_grid.nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSizeRatio(_grid, *_grid.localCells[i]);
+		};
+		_cgnsWriter.WriteField(_grid, solutionName, "LinearSizeRatio", buffer);
 
 		//Write partitioning to solution
 		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
@@ -1418,7 +1374,12 @@ public:
 	};	
 
 	//Compute convective flux and max wave propagation speed throught each face
-	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {		
+	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {
+		//Nullify all fluxes
+		for (std::vector<double>& flux : fluxes) {
+			for (double& v : flux) v = 0;
+		};
+
 		//Compute gradients for second order reconstruction
 		/*if (IsSecondOrder) {
 			ComputeFunctionGradient(gradCellsRo, U, &Model<RiemannSolver>::GetDensity);
@@ -1474,26 +1435,30 @@ public:
 			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
 			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/						
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/		
 
-			//Compute flux
-			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, ALEindicators[i]);			
+			//Determine face velocity
+			Vector faceVelocityAverage = Vector(0,0,0);
+			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {			
+				faceVelocityAverage = _ALEmethod.facesVelocity[f.GlobalIndex];
+			};
+
+			//Compute flux			
+			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, faceVelocityAverage);			
 			//Store interface velocity and pressure for ALE
-			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
-			_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
+			//_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
+			//_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
 			//Store wave speeds
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 			//Store flux
 			fluxes[f.GlobalIndex] = result.Fluxes;
-			
-			if (IsDummyCell(f.FaceCell_2)) {
-				//Correct dummy face flux
-				//fluxes[f.GlobalIndex][0] = 0;
-				//fluxes[f.GlobalIndex][1] = 0;
-				//fluxes[f.GlobalIndex][2] = 0;
-				//fluxes[f.GlobalIndex][3] = 0;
-				//fluxes[f.GlobalIndex][4] = 0;
+
+			//If it's material interface
+			if (nmatL != nmatR) {
+				result.Fluxes[0] = 0;
+				assert(result.Fluxes[0] == 0);
 			};
+		
 
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
@@ -1554,27 +1519,72 @@ public:
 		for (Face& f : _grid.localFaces) {
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
-				ALEindicators[f.GlobalIndex] = 1; // all move
-			};
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
-				ALEindicators[f.GlobalIndex] = 0;
-				if (nmatL != nmatR) { //move material interface
+			if (!IsDummyCell(f.FaceCell_2)) {
+				//Determine ALE movement indicators for inner cells
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureLagrangian) {
+					ALEindicators[f.GlobalIndex] = 1; // all move
+				};
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::ALEMaterialInterfaces) { 
+					ALEindicators[f.GlobalIndex] = 0;
+					if (nmatL != nmatR) { //move material interface
+						ALEindicators[f.GlobalIndex] = 1;
+					};				
+				};
+				if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
+					ALEindicators[f.GlobalIndex] = 0;
+				};
+			} else {
+				//Determine ALE movement indicators for boundaries
+				BoundaryConditionMovementType movementType = GetCellBoundaryCondition(f.FaceCell_2)->movementType;
+				if (movementType == BoundaryConditionMovementType::Fixed) {
+					ALEindicators[f.GlobalIndex] = 0;
+				};
+				if (movementType == BoundaryConditionMovementType::FreeSurface) {
 					ALEindicators[f.GlobalIndex] = 1;
 				};
-				if (IsDummyCell(f.FaceCell_2)) { // move boundaries
-					ALEindicators[f.GlobalIndex] = 1;
-				};
-			};
-			if (_ALEmethod.ALEMotionType == ALEMethod::ALEMotionType::PureEulerian) {
-				ALEindicators[f.GlobalIndex] = 0;
 			};
 		};
 
-		//Compute convective fluxes and max wave speeds
-		for (std::vector<double>& flux : FaceFluxes) {
-			for (double& v : flux) v = 0;
+		//ALE step determine mesh motion
+		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+			//Compute face velocities
+			_ALEmethod.facesVelocity.clear();
+			for (Face& f : _grid.localFaces) {
+				int ALEindicator = ALEindicators[f.GlobalIndex];
+				if (ALEindicator == 0) continue; //Skip face that don't participate in obligatory motion
+				int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+				int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+				GasModel::ConservativeVariables UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
+				GasModel::ConservativeVariables UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));															
+				Vector faceVelocity = _ALEmethod.ComputeFaceVelocity(_gasModels[nmatL], UL, _gasModels[nmatR], UR, f, ALEindicator);
+				_ALEmethod.facesVelocity[f.GlobalIndex] = faceVelocity;
+			};
+
+			//Compute moving nodes velocities
+			_ALEmethod.ComputeMovingNodesVelocities();
+
+			//Impose boundary movement
+			for (Face& f : _grid.localFaces) {
+				if (!_grid.IsBoundaryFace(f)) continue;
+				BoundaryConditionMovementType movementType = GetFaceBoundaryCondition(f)->movementType;
+				if (movementType == BoundaryConditionMovementType::Fixed) {
+					//Each node must stick to its place
+					for (int nodeIndex : f.FaceNodes) _ALEmethod.nodesVelocity[nodeIndex] = Vector(0,0,0);
+				};
+			};
+
+			//Compute velocities of all other nodes
+			_ALEmethod.ComputeFreeNodesVelocities();
+
+			//Compute new face velocities
+			for (Face& f : _grid.localFaces) {
+				_ALEmethod.facesVelocity[f.GlobalIndex] = _ALEmethod.ComputeFaceVelocityByNodes(f);
+			};
+			
 		};
+
+
+		//Compute convective fluxes and max wave speeds		
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
@@ -1583,12 +1593,6 @@ public:
 
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
-
-		//ALE step mesh transformation
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-			//Compute node velocities
-			_ALEmethod.ComputeNodeVelocities();	
-		};		
 
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1606,9 +1610,9 @@ public:
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
 				};		
 
-				//Mesh deformation contribution
+				//Mesh deformation contribution (GCL part statisfied explicitly)
 				if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-					double sweptVolume = _ALEmethod.CalcSweptVolumeRate(face);
+					double sweptVolume = _ALEmethod.facesVelocity[face.GlobalIndex] * face.FaceNormal * face.FaceSquare;
 					for (int j = 0; j<nVariables; j++) {						
 						residual[cellIndex * nVariables + j] += sweptVolume * cellValues[cellIndex * nVariables + j] * fluxDirection;
 					};					
@@ -1722,17 +1726,33 @@ public:
 			alpha.push_back(0.5052);
 			alpha.push_back(1.0);
 		};
+
+		stepInfo.Residual = std::vector<double>(5, 0.0);	
 		
 		//Time stepping
-		for (int stage = 0; stage<nStages-1; stage++) {			
+		for (int stage = 0; stage<nStages; stage++) {
+			//ALE step mesh transformation
+			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
+				//Move mesh
+				_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+
+				//Regenerate geometric entities
+				GenerateGridGeometry(_grid);
+			};		
+
 			for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 			{
 				Cell* cell = _grid.localCells[cellIndex];			
 				//Update values
 				for (int i = 0; i < nVariables; i++) {
 					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[stage];
+					stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
 				};
 			};
+			//Synchronize
+			_parallelHelper.Barrier();
+
+			if (stage == nStages - 1) break;
 
 			//Compute new residual
 			ComputeResidual(Residual, Values);
@@ -1740,32 +1760,14 @@ public:
 			_parallelHelper.Barrier();
 		};
 
-		//Compute new result and residual
-		stepInfo.Residual = std::vector<double>(5, 0.0);		
-		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
-		{
-			Cell* cell = _grid.localCells[cellIndex];			
-			//Update values
-			for (int i = 0; i < nVariables; i++) {
-				Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[nStages-1];
-				stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
-			};					
-		};
+	
 
+		//Compute new result and residual
 		//Compute RMS residual		
 		for (int i = 0; i<nVariables; i++) {
 			stepInfo.Residual[i] = _parallelHelper.SumDouble(stepInfo.Residual[i]);
 			stepInfo.Residual[i] = sqrt(stepInfo.Residual[i]);
 		};
-
-		//ALE step mesh transformation
-		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
-			//Move mesh
-			_ALEmethod.MoveMesh(stepInfo.TimeStep);			
-
-			//Regenerate geometric entities
-			GenerateGridGeometry();
-		};		
 
 		//Advance total time
 		stepInfo.Time += stepInfo.TimeStep;
@@ -1831,11 +1833,56 @@ public:
 	//};
 
 	inline bool IsLocalCell(int globalIndex) {
-		return _grid.cellsPartitioning[globalIndex] == _parallelHelper.getRank();
+		return _grid.GetCellPart(globalIndex) == _parallelHelper.getRank();
 	};
 
 	inline bool IsDummyCell(int globalIndex) {
-		return _grid.Cells[globalIndex].IsDummy;
+		return _grid.IsDummyCell(globalIndex);
+	};
+
+	inline bool IsBoundaryFace(Face& face) {
+		return _grid.IsBoundaryFace(face);
+	};
+
+	inline BoundaryConditions::BoundaryCondition* GetFaceBoundaryCondition(Face& face) {
+		if (!IsBoundaryFace(face)) throw 1; //TO DO check
+		return GetCellBoundaryCondition(face.FaceCell_2);
+	};
+
+	//Get cell boundary condition reference
+	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
+		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
+		Cell& cell = _grid.Cells[globalIndex];						
+		return _boundaryConditions[cell.BCMarker];
+	};
+
+	//Get cell gas model index
+	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
+		if (IsLocalCell(globalIndex)) {
+			if (IsDummyCell(globalIndex)) {
+				//If dummy cell compute on the go				
+				Cell& cell = _grid.Cells[globalIndex];
+				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
+
+				//IF dummy get from boundary condition
+				int nmat = _boundaryConditions[cell.BCMarker]->_nmat;
+				//int nmat = CellGasModel[nCellIndex]; //Neighbour cell for now
+				//nmat = 0; //Air for now
+				return nmat;
+			} else {
+				//If proper cell return part of Values array				
+				if (localIndex == -1) {
+					//If local index is unknown determine it
+					//Lower perfomance WARNING
+					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
+				};
+				int nmat = CellGasModel[localIndex];
+				return nmat;
+			};
+		} else {
+			//Return result of interprocessor exchange
+			return _parallelHelper.RequestedGasModelIndex[globalIndex];
+		};
 	};
 
 	//Get cell values
@@ -1871,34 +1918,6 @@ public:
 			return _parallelHelper.RequestedValues[globalIndex];
 		};
 	};
-
-	//Get cell gas model index
-	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
-		if (IsLocalCell(globalIndex)) {
-			if (IsDummyCell(globalIndex)) {
-				//If dummy cell compute on the go				
-				Cell& cell = _grid.Cells[globalIndex];
-				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
-				int nmat = CellGasModel[nCellIndex]; //Neighbour cell for now
-				//nmat = 0; //Air for now
-				return nmat;
-			} else {
-				//If proper cell return part of Values array				
-				if (localIndex == -1) {
-					//If local index is unknown determine it
-					//Lower perfomance WARNING
-					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
-				};
-				int nmat = CellGasModel[localIndex];
-				return nmat;
-			};
-		} else {
-			//Return result of interprocessor exchange
-			return _parallelHelper.RequestedGasModelIndex[globalIndex];
-		};
-	};
-
-
 };
 
 #endif

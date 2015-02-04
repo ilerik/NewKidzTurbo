@@ -6,4 +6,10 @@ template <typename T> int sign(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
+//Roe averaging procedure
+inline double takeRoeAverage(double& roLRoot, double roRRoot, double fL, double fR) {
+	double roeAvg = (roLRoot * fL + roRRoot * fR) / (roLRoot + roRRoot);
+	return roeAvg;
+};
+
 #endif
