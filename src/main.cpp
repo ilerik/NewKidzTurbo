@@ -14,14 +14,7 @@
 #include <cuda_runtime.h>
 
 //Test cases
-#include "testcases\TestCases1D\TestCase1D_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_2.h"
-#include "testcases\RMInstabilityTests\RMITest_1.h"
-#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
+#include "test_list.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -32,7 +25,6 @@ std::string int_to_hex( T i )
          << std::hex << i;
   return stream.str();
 }
-
 
 //Shear layer computation
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
@@ -221,8 +213,11 @@ void runImpactShockTest(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {	
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
+	//test.RunTest(&argc, &argv);
+	ToroTests::ToroTest test;
+	test.SetParams();
 	test.RunTest(&argc, &argv);
 	return 0;
-
+	
 };

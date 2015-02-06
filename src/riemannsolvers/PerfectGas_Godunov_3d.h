@@ -3,26 +3,66 @@
 
 #include "datatypes.h"
 #include "basetypes.h"
-#include "optimization.h"
+#include "utilityfunctions.h"
 #include "grid.h"
+#include "GasModel.h"
+#include "RiemannSolver.h"
 
-class Godunov3DSolverPerfectGas {
+class Godunov3DSolverPerfectGas : public RiemannSolver {
 	//Required info
 	double gamma;
-	double eps;	
-public:	
+public:
+	using RiemannSolver::RiemannSolver; //Inherit constructor
+
+	//Check gas models
+	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) {
+		bool isCorrect = true;
+
+		//Pointer to perfect gas model
+		PerfectGasModel* perfectGasModel;
+		std::vector<double> gammas;
+
+		//Only several perfect gas models with common value of gamma allowed
+		for (GasModel* gasModel : gasModels) {
+			//Check if it's perfect gas 
+			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel)) {
+				//and save gamma value
+				gammas.push_back(perfectGasModel->Gamma);
+			} else {
+				//It's not perfect gas model
+				return false;
+			};
+		};
+
+		//Check if all gammas are the same
+		for (int i = 0; i<gammas.size() - 1; i++) {
+			if (gammas[i] != gammas[i-1]) {
+				isCorrect = false;
+				break;
+			};
+		};
+
+		//If everything is ok bind gas models
+		if (isCorrect) {
+			_gasModels = gasModels;
+			//And set gamma
+			gamma = gammas[0];
+		};
+		return isCorrect;
+	};
+
+	//Load settings from configuration object
+	bool loadConfiguration(Logger* logger, RiemannSolverConfiguration configuration) {
+		//Load properties
+		std::pair<double, bool> res;
+		return true;
+	};
+
+	//empty constructor
 	Godunov3DSolverPerfectGas(){
-		eps = 0.05;
 	};
 
-	void SetGamma(double _g) {
-		gamma = _g;
-	};
-
-	void SetHartenEps(double _eps) {
-		eps = _eps;
-	};
-
+	//case without vacuum
 	double GetPressure(const GasModel::ConservativeVariables& celldata) {
 		double ro = celldata.ro;
 		double vx = celldata.rou/celldata.ro;
@@ -62,6 +102,7 @@ public:
 		double deltaU;		
 	} params;
 
+	//fL part of algebraic equation for pressure in exact RP solver		(proposition 4.2.1 from Toro)
 	double f1(double roL, double uL, double pL, double pStar) 
 	{
 		double res = 0;
@@ -81,6 +122,7 @@ public:
 		return res;
 	};
 
+	//fR part
 	double f2(double roR, double uR, double pR, double pStar) 
 	{
 		double res = 0;
@@ -100,6 +142,7 @@ public:
 		return res;
 	};
 
+	//Target function for pressure equation in exact RP solver
 	static void fFunction(const alglib::real_1d_array &x, alglib::real_1d_array &fi, void *object)
 	{
 		Godunov3DSolverPerfectGas* solver = (Godunov3DSolverPerfectGas*)object;
@@ -269,7 +312,6 @@ public:
 		return result;
 	};
 	  	
-
 	//Solve riemann problem
 	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
 		std::vector<double> res(5,0);		
@@ -422,19 +464,22 @@ public:
 		return F(U, f.FaceNormal);
 	};
 
-	
-
-	//fabs() and Harten's entropy correction procedure
-	double Harten(double z, double eps) 
-	{
-		z = std::abs(z);
-		if (z<eps) z = ((z*z)/eps + eps)*0.5;
-		return z;
-	};
-
-
 	//Public properties
 	double MaxEigenvalue;
+
+	//Solve riemann problem	
+	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f,  Vector faceVelocity) {
+		RiemannProblemSolutionResult result;
+		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
+		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
+
+		result.Fluxes = ComputeFlux(UL, UR, f);
+		result.MaxEigenvalue = MaxEigenvalue;
+		result.Velocity = Vector(0,0,0);
+		result.Pressure = 0;
+
+		return result;
+	};
 };
 
 #endif

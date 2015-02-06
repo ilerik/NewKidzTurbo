@@ -248,6 +248,10 @@ public:
 			rSolver = new Roe3DSolverPerfectGas();
 			isSolverSpecified = true;
 		};
+		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Godunov) {
+			rSolver = new Godunov3DSolverPerfectGas();
+			isSolverSpecified = true;
+		};
 		if (!isSolverSpecified) {
 			_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "Riemann solver is not specified.");
 			//Halt programm		

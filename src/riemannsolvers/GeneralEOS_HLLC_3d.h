@@ -9,7 +9,7 @@
 #include "RiemannSolver.h"
 
 class HLLCSolverGeneralEOS : public RiemannSolver {	
-public:	
+public:
 	using RiemannSolver::RiemannSolver; //Inherit constructor
 
 	//Check gas models

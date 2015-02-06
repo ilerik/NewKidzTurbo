@@ -175,7 +175,7 @@
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
-    <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h" />
+    <ClInclude Include="src\riemannsolvers\PerfectGas_Godunov_3d.h" />
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
@@ -183,12 +183,13 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h" />
+    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTests.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
-    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h" />
+    <ClInclude Include="src\testcases\test_list.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />

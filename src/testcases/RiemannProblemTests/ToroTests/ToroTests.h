@@ -1,32 +1,54 @@
-#ifndef TURBO_TestCases_TestCases1D_TestCase1
-#define TURBO_TestCases_TestCases1D_TestCase1
+#ifndef TURBO_TestCeses_RiemannProblemTests_ToroTest
+#define TURBO_TestCeses_RiemannProblemTests_ToroTest
 
 #include "TestCase.h"
 #include "gengrid1D.h"
 
-namespace TestCases1D {
 
-//Base class for all automated tests
-class TestCase1 : public TestCase {
+namespace ToroTests {
+
+//Base class for all test from Toro book (the paragraph 4.3.3 pp. 129 - 133)
+class ToroTest : public TestCase {
 protected:
 	Kernel* _kernel; //Computational kernel object
 	Grid _grid;					  //Grid object	
 	Configuration _configuration; //Configuration object
 public:
 	//Test parameters
-	static const int nCells;
-	static const double Lx;
-	static const double TimeMax;
+	int nCells;
+	double Lx;					//solve problem in [0; Lx] segment
+	double discontinuity_pos;		//posiyion of initial discontin
+	double DiscontunityPos;		//position of discontinuity
+	double TimeMax;				//time of solution
 
 	//Left state density, pressure and velocity
-	static const double roL;
-	static const double pL;
-	static const double uL;
+	double roL;
+	double pL;
+	double uL;
 
 	//Right state density, pressure and velocity
-	const static double roR;
-	static const double pR;
-	static const double uR;
+	double roR;
+	double pR;
+	double uR;
+
+	//set parameters for test 1
+	void SetParams() {
+		//Test constant's
+		nCells = 1000;
+		Lx = 1.0;
+		discontinuity_pos = 0.5;
+		TimeMax = 0.2;
+
+		//Left state density, pressure and velocity
+		roL = 1.0;
+		pL = 1.0;
+		uL = 0.0;
+
+		//Right state density, pressure and velocity
+		roR = 0.1;
+		pR = 0.125;
+		uR = 0.0;
+	};
 
 	//Prepare computational grid
 	void PrepareGrid() {		
@@ -41,7 +63,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Roe;
+		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
 
 		//Availible gas models
 		_configuration.AddGasModel("Air");			
@@ -55,7 +77,13 @@ public:
 
 		//Boundary conditions				
 		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["left"].MaterialName = "Air";
+
 		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
+		_configuration.BoundaryConditions["right"].MaterialName = "Air";
+
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -69,7 +97,7 @@ public:
 		_configuration.MaxIteration = 1000000;
 		_configuration.MaxTime = TimeMax;
 		_configuration.SaveSolutionSnapshotIterations = 0;
-		_configuration.SaveSolutionSnapshotTime = 0;			
+		_configuration.SaveSolutionSnapshotTime = 0.1*TimeMax;			
 
 		_kernel->BindConfiguration(_configuration);	
 
@@ -90,7 +118,7 @@ public:
 		_kernel->InitCalculation();
 
 		//Initial conditions
-		_kernel->GenerateInitialConditions(new TestCaseInitialConditions());	
+		_kernel->GenerateInitialConditions(new TestCaseInitialConditions(uL, roL, pL, 0, uR, roR, pR, 0, Lx, discontinuity_pos));	
 
 		//Run computational cycle
 		_kernel->RunCalculation();
@@ -119,8 +147,36 @@ public:
 	//Sod's shock tube
 	class TestCaseInitialConditions : public InitialConditions::InitialConditions
 	{
-	private:		
-	public:			
+	public:
+		//Left state density, pressure, velocity and material index
+		double _uLeft;
+		double _roLeft;
+		double _pLeft;
+		int _nmatLeft;
+
+		//Right state density, pressure, velocity and material index
+		double _uRight;
+		double _roRight;
+		double _pRight;
+		int _nmatRight;
+
+		//length of domain and initial discontinuity position
+		double _lx;
+		double _x0;
+
+		//constructor
+		TestCaseInitialConditions(double uLeft, double roLeft, double pLeft, int nmatLeft, double uRight, double roRight, double pRight, int nmatRight, double lx, double x0) :
+		_uLeft(uLeft),
+		_roLeft(roLeft),
+		_pLeft(pLeft),
+		_nmatLeft(nmatLeft),
+		_uRight(uRight),
+		_roRight(roRight),
+		_pRight(pRight),
+		_nmatRight(nmatRight),
+		_lx(lx),
+		_x0(x0)
+		{ };
 
 		virtual int getInitialGasModelIndex(const Cell& cell) {
 			//Cell center
@@ -146,19 +202,19 @@ public:
 			double x = cell.CellCenter.x;
 			double y = cell.CellCenter.y;
 			double z = cell.CellCenter.z;
-				
+			
 			//Values
 			double u = 0;
 			double ro = 0;
 			double roE = 0;				
-			if (x <= Lx/2.0) {
-				ro = roL;
-				u = uL;			
-				e = pL / (0.4 * ro);
+			if (x <= _x0) {
+				ro = _roLeft;
+				u = _uLeft;			
+				e = _pLeft / (0.4 * ro);
 			} else {
-				ro = roR;
-				u = uR;						
-				e = pR / (0.4 * ro);
+				ro = _roRight;
+				u = _uRight;						
+				e = _pRight / (0.4 * ro);
 			};
 			
 			//Convert to conservative variables						
@@ -175,21 +231,6 @@ public:
 	}; //Initial conditions
 
 }; //TestCase
-
-//Test constant's
-const int TestCase1::nCells = 1000;
-const double TestCase1::Lx = 1.0;
-const double TestCase1::TimeMax = 0.2;
-
-//Left state density, pressure and velocity
-const double TestCase1::roL = 1.0;
-const double TestCase1::pL = 1.0;
-const double TestCase1::uL = 0.0;
-
-//Right state density, pressure and velocity
-const double TestCase1::roR = 0.1;
-const double TestCase1::pR = 0.125;
-const double TestCase1::uR = 0.0;
 
 }; //namespace
 

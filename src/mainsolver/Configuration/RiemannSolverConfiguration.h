@@ -10,7 +10,8 @@ public:
 	//Riemann solver type
 	enum class RiemannSolverType {
 		Roe,
-		HLLC
+		HLLC,
+		Godunov
 	} RiemannSolverType;
 
 	//Checks if property was set

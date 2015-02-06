@@ -38,6 +38,7 @@ public:
 	static const double SoundSpeedLightFluid;
 	static const double MachNumber;
 	static const double pShock;
+
 	static const double roShock;
 	static const double uShock;
 
