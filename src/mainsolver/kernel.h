@@ -240,15 +240,15 @@ public:
 		//Solver settings
 		bool isSolverSpecified = false;
 		//Instantiate solver depending on user choice
-		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
 			rSolver = new HLLCSolverGeneralEOS();
 			isSolverSpecified = true;
 		};
-		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
 			rSolver = new Roe3DSolverPerfectGas();
 			isSolverSpecified = true;
 		};
-		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Godunov) {
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Godunov) {
 			rSolver = new Godunov3DSolverPerfectGas();
 			isSolverSpecified = true;
 		};

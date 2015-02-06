@@ -261,11 +261,14 @@
     <ClInclude Include="src\testcases\test_list.h">
       <Filter>Header Files\TestCases</Filter>
     </ClInclude>
-    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTests.h">
-      <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
-    </ClInclude>
     <ClInclude Include="src\riemannsolvers\PerfectGas_Godunov_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest1.h">
+      <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest.h">
+      <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

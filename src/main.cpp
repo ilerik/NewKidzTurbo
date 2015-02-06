@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
 	//test.RunTest(&argc, &argv);
-	ToroTests::ToroTest test;
+	ToroTests::ToroTest1 test;
 	test.SetParams();
 	test.RunTest(&argc, &argv);
 	return 0;

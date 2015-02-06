@@ -12,7 +12,7 @@ public:
 		Roe,
 		HLLC,
 		Godunov
-	} RiemannSolverType;
+	} riemannSolverType;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {

@@ -1,5 +1,5 @@
-#ifndef TURBO_TestCeses_RiemannProblemTests_ToroTest
-#define TURBO_TestCeses_RiemannProblemTests_ToroTest
+#ifndef TURBO_TestCases_RiemannProblemTests_ToroTests_ToroTest
+#define TURBO_TestCases_RiemannProblemTests_ToroTests_TotoTest
 
 #include "TestCase.h"
 #include "gengrid1D.h"
@@ -13,11 +13,13 @@ protected:
 	Kernel* _kernel; //Computational kernel object
 	Grid _grid;					  //Grid object	
 	Configuration _configuration; //Configuration object
+	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//type of Riemann Solver Problem
+
 public:
 	//Test parameters
 	int nCells;
 	double Lx;					//solve problem in [0; Lx] segment
-	double discontinuity_pos;		//posiyion of initial discontin
+	double discontinuity_pos;		//posiyion of initial discontinuity
 	double DiscontunityPos;		//position of discontinuity
 	double TimeMax;				//time of solution
 
@@ -63,7 +65,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
 
 		//Availible gas models
 		_configuration.AddGasModel("Air");			
