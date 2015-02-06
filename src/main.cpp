@@ -15,6 +15,16 @@
 
 //Test cases
 #include "test_list.h"
+#include "testcases\TestCases1D\TestCase1D_1.h"
+#include "testcases\TestCases1D\TestCase1D_ALE_1.h"
+#include "testcases\TestCases1D\TestCase1D_ALE_2.h"
+#include "testcases\RMInstabilityTests\RMITest_1.h"
+#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
+#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
+#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
+#include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
+#include "testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h"
+#include "testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -25,6 +35,7 @@ std::string int_to_hex( T i )
          << std::hex << i;
   return stream.str();
 }
+
 
 //Shear layer computation
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
@@ -211,22 +222,115 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//Fill task settings for Test 1
-	ToroTests::ToroTestsInit test1Settings;
-	test1Settings.discontinuityPosition = 0.5;
-	test1Settings.Lx = 1.0;
-	test1Settings.nCells = 1600;
-	test1Settings.TimeMax = 0.2;
-	test1Settings.gammaL = 1.4;
-	test1Settings.roL = 1.0;
-	test1Settings.uL = 0.0;
-	test1Settings.pL = 1.0;
-	test1Settings.gammaR = 1.4;
-	test1Settings.roR = 0.125;
-	test1Settings.uR = 0.0;
-	test1Settings.pR = 0.1;
-	ToroTests::ToroTestComposite test(test1Settings);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
+
+	//2:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	80, //snapshots
+	//	30e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//4:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	80, //snapshots
+	//	60e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//3:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	80, //snapshots
+	//	45e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	////3:1 width ratio
+	////PbWidth = 2x15
+	//double widthPb = 30e-3;
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	200, //snapshots
+	//	3*widthPb, //
+	//	widthPb, 
+	//	20e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//3:1 width ratio
+	//PbWidth = 15, V = 1000
+	//double widthPb = 15e-3;
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	100, //snapshots
+	//	3*widthPb, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-1000.0
+	//	);
+
+	//Test 1
+	double widthSteel = 3e-3; //3 mm
+	double widthPb = 2e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	100, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
+
+	//Test 2
+	widthSteel = 3e-3; //3 mm
+	widthPb = 9e-3; //2 mm
+	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+		100, //snapshots
+		widthSteel, //
+		widthPb, 
+		10e-6, // time = 8 mks
+		TestCasesMetalsImpact::MetalType::StainlessSteel,
+		0.0,
+		TestCasesMetalsImpact::MetalType::Plumbum,
+		-470.0
+		);
+
+	//Test 1 2D
+	double width = 10e-3;
+	//TestCasesMetalsImpact::MetalsImpact2DTestCase test( 100, 100,
+	//	100, //snapshots
+	//	width, //
+	//	widthSteel, //
+	//	widthPb, 
+	//	5e-6, // time = 5 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
 	test.RunTest(&argc, &argv);
 	return 0;
-	
+
 };

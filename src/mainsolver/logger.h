@@ -33,7 +33,7 @@ public:
 		_nProcessors = _parallelHelper->getProcessorNumber();
 		_rank = _parallelHelper->getRank();		
 		std::ostringstream fname;
-		fname<<filename<<_rank;
+		fname<<filename<<_rank<<".log";
 		_output.open(fname.str(), std::ios_base::out);
 		return 0;
 	};

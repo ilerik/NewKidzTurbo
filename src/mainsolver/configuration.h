@@ -29,6 +29,7 @@ class Configuration {
 	};
 public:
 	//Files locations
+	std::string WorkingDirectory;
 	std::string InputCGNSFile;
 	std::string OutputCGNSFile;
 	std::string InitialConditionsSolution;	
