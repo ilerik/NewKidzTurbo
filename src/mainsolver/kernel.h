@@ -11,6 +11,7 @@
 #include "BoundaryConditions.h"
 #include "InitialConditions.h"
 #include "cmath"
+#include <direct.h>
 //#include "BoundaryCondition.h"
 //#include "BCSymmetryPlane.h"
 #include "geomfunctions.h"
@@ -173,7 +174,7 @@ public:
 			_nProcessors = _parallelHelper.getProcessorNumber();
 
 			//Initialize loggin subsistem
-			_logfilename = "kernel.log"; //TO DO
+			_logfilename = "kernel"; //TO DO
 			_logger.InitLogging(_parallelHelper, _logfilename);
 
 			//Initialize cgns i\o subsystem
@@ -202,7 +203,13 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt InitCalculation() {				
+	turbo_errt InitCalculation() {
+		//Change working directory
+		if (_configuration.WorkingDirectory != "") {
+			//const wchar_t *ptr = _configuration.WorkingDirectory.c_str();
+			//_wchdir();
+		};
+
 		//Gas models setup
 		//List of availible gas models
 		_gasModels.resize(_configuration.GasModelsConfiguration.size());
@@ -280,6 +287,7 @@ public:
 		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
 
 		//ALE settings
+		_ALEmethod._moveHelper.meshMovementAlgorithm = _configuration.ALEConfiguration.MeshMovementAlgorithm;
 		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
 		};
@@ -328,6 +336,12 @@ public:
 	};
 
 	turbo_errt RunCalculation() {
+		//Calculate snapshot times order of magnitude
+		int snapshotTimePrecision = 0;
+		if (SaveSolutionSnapshotTime > 0) {
+			snapshotTimePrecision = 1 - std::floor(std::log10(SaveSolutionSnapshotTime));
+		};
+
 		//Start timer
 		double workTime = 0.0;
 		clock_t start, stop;
@@ -379,7 +393,7 @@ public:
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
 				snapshotFileName<<std::fixed;
-				snapshotFileName.precision(7);								
+				snapshotFileName.precision(snapshotTimePrecision);								
 				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");

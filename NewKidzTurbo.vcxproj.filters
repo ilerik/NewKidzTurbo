@@ -257,9 +257,18 @@
     </ClInclude>
     <ClInclude Include="src\utility\DSUClusteredSet.h">
       <Filter>Header Files\Utility</Filter>
-	</ClInclude>
+    </ClInclude>
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h">
       <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpactTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

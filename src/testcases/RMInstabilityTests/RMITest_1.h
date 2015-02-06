@@ -103,7 +103,7 @@ public:
 		};
 
 		for (int i = 0; i<nDeformationSteps; i++) {
-			moveHelper.IDWMoveNodes(_grid, nodes, displacements);
+			moveHelper.MoveNodes(_grid, nodes, displacements);
 		};
 
 		_kernel->BindGrid(&_grid);
