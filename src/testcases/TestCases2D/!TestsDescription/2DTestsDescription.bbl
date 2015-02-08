@@ -1,0 +1,82 @@
+% $ biblatex auxiliary file $
+% $ biblatex version 2.4 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated as
+% required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+\entry{Ni2013}{article}{}
+  \name{author}{3}{}{%
+    {{}%
+     {Ni}{N.}%
+     {Guoxi}{G.}%
+     {}{}%
+     {}{}}%
+    {{}%
+     {Jiang}{J.}%
+     {Song}{S.}%
+     {}{}%
+     {}{}}%
+    {{}%
+     {Wang}{W.}%
+     {Shuanghu}{S.}%
+     {}{}%
+     {}{}}%
+  }
+  \list{publisher}{1}{%
+    {Elsevier Ltd}%
+  }
+  \keyw{Diffusive mesh velocity,General EOS,Inverse Hermite
+  interpolation,Moving mesh,Multi-material fluids}
+  \strng{namehash}{NGJSWS1}
+  \strng{fullhash}{NGJSWS1}
+  \field{sortinit}{2}
+  \field{abstract}{%
+  Based on an efficient Riemann solver, a remapping-free ALE method (RALE) for
+  multi-material fluids with general equations of state is proposed. The basic
+  idea of constructing the RALE is to couple the Lagrangian method with a
+  remapping-free ALE-type method. In order to keep the sharpness of a material
+  interface, the Lagrangian formulation is employed for tracking the material
+  interface, where the Lagrangian velocity of nodes and Lagrangian fluxes are
+  designed. In single material regions, the numerical fluxes are constructed on
+  moving meshes which move nodes to the regions with large gradients to
+  increase the numerical accuracy, and the explicit remapping stage is avoided
+  because of the new discrete scheme. The inverse Hermite interpolation
+  argument is employed in solving the Riemann problem with general EOS,
+  consequently, reducing iteration steps greatly and resulting in an efficient
+  and robust Riemann solver. A number of numerical examples are presented. ??
+  2012 Elsevier Ltd.%
+  }
+  \verb{doi}
+  \verb 10.1016/j.compfluid.2012.10.005
+  \endverb
+  \field{issn}{00457930}
+  \field{pages}{19\bibrangedash 27}
+  \field{title}{{A remapping-free, efficient Riemann-solvers based, ALE method
+  for multi-material fluids with general EOS}}
+  \verb{url}
+  \verb http://dx.doi.org/10.1016/j.compfluid.2012.10.005
+  \endverb
+  \field{volume}{71}
+  \verb{file}
+  \verb :C$\backslash$:/Users/Erik/Dropbox/Science/!Articles/ALE/ni2013.pdf:pdf
+  \endverb
+  \field{journaltitle}{Computers and Fluids}
+  \field{year}{2013}
+\endentry
+
+\lossort
+\endlossort
+
+\endinput

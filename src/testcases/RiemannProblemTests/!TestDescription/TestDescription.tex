@@ -6,10 +6,18 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{graphicx}
+
+\usepackage[backend=bibtex,
+style=numeric,
+%style=alphabetic
+%style=reading
+sorting=ynt]{biblatex}
+\addbibresource{references1D.bib}
+
 \author{Ilya Eriklintsev}
-\title{Riemann problem for the Euler equations test cases description}
+\title{One dimensional test cases}
 \begin{document}
-\section{Test case motivation}
+\section{Riemann problem tests}
 Five Riemann problems are selected to test the performance of the Riemann
 solver and the influence of the initial guess for pressure. The tests are
 also used to illustrate some typical wave patterns resulting from the solution
@@ -36,7 +44,11 @@ from the solution to tests 3 and 4 respectively; its solution represents the col
 of these two strong shocks and consists of a left facing shock (travelling
 very slowly to the right), a right travelling contact discontinuity and a right
 travelling shock wave. Fig. 4.11 shows solution profiles for Test 5.
-\section{Test case description and setting}
-Current test case composed of five independent tests.
-\section{Expected result and scoring procedure}
+\section{Arbitrary Lagrange-Euler tests}
+Current section composed of various tests that used for ALE codes validation.
+
+\medskip
+ 
+\printbibliography
+
 \end{document}

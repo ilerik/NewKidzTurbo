@@ -1764,15 +1764,19 @@ public:
 			alpha.push_back(0.5052);
 			alpha.push_back(1.0);
 		};
+		double sumAlpha = 0;
+		for (double a : alpha) sumAlpha += a;
 
-		stepInfo.Residual = std::vector<double>(5, 0.0);	
+		stepInfo.Residual = std::vector<double>(5, 0.0);
 		
 		//Time stepping
 		for (int stage = 0; stage<nStages; stage++) {
+			double stageTimeStep = stepInfo.TimeStep * alpha[stage] / sumAlpha;
+
 			//ALE step mesh transformation
 			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
 				//Move mesh
-				_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+				_ALEmethod.MoveMesh(stageTimeStep);			
 
 				//Regenerate geometric entities
 				GenerateGridGeometry(_grid);
@@ -1783,10 +1787,11 @@ public:
 				Cell* cell = _grid.localCells[cellIndex];			
 				//Update values
 				for (int i = 0; i < nVariables; i++) {
-					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[stage];
+					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (- stageTimeStep / cell->CellVolume);
 					stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
 				};
 			};
+
 			//Synchronize
 			_parallelHelper.Barrier();
 
@@ -1796,9 +1801,7 @@ public:
 			ComputeResidual(Residual, Values);
 			//Synchronize
 			_parallelHelper.Barrier();
-		};
-
-	
+		};	
 
 		//Compute new result and residual
 		//Compute RMS residual		

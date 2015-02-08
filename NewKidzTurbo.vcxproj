@@ -191,10 +191,14 @@
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h" />
     <ClInclude Include="src\testcases\test_list.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK1.h" />
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
     <ClInclude Include="src\turbulentmodels\SAmodel.h" />

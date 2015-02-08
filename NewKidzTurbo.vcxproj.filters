@@ -291,6 +291,18 @@
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTestComposite.h">
       <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files\TestCases\TestCases2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK1.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
