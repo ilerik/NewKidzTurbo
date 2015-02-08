@@ -17,6 +17,9 @@
 #include "testcases\TestCases1D\TestCase1D_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_2.h"
+#include "testcases\TestCases1D\TestCase1DALE3_RK1.h"
+#include "testcases\TestCases1D\TestCase1DALE3_RK2.h"
+#include "testcases\TestCases1D\TestCase1DALE3_RK4.h"
 #include "testcases\RMInstabilityTests\RMITest_1.h"
 #include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
@@ -303,20 +306,20 @@ int main(int argc, char *argv[]) {
 	//	);
 
 	//Test 2
-	widthSteel = 3e-3; //3 mm
-	widthPb = 9e-3; //2 mm
-	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
-		100, //snapshots
-		widthSteel, //
-		widthPb, 
-		10e-6, // time = 8 mks
-		TestCasesMetalsImpact::MetalType::StainlessSteel,
-		0.0,
-		TestCasesMetalsImpact::MetalType::Plumbum,
-		-470.0
-		);
+	//widthSteel = 3e-3; //3 mm
+	//widthPb = 9e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	100, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
 
-	//Test 2
+	//Test 3
 	//widthSteel = 30e-3; //3 mm
 	//widthPb = 2e-3; //2 mm
 	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 3000,
@@ -330,6 +333,7 @@ int main(int argc, char *argv[]) {
 	//	-470.0
 	//	);
 
+	TestCases1D::TestCase1DALE3_RK1 test;
 	test.RunTest(&argc, &argv);
 	return 0;
 

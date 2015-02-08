@@ -119,7 +119,7 @@ public:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::Linear1D;
-		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
 		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 

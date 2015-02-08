@@ -1,0 +1,42 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian,english]{babel}
+\usepackage[OT1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+
+\usepackage[backend=bibtex,
+style=numeric,
+%style=alphabetic
+%style=reading
+sorting=ynt]{biblatex}
+\addbibresource{references.bib}
+
+\author{Ilya Eriklintsev}
+\title{2D Tests descripition}
+\begin{document}
+\section{Example 4. Saltzman's problem} 
+Completely taken from \cite{Ni2013}.
+
+This is a difficult test case to validate numerical schemes with moving boundary and has been extensively studied in the literature. The set-up of the problem is
+the following. On a computational domain $ 1.0 \times 0.1$, $100 \times 10$ grid points are distributed in the following (x, y) locations,
+\[
+ \begin{cases}
+   x_{ij} = (i-1) \Delta x + (11 - j) sin(\frac{\pi (i-1)}{100}) \Delta y \\
+   y_{ij} = (j-1) \Delta y
+  \end{cases}
+\]
+where $\Delta x = \Delta y = 0.01$.
+
+A gas with specific heat ratio $\gamma = 5/3 $ is filled stationarily inside
+the computational domain initially. Then, the left boundary, such as a piston, is moving into the gas with constant velocity $1.0$. Thus, a strong shock wave is generated from the moving piston. On the upper and lower boundaries, a reflection boundary condition is used. This problem has the exact solution. At $t = 0.6$, the shock is expected to be located at $x = 0.8$ with the post-shock density $\rho = 0.6$, velocity $u = 1.0$, and pressure $p = 1.333$. 
+
+In this case, we simply take $U_{g,y} = 0$. The numerical results by the current moving mesh method are shown in Figs. 8-13. The initial mesh is given in Figs. 8 and 9 is the mesh at time $t = 0.6$. The computed pressure, velocity and density are presented in Figs. 12 and 11 along the line y = 0.05. We find that the current numerical results are more accurate in comparison with other scheme, such as in [36,37].In Fig. 13, the mesh and density contour at time $t = 0.9$ are shown.
+
+\medskip
+ 
+\printbibliography
+
+\end{document}
