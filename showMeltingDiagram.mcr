@@ -5,7 +5,7 @@ $!READDATASET  '"|MFBD|\history.dat" '
   RESETSTYLE = YES
   VARLOADMODE = BYNAME
   ASSIGNSTRANDIDS = YES
-  VARNAMELIST = '"Time" "Iteration" "TimeStep" "MeltedZoneWidth" "TotalMeltedVolume" "xMin" "xMax" "xInterface" "avgMeltedZoneTemperature"'
+  VARNAMELIST = '"Time" "Iteration" "TimeStep" "MeltedZoneWidth" "TotalMeltedVolume" "xMin" "xMax" "xInterface" "xLeftBorder" "xRightBorder" "avgMeltedZoneTemperature"'
 $!ACTIVELINEMAPS -= [1]
 $!CREATELINEMAP 
 $!LINEMAP [9]  NAME = 'xMinTime'
@@ -22,6 +22,16 @@ $!LINEMAP [11]  NAME = 'xInterfaceTime'
 $!LINEMAP [11]  ASSIGN{XAXISVAR = 8}
 $!LINEMAP [11]  ASSIGN{YAXISVAR = 1}
 $!ACTIVELINEMAPS += [11]
+$!CREATELINEMAP 
+$!LINEMAP [12]  NAME = 'xLeftBorder'
+$!LINEMAP [12]  ASSIGN{XAXISVAR = 9}
+$!LINEMAP [12]  ASSIGN{YAXISVAR = 1}
+$!ACTIVELINEMAPS += [12]
+$!CREATELINEMAP 
+$!LINEMAP [13]  NAME = 'xRightBorder'
+$!LINEMAP [13]  ASSIGN{XAXISVAR = 10}
+$!LINEMAP [13]  ASSIGN{YAXISVAR = 1}
+$!ACTIVELINEMAPS += [13]
 $!PICK ADDATPOSITION
   X = 3.26445396146
   Y = 2.68254817987

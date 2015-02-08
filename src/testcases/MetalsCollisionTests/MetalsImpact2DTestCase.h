@@ -14,8 +14,11 @@ protected:
 	int _nCellsX;
 	int _nCellsY;
 	double _widthY;
+
+	//Pertrubation parameters
 	double _D;
 	double _A;
+	double _n;
 
 
 	//Pertrubation parameters
@@ -23,8 +26,10 @@ protected:
 	//d
 
 	//Pertrubation position
-	double _pFunction(Vector r) {			
-		return r.x;
+	double _pFunction(Vector r) {	
+		if (std::abs(r.y) > _D / 2.0) return r.x;
+		double x = _A * std::cos(2.0 * PI * r.y / (_n * _D));
+		return r.x - x;
 	};
 
 public:
@@ -35,6 +40,11 @@ public:
 		_widthY = widthY;
 		_nCellsX = nCellsX;
 		_nCellsY = nCellsY;
+
+		//Pertrubation parameters
+		_D = 0.2e-3;
+		_A = 0.1e-3;
+		_n = 1;
 	};
 
 	//Prepare computational grid
@@ -71,7 +81,7 @@ public:
 		displacements.clear();
 		for (std::pair<double, int> pair : interfaceNodeIndexes) {
 			double y = pair.first;
-			double dX = interfaceNodeXs[y];						
+			double dX = _pFunction(Vector(interfaceNodeXs[y], y, 0));						
 			displacements.push_back(Vector(-dX, 0, 0));
 			int nodeIndex = pair.second;
 			nodes.push_back(nodeIndex);
@@ -79,7 +89,7 @@ public:
 
 		//Move mesh
 		MeshMovement moveHelper;
-		moveHelper.meshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;
+		moveHelper.meshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
 		moveHelper.MoveNodes(_grid, nodes, displacements);
 		
 		_kernel->BindGrid(&_grid);

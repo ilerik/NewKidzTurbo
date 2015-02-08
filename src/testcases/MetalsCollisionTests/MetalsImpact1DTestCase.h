@@ -89,11 +89,11 @@ public:
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
 
 		//Left
-		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
+		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
 		//_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
 		_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::FreeSurface;
-		_configuration.BoundaryConditions["left"].MaterialName = "Air";
+		_configuration.BoundaryConditions["left"].MaterialName = "MetalLeft";
 		_configuration.BoundaryConditions["left"].SetPropertyValue("Density", _roBoundary);
 		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", _uBoundary);
 		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0);

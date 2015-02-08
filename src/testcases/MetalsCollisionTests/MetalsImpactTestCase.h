@@ -144,6 +144,8 @@ public:
 				historyFile<<"\""<<"xMin"<<"\" ";
 				historyFile<<"\""<<"xMax"<<"\" ";
 				historyFile<<"\""<<"xInterface"<<"\" ";
+				historyFile<<"\""<<"xLeftBorder"<<"\" ";
+				historyFile<<"\""<<"xRightBorder"<<"\" ";
 				historyFile<<"\""<<"avgMeltedZoneTemperature"<<"\" ";
 				historyFile<<std::endl;
 			};
@@ -206,6 +208,8 @@ public:
 			double xMin = 1000; bool isXMinSet = false;
 			double xMax = 1000; bool isXMaxSet = false;
 			double xInterface = 1000; bool isXInterfaceSet = false;
+			double xLeftBorder = 1000;
+			double xRightBorder = -1000;
 			for (Face& face : _grid->localFaces) {
 				bool isMeltedL = (phases[face.FaceCell_1] == GasModel::MediumPhase::AboveMeltingPoint);
 				bool isMeltedR = (phases[face.FaceCell_2] == GasModel::MediumPhase::AboveMeltingPoint);
@@ -217,6 +221,8 @@ public:
 				if (nmatL != nmatR) {
 					xInterface = faceX;
 				};
+				if (faceX > xRightBorder) xRightBorder = faceX;
+				if (faceX < xLeftBorder) xLeftBorder = faceX;
 
 				//Merge cells
 				if ((isMeltedL && isMeltedR)) meltedCells.Union(face.FaceCell_1, face.FaceCell_2);
@@ -284,6 +290,8 @@ public:
 				historyFile<<xMin<<" ";
 				historyFile<<xMax<<" ";
 				historyFile<<xInterface<<" ";
+				historyFile<<xLeftBorder<<" ";
+				historyFile<<xRightBorder<<" ";
 				historyFile<<biggestClusterAvgTemperature<<" ";
 				historyFile<<std::endl;
 			};
