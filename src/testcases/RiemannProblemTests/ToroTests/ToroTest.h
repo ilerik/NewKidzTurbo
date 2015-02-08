@@ -1,5 +1,5 @@
 #ifndef TURBO_TestCases_RiemannProblemTests_ToroTests_ToroTest
-#define TURBO_TestCases_RiemannProblemTests_ToroTests_TotoTest
+#define TURBO_TestCases_RiemannProblemTests_ToroTests_ToroTest
 
 #include "TestCase.h"
 #include "gengrid1D.h"
@@ -14,6 +14,7 @@ protected:
 	Grid _grid;					  //Grid object	
 	Configuration _configuration; //Configuration object
 	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//type of Riemann Solver Problem
+	GasModel::ConservativeVariables U_an;			//analitical solution
 
 public:
 	//Test parameters
