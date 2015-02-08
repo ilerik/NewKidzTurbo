@@ -19,15 +19,12 @@ public:
 
 	//Weighting Function
 	double W(Vector d_r) {	
-		double dr = d_r.mod();
-		double drx = d_r.x;
+		double dr = d_r.mod();		
 		if (abs(dr) < 1e-15) return 1;
 		double Ai = 1;
 		double Ldef = 1e-2;
 		double alpha = 0.1;
-		double a = 3.0;
-		dr = d_r.mod();
-		//double a = 2.5;
+		double a = 3.0;				
 		double b = 5;
 		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));
 		return res;
@@ -183,6 +180,52 @@ public:
 		//Sync
 	};
 
+	void IDWNoRotationComputeDisplacements(Grid& grid, 
+		const std::unordered_set<int> movingNodes, 
+		std::map<int, Vector>& movingNodesDisplacements, 
+		const std::unordered_set<int> freeNodes, 
+		std::map<int, Vector>& freeNodesDisplacements) 
+	{		
+		//assert(movingNodesDisplacements.size() == movingNodes.size());
+		//For all nodes allocate memory to store rotation and displacements
+		std::map<int, Vector> dR;
+		std::map<int, Vector> b;
+		std::map<int, RotationMatrix> R;
+		std::map<int, std::set<int> > bFaces;
+
+		//For all nodes
+		for (int movingNodeIndex : movingNodes) {
+			if (movingNodesDisplacements.find(movingNodeIndex) == movingNodesDisplacements.end()) throw new Exception("Displacement for node is absent");
+			dR[movingNodeIndex] = movingNodesDisplacements[movingNodeIndex];
+		};					
+
+		//Compute displacement for free nodes
+		int counter = 0;
+		double percent = 0;
+		for (int nodeIndex : freeNodes) {
+			counter++;		
+			Node& ni = grid.localNodes[nodeIndex];
+			std::vector<Vector> displacements;
+			dR[nodeIndex] = Vector(0,0,0);
+			double sum = 0;		
+
+			for (int movingNodeIndex : movingNodes) {			
+				Node& nb = grid.localNodes[movingNodeIndex];				
+				Vector dr = ni.P - nb.P;							
+				Vector displ = dR[movingNodeIndex];				
+				double w = W(dr);	//TO DO		
+				dR[nodeIndex] += w * displ; 
+				sum += w; //			
+			}					
+			dR[nodeIndex] /= sum;	
+
+			//Save result
+			freeNodesDisplacements[nodeIndex] = dR[nodeIndex];
+		};
+
+		//Sync
+	};
+
 
 	//Main function
 	void ComputeDisplacements(Grid& grid, 
@@ -197,6 +240,10 @@ public:
 		};
 		if (meshMovementAlgorithm == MeshMovement::MeshMovementAlgorithm::IDW) {
 			IDWComputeDisplacements(grid, movingNodes, movingNodesDisplacements, freeNodes, freeNodesDisplacements);
+			return;
+		};
+		if (meshMovementAlgorithm == MeshMovement::MeshMovementAlgorithm::IDWnoRotation) {
+			IDWNoRotationComputeDisplacements(grid, movingNodes, movingNodesDisplacements, freeNodes, freeNodesDisplacements);
 			return;
 		};
 		//TO DO

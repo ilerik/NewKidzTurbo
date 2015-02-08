@@ -316,8 +316,25 @@ int main(int argc, char *argv[]) {
 		-470.0
 		);
 
+	//Test 2
+	//widthSteel = 30e-3; //3 mm
+	//widthPb = 2e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 3000,
+	//	100, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
+
+	test.RunTest(&argc, &argv);
+	return 0;
+
 	//Test 1 2D
-	double width = 10e-3;
+	//double width = 10e-3;
 	//TestCasesMetalsImpact::MetalsImpact2DTestCase test( 100, 100,
 	//	100, //snapshots
 	//	width, //
@@ -329,7 +346,7 @@ int main(int argc, char *argv[]) {
 	//	TestCasesMetalsImpact::MetalType::Plumbum,
 	//	-470.0
 	//	);
-	test.RunTest(&argc, &argv);
+	//test.RunTest(&argc, &argv);
 	return 0;
 
 };
