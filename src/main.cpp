@@ -217,7 +217,8 @@ int main(int argc, char *argv[]) {
 	//test.RunTest(&argc, &argv);
 	ToroTests::ToroTest1 test;
 	test.SetParams();
-	test.RunTest(&argc, &argv);
+	//test.RunTest(&argc, &argv);
+	test.ComputeExactSolution();
 	return 0;
 	
 };
