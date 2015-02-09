@@ -7,6 +7,24 @@
 
 namespace ToroTests {
 
+//common structure to pass input parameters into test
+struct ToroTestsInit{
+	int nCells;
+	double Lx;					//solve problem in [0; Lx] segment
+	double discontinuity_pos;		//posiyion of initial discontinuity
+	double TimeMax;				//time of solution
+
+	//Left state density, pressure and velocity
+	double roL;
+	double pL;
+	double uL;
+
+	//Right state density, pressure and velocity
+	double roR;
+	double pR;
+	double uR;
+};
+
 //Base class for all test from Toro book (the paragraph 4.3.3 pp. 129 - 133)
 class ToroTest : public TestCase {
 protected:
@@ -15,13 +33,13 @@ protected:
 	Configuration _configuration; //Configuration object
 	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//type of Riemann Solver Problem
 	std::vector<GasModel::ConservativeVariables> U_an;			//analitical solution
+	std::string solution_name;
 
 public:
 	//Test parameters
 	int nCells;
 	double Lx;					//solve problem in [0; Lx] segment
 	double discontinuity_pos;		//posiyion of initial discontinuity
-	double DiscontunityPos;		//position of discontinuity
 	double TimeMax;				//time of solution
 
 	//Left state density, pressure and velocity
@@ -34,23 +52,32 @@ public:
 	double pR;
 	double uR;
 
+	//constructors
+	ToroTest() {
+		solution_name = "solution";
+	};
+	ToroTest(ToroTestsInit &params) {
+		this->SetParams(params);
+		solution_name = "solution";
+	};
+
 	//set parameters for test 1
-	void SetParams() {
+	void SetParams(ToroTestsInit &params) {
 		//Test constant's
-		nCells = 1000;
-		Lx = 1.0;
-		discontinuity_pos = 0.5;
-		TimeMax = 0.2;
+		nCells = params.nCells;
+		Lx = params.Lx;
+		discontinuity_pos = params.discontinuity_pos;
+		TimeMax = params.TimeMax;
 
 		//Left state density, pressure and velocity
-		roL = 1.0;
-		pL = 1.0;
-		uL = 0.0;
+		roL = params.roL;
+		pL = params.pL;
+		uL = params.uL;
 
 		//Right state density, pressure and velocity
-		roR = 0.1;
-		pR = 0.125;
-		uR = 0.0;
+		roR = params.roR;
+		pR = params.pR;
+		uR = params.uR;
 	};
 
 	//Prepare computational grid
@@ -100,7 +127,7 @@ public:
 		_configuration.MaxIteration = 1000000;
 		_configuration.MaxTime = TimeMax;
 		_configuration.SaveSolutionSnapshotIterations = 0;
-		_configuration.SaveSolutionSnapshotTime = 0.1*TimeMax;			
+		_configuration.SaveSolutionSnapshotTime = 0;			
 
 		_kernel->BindConfiguration(_configuration);	
 
@@ -131,8 +158,8 @@ public:
 
 		//Check results
 		//Output result
-		_kernel->SaveGrid("result.cgns");
-		_kernel->SaveSolution("result.cgns", "Solution");
+		_kernel->SaveGrid(solution_name + ".cgns");
+		_kernel->SaveSolution(solution_name + ".cgns", solution_name);
 	};
 
 	//Run test with program arguments
@@ -145,6 +172,95 @@ public:
 
 		_kernel->Finalize();
 	};
+
+	//Specify initial conditions
+	//Sod's shock tube
+	class TestCaseInitialConditions : public InitialConditions::InitialConditions
+	{
+	public:
+		//Left state density, pressure, velocity and material index
+		double _uLeft;
+		double _roLeft;
+		double _pLeft;
+		int _nmatLeft;
+
+		//Right state density, pressure, velocity and material index
+		double _uRight;
+		double _roRight;
+		double _pRight;
+		int _nmatRight;
+
+		//length of domain and initial discontinuity position
+		double _lx;
+		double _x0;
+
+		//constructor
+		TestCaseInitialConditions(double uLeft, double roLeft, double pLeft, int nmatLeft, double uRight, double roRight, double pRight, int nmatRight, double lx, double x0) :
+		_uLeft(uLeft),
+		_roLeft(roLeft),
+		_pLeft(pLeft),
+		_nmatLeft(nmatLeft),
+		_uRight(uRight),
+		_roRight(roRight),
+		_pRight(pRight),
+		_nmatRight(nmatRight),
+		_lx(lx),
+		_x0(x0)
+		{ };
+
+		virtual int getInitialGasModelIndex(const Cell& cell) {
+			//Cell center
+			double x = cell.CellCenter.x;
+			double y = cell.CellCenter.y;
+			double z = cell.CellCenter.z;
+		
+			return 0; 
+		};
+
+		virtual std::vector<double> getInitialValues(const Cell& cell) {
+			int nmat = getInitialGasModelIndex(cell); //get material index
+
+			std::vector<double> initValues;				
+			//Other velocities
+			double v = 0;
+			double w = 0;
+
+			//Internal energy
+			double e = 0;		
+
+			//Cell center
+			double x = cell.CellCenter.x;
+			double y = cell.CellCenter.y;
+			double z = cell.CellCenter.z;
+			
+			//Values
+			double u = 0;
+			double ro = 0;
+			double roE = 0;
+
+			//TO DO insert a gamma
+			if (x <= _x0) {
+				ro = _roLeft;
+				u = _uLeft;			
+				e = _pLeft / (0.4 * ro);
+			} else {
+				ro = _roRight;
+				u = _uRight;						
+				e = _pRight / (0.4 * ro);
+			};
+			
+			//Convert to conservative variables						
+			roE = ro*(e + (u*u + v*v + w*w) / 2.0);
+			initValues.resize(_gasModels[nmat]->nConservativeVariables);
+			initValues[0] = ro;
+			initValues[1] = ro * u;
+			initValues[2] = ro * v;
+			initValues[3] = ro * w;
+			initValues[4] = roE;
+
+			return initValues;
+		};
+	}; //Initial conditions
 
 	//Exact Solution Block//
 	//star values structure
@@ -193,7 +309,7 @@ public:
 	};
 
 	//Target function for pressure equation in exact RP solver TO DO ask Ekr about object
-	void fFunction(const alglib::real_1d_array &x, alglib::real_1d_array &fi, void *object)
+	static void fFunction(const alglib::real_1d_array &x, alglib::real_1d_array &fi, void *object)
 	{
 		ToroTest* params = (ToroTest*)object;
 		//
@@ -202,7 +318,7 @@ public:
 		//
 		double pStar = x[0];
 		double deltaU = params->uR - params->uL;
-		double res = f1(pStar) + f2(pStar) + deltaU;
+		double res = params->f1(pStar) + params->f2(pStar) + deltaU;
 
 		fi[0] = res;		
 	}
@@ -445,110 +561,25 @@ public:
 	};
 	
 	void ComputeExactSolution(double eps = 1.0e-10) {
-		//Solve riemann problem as Godunov did
+		//Add specifik heat ratio of our gas
+		_configuration.AddGasModel("Air");
+		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatRatio", 1.4);
 
 		//compute star variables at first		
 		starValues = ComputeStarVariables(eps);
 
-		std::string exact_sol_file = "result.dat";
+		std::string exact_sol_file = "exact_solution.dat";
 		std::ofstream ofs(exact_sol_file);
-		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
-			Cell* cell = _grid.localCells[cellIndex];
-			double x, t;
-			x = cell->CellCenter.x;
+		for (int cellIndex = 0; cellIndex < nCells; cellIndex++) {
+			double x;
+			double hx = Lx/nCells;	//grid step for UNIFORM GRID
+			x = hx*(0.5 + cellIndex);
 			//compute ro u and p in x point at moment t
-			std::vector<double> res =  ComputeExactValuesInCell(x, TimeMax);
+			std::vector<double> res =  ComputeExactValuesInCell(x - discontinuity_pos, TimeMax);
 			ofs << x << ' ' << res[0] << ' ' << res[1] << ' ' << res[2] << '\n';
 		};
 		ofs.close();
 	};
-
-	//Specify initial conditions
-	//Sod's shock tube
-	class TestCaseInitialConditions : public InitialConditions::InitialConditions
-	{
-	public:
-		//Left state density, pressure, velocity and material index
-		double _uLeft;
-		double _roLeft;
-		double _pLeft;
-		int _nmatLeft;
-
-		//Right state density, pressure, velocity and material index
-		double _uRight;
-		double _roRight;
-		double _pRight;
-		int _nmatRight;
-
-		//length of domain and initial discontinuity position
-		double _lx;
-		double _x0;
-
-		//constructor
-		TestCaseInitialConditions(double uLeft, double roLeft, double pLeft, int nmatLeft, double uRight, double roRight, double pRight, int nmatRight, double lx, double x0) :
-		_uLeft(uLeft),
-		_roLeft(roLeft),
-		_pLeft(pLeft),
-		_nmatLeft(nmatLeft),
-		_uRight(uRight),
-		_roRight(roRight),
-		_pRight(pRight),
-		_nmatRight(nmatRight),
-		_lx(lx),
-		_x0(x0)
-		{ };
-
-		virtual int getInitialGasModelIndex(const Cell& cell) {
-			//Cell center
-			double x = cell.CellCenter.x;
-			double y = cell.CellCenter.y;
-			double z = cell.CellCenter.z;
-		
-			return 0; 
-		};
-
-		virtual std::vector<double> getInitialValues(const Cell& cell) {
-			int nmat = getInitialGasModelIndex(cell); //get material index
-
-			std::vector<double> initValues;				
-			//Other velocities
-			double v = 0;
-			double w = 0;
-
-			//Internal energy
-			double e = 0;		
-
-			//Cell center
-			double x = cell.CellCenter.x;
-			double y = cell.CellCenter.y;
-			double z = cell.CellCenter.z;
-			
-			//Values
-			double u = 0;
-			double ro = 0;
-			double roE = 0;				
-			if (x <= _x0) {
-				ro = _roLeft;
-				u = _uLeft;			
-				e = _pLeft / (0.4 * ro);
-			} else {
-				ro = _roRight;
-				u = _uRight;						
-				e = _pRight / (0.4 * ro);
-			};
-			
-			//Convert to conservative variables						
-			roE = ro*(e + (u*u + v*v + w*w) / 2.0);
-			initValues.resize(_gasModels[nmat]->nConservativeVariables);
-			initValues[0] = ro;
-			initValues[1] = ro * u;
-			initValues[2] = ro * v;
-			initValues[3] = ro * w;
-			initValues[4] = roE;
-
-			return initValues;
-		};
-	}; //Initial conditions
 
 }; //TestCase
 

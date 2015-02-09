@@ -215,10 +215,13 @@ int main(int argc, char *argv[]) {
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
 	//test.RunTest(&argc, &argv);
-	ToroTests::ToroTest1 test;
-	test.SetParams();
+
+	//ToroTests::ToroTest1 test;
+	//test.SetParams();
 	//test.RunTest(&argc, &argv);
-	test.ComputeExactSolution();
+	//test.ComputeExactSolution(1.0e-16);
+	ToroTests::AutomaticTest1 test(200, 0.2);
+	test.RunTest(&argc, &argv);
 	return 0;
 	
 };
