@@ -232,8 +232,13 @@ public:
 
 		result.Fluxes = ComputeFlux(UL, UR, f);
 		result.MaxEigenvalue = MaxEigenvalue;
-		result.Velocity = velocity;
-		result.Pressure = 0;
+		double ro = result.Fluxes[0];
+		double u = result.Fluxes[1]/ro;
+		double v = result.Fluxes[2]/ro;
+		double w = result.Fluxes[3]/ro;
+		double roe = result.Fluxes[4] - ro * (u*u + v*v + w*w) / 2.0;
+		result.Velocity = Vector(u,v,w);
+		result.Pressure = (gamma - 1) * roe;
 
 		return result;
 	};

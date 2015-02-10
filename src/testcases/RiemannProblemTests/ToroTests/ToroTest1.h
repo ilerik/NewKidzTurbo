@@ -12,9 +12,10 @@ public:
 
 	//constructor
 	AutomaticTest1() {
-		NCells = 200;
+		NCells = 1;
 		total_time = 0.2;
 	};
+
 	AutomaticTest1(int _NCells, double _total_time) : NCells(_NCells), total_time(_total_time) { };
 
 	//classes of different solvers for Test 1 (E.Toro's book // parag. 4.3.3, pp. 129 - 133)
@@ -37,7 +38,7 @@ public:
 		//constructor
 		ToroTest1HLLC(ToroTestsInit &params) {
 			this->SetParams(params);
-			_riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Roe;
+			_riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 			solution_name = "test1_HLLC";
 		};
 	}; //ToroTest1
@@ -49,7 +50,7 @@ public:
 		//constructor
 		ToroTest1Godunov(ToroTestsInit &params) {
 			this->SetParams(params);
-			_riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Roe;
+			_riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
 			solution_name = "test1_Godunov";
 		};
 	}; //ToroTest1
@@ -72,19 +73,23 @@ public:
 
 		//create tests for all solvers
 		Kernel kernel;
-		kernel.Initilize(argc, argv);
+		kernel.Initilize(argc, argv);		
 
 		ToroTest1Roe test_roe(test1);
 		ToroTest1HLLC test_hllc(test1);
 		ToroTest1Godunov test_godunov(test1);
 
 		//Run all tests
+		test_roe.SetKernel(kernel);
+		test_roe.PrepareGrid();
+		kernel.SaveGrid("result.cgns");
+
 		std::cout << "Test 1 for Roe solver is running!\n";
 		test_roe.RunTestWithKernel(&kernel);
 		std::cout << "Test 1 for HLLC solver is running!\n";
 		test_hllc.RunTestWithKernel(&kernel);
 		std::cout << "Test 1 for Godunov solver is running!\n";
-		test_godunov.RunTestWithKernel(&kernel);
+		test_godunov.RunTestWithKernel(&kernel);		
 
 		kernel.Finalize();
 	};

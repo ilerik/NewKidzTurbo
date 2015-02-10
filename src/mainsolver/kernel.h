@@ -1240,6 +1240,27 @@ public:
 		return TURBO_OK;
 	};
 
+	turbo_errt FillInitialConditions(std::function<std::vector<double>(Vector)> FVariables, std::function<int(Vector)> FMaterial) {
+		//For each local cell write initial conditions
+		for (int i = 0; i < _grid.nCellsLocal; i++) {
+			Cell* cell = _grid.localCells[i];
+
+			//Get initial values
+			std::vector<double> values = FVariables(cell->CellCenter);						
+			for (int j = 0; j<nVariables; j++) {				
+				Values[i * nVariables + j] = values[j];
+			};
+
+			//Get material distribution
+			CellGasModel[i] = FMaterial(cell->CellCenter);
+		};
+
+		//Synchronize		
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished generating initial conditions");	
+		return TURBO_OK;
+	};
+
 	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
 		//Open file
 		_cgnsWriter.OpenFile(fname);

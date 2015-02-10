@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 	//test.SetParams();
 	//test.RunTest(&argc, &argv);
 	//test.ComputeExactSolution(1.0e-16);
-	ToroTests::AutomaticTest1 test(200, 0.2);
+	ToroTests::AutomaticTest1 test(100, 0.2);
 	test.RunTest(&argc, &argv);
 	return 0;
 	

@@ -6,9 +6,14 @@
 //Base class for all automated tests
 class TestCase {
 protected:
-	Kernel _kernel; //Computational kernel object
+	Kernel* _kernel; //Computational kernel object
 public:
 	void RunTest(Kernel* kernel); //Main interface function for running test case code
+
+	//Attach computational kernel
+	void SetKernel(Kernel& kernel) {
+		_kernel = &kernel;
+	};
 };
 
 

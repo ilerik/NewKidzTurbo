@@ -27,8 +27,7 @@ struct ToroTestsInit{
 
 //Base class for all test from Toro book (the paragraph 4.3.3 pp. 129 - 133)
 class ToroTest : public TestCase {
-protected:
-	Kernel* _kernel; //Computational kernel object
+protected:	
 	Grid _grid;					  //Grid object	
 	Configuration _configuration; //Configuration object
 	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//type of Riemann Solver Problem
@@ -39,7 +38,7 @@ public:
 	//Test parameters
 	int nCells;
 	double Lx;					//solve problem in [0; Lx] segment
-	double discontinuity_pos;		//posiyion of initial discontinuity
+	double discontinuity_pos;	//position of initial discontinuity
 	double TimeMax;				//time of solution
 
 	//Left state density, pressure and velocity
@@ -93,7 +92,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = _riemannSolverType;
 
 		//Availible gas models
 		_configuration.AddGasModel("Air");			
@@ -157,9 +156,8 @@ public:
 		_kernel->FinalizeCalculation();
 
 		//Check results
-		//Output result
-		_kernel->SaveGrid(solution_name + ".cgns");
-		_kernel->SaveSolution(solution_name + ".cgns", solution_name);
+		//Output result		
+		_kernel->SaveSolution("result.cgns", solution_name);
 	};
 
 	//Run test with program arguments
@@ -579,6 +577,13 @@ public:
 			ofs << x << ' ' << res[0] << ' ' << res[1] << ' ' << res[2] << '\n';
 		};
 		ofs.close();
+	};
+
+
+
+	void WriteExactSolution(Kernel *kernel, std::string filename, std::string solutionName) {
+		//std::bind(ComputeExactValuesInCell());
+		//kernel->FillInitialConditions();
 	};
 
 }; //TestCase
