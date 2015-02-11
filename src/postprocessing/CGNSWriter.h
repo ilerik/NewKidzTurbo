@@ -157,7 +157,7 @@ public:
 		for (int S = 0; S<nSolutions; S++) {
 			if (_parallelHelper->IsMaster()) {				
 				GridLocation_t gridLocation;
-				CALL_CGNS(cg_sol_info(m_file.idx, m_base.idx, m_zone.idx, S, solName, &gridLocation));
+				CALL_CGNS(cg_sol_info(m_file.idx, m_base.idx, m_zone.idx, S+1, solName, &gridLocation));
 				
 				//We dont support other grid locations
 				if (gridLocation == GridLocation_t::CellCenter) {					

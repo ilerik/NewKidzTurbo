@@ -38,6 +38,7 @@ public:
 	static const double SoundSpeedLightFluid;
 	static const double MachNumber;
 	static const double pShock;
+
 	static const double roShock;
 	static const double uShock;
 
@@ -117,7 +118,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 
 		//Availible gas models
 			

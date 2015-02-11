@@ -14,14 +14,7 @@
 #include <cuda_runtime.h>
 
 //Test cases
-#include "testcases\TestCases1D\TestCase1D_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_2.h"
-#include "testcases\RMInstabilityTests\RMITest_1.h"
-#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
+#include "test_list.h"
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -32,7 +25,6 @@ std::string int_to_hex( T i )
          << std::hex << i;
   return stream.str();
 }
-
 
 //Shear layer computation
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
@@ -219,10 +211,22 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
+	//Fill task settings for Test 1
+	ToroTests::ToroTestsInit test1Settings;
+	test1Settings.discontinuityPosition = 0.5;
+	test1Settings.Lx = 1.0;
+	test1Settings.nCells = 1600;
+	test1Settings.TimeMax = 0.2;
+	test1Settings.gammaL = 1.4;
+	test1Settings.roL = 1.0;
+	test1Settings.uL = 0.0;
+	test1Settings.pL = 1.0;
+	test1Settings.gammaR = 1.4;
+	test1Settings.roR = 0.125;
+	test1Settings.uR = 0.0;
+	test1Settings.pR = 0.1;
+	ToroTests::ToroTestComposite test(test1Settings);
 	test.RunTest(&argc, &argv);
 	return 0;
-
+	
 };

@@ -10,8 +10,9 @@ public:
 	//Riemann solver type
 	enum class RiemannSolverType {
 		Roe,
-		HLLC
-	} RiemannSolverType;
+		HLLC,
+		Godunov
+	} riemannSolverType;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {
