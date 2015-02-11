@@ -1,0 +1,39 @@
+#ifndef TURBO_TestCases_TestCase
+#define TURBO_TestCases_TestCase
+
+#include "kernel.h"
+
+struct TestCaseResultInfo {
+	//Test status
+	enum class TestStatusType {
+		Passed,
+		Failed
+	} testStatus;
+};
+
+//Base class for all automated tests
+class TestCase {
+protected:
+<<<<<<< HEAD
+	Kernel* _kernel; //Computational kernel object
+public:	
+	virtual void RunTestWithKernel(Kernel* kernel) = 0; //Main interface function for running test case code
+
+	virtual TestCaseResultInfo GetTestCaseResultInfo() = 0; //Get results of test run 
+
+	//Attach computational kernel
+	void SetKernel(Kernel& kernel) {
+		_kernel = &kernel;
+	};
+=======
+	Kernel* _kernel; //Computational kernel object	
+	Grid _grid;					  //Grid object	
+	Configuration _configuration; //Configuration object
+public:	
+	virtual void RunTest(int* argc, char** argv[]) = 0; //Run test with program arguments
+	//virtual void RunTest(Kernel* kernel) = 0; //Main interface function for running test case code
+>>>>>>> 149fac8860f8a46ec27dc1bfc5fc73eb291dc9d5
+};
+
+
+#endif
