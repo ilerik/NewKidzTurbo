@@ -10,31 +10,40 @@ namespace ToroTests {
 //common structure to pass input parameters into test
 struct ToroTestsInit{
 	int nCells;
-	double Lx;					//solve problem in [0; Lx] segment
-	double discontinuity_pos;		//posiyion of initial discontinuity
-	double TimeMax;				//time of solution
+	double Lx;						//solve problem in [0; Lx] segment
+	double discontinuityPosition;	//position of initial discontinuity
+	double TimeMax;					//time of solution
 
 	//Left state density, pressure and velocity
+	double gammaL;
 	double roL;
 	double pL;
 	double uL;
 
 	//Right state density, pressure and velocity
+	double gammaR;
 	double roR;
 	double pR;
 	double uR;
 };
 
+//Class for storing results of testing
+struct RiemanProblemTestReport {	
+	double LInf; //Infinity norm of error
+	double L2;	 //L2 norm of error
+};
+
 //Base class for all test from Toro book (the paragraph 4.3.3 pp. 129 - 133)
 class ToroTest : public TestCase {
 protected:	
-	Grid _grid;					  //Grid object	
-	Configuration _configuration; //Configuration object
-	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//type of Riemann Solver Problem
-	std::vector<GasModel::ConservativeVariables> U_an;			//analitical solution
-	std::string solution_name;
+	Configuration _configuration;											//Configuration object
+	RiemannSolverConfiguration::RiemannSolverType _riemannSolverType;		//Type of Riemann Solver Problem	
+	std::string _solutionName;												//Solution name
+	double _eps;															//Iterative solver precision
 
-public:
+	//Test settings
+	ToroTestsInit _initSettings;
+public:	
 	//Test parameters
 	int nCells;
 	double Lx;					//solve problem in [0; Lx] segment
@@ -42,22 +51,23 @@ public:
 	double TimeMax;				//time of solution
 
 	//Left state density, pressure and velocity
+	double gammaL;
 	double roL;
 	double pL;
 	double uL;
 
 	//Right state density, pressure and velocity
+	double gammaR;
 	double roR;
 	double pR;
 	double uR;
 
-	//constructors
-	ToroTest() {
-		solution_name = "solution";
-	};
+	//Constructor with test parameters
 	ToroTest(ToroTestsInit &params) {
-		this->SetParams(params);
-		solution_name = "solution";
+		_initSettings = params;
+		this->SetParams(_initSettings);
+		_eps = 1e-10;
+		_solutionName = "Solution";
 	};
 
 	//set parameters for test 1
@@ -65,15 +75,17 @@ public:
 		//Test constant's
 		nCells = params.nCells;
 		Lx = params.Lx;
-		discontinuity_pos = params.discontinuity_pos;
+		discontinuity_pos = params.discontinuityPosition;
 		TimeMax = params.TimeMax;
 
 		//Left state density, pressure and velocity
+		gammaL = params.gammaL;
 		roL = params.roL;
 		pL = params.pL;
 		uL = params.uL;
 
 		//Right state density, pressure and velocity
+		gammaR = params.gammaR;
 		roR = params.roR;
 		pR = params.pR;
 		uR = params.uR;
@@ -81,8 +93,8 @@ public:
 
 	//Prepare computational grid
 	void PrepareGrid() {		
-		_grid = GenGrid1D(_kernel->getParallelHelper(), nCells, 0.0, Lx, false);
-		_kernel->BindGrid(&_grid);
+		Grid& grid = GenGrid1D(_kernel->getParallelHelper(), nCells, 0.0, Lx, false);
+		_kernel->BindGrid(&grid);
 	};
 
 	//Prepare configuration object and set all parameters
@@ -133,12 +145,9 @@ public:
 		return _configuration;
 	};
 
-	//Main interface function for running test case code
-	void RunTestWithKernel(Kernel* kernel) {		
+	//Main interface function for running test case code (grid already defined)
+	virtual void RunTestWithKernel(Kernel* kernel) override {		
 		_kernel = kernel; //Save reference to kernel
-		
-		//Get grid
-		PrepareGrid();
 
 		//Set parameters
 		PrepareConfiguration();
@@ -155,19 +164,23 @@ public:
 		//Finilize
 		_kernel->FinalizeCalculation();
 
-		//Check results
 		//Output result		
-		_kernel->SaveSolution("result.cgns", solution_name);
+		_kernel->SaveSolution("result.cgns", _solutionName);
 	};
 
 	//Run test with program arguments
 	void RunTest(int* argc, char** argv[]) {
+		//Initialize kernel
 		_kernel = new Kernel();
 		_kernel->Initilize(argc, argv);
+
+		//Prepare computational grid
+		PrepareGrid();
 
 		//Call main function
 		RunTestWithKernel(_kernel);
 
+		//Finilize
 		_kernel->Finalize();
 	};
 
@@ -267,19 +280,18 @@ public:
 	//fL part of algebraic equation for pressure in exact RP solver	(proposition 4.2.1 from Toro)
 	double f1(double pStar) 
 	{
-		double res = 0;
-		double gamma = _configuration.GasModelsConfiguration["Air"].GetPropertyValue("SpecificHeatRatio").first;	//ask EKR
+		double res = 0;		
 
 		if (pStar > pL) {
 			//Left shock
-			double AL = 2 / ((gamma + 1.0) * roL);
-			double BL = pL * (gamma - 1.0) / (gamma + 1.0);
+			double AL = 2 / ((gammaL + 1.0) * roL);
+			double BL = pL * (gammaL - 1.0) / (gammaL + 1.0);
 			res = (pStar - pL) * sqrt(AL / (pStar + BL));
 		} else {
 			//Left rarefaction
-			double aL = sqrt(gamma * pL / roL);
-			res = pow(pStar/pL, (gamma - 1.0)/(2*gamma)) - 1.0;
-			res *= 2*aL/(gamma - 1.0);
+			double aL = sqrt(gammaL * pL / roL);
+			res = pow(pStar/pL, (gammaL - 1.0)/(2*gammaL)) - 1.0;
+			res *= 2*aL/(gammaL - 1.0);
 		};
 
 		return res;
@@ -288,25 +300,24 @@ public:
 	//fR part of algebraic equation for pressure in exact RP solver	(proposition 4.2.1 from Toro)
 	double f2(double pStar) 
 	{
-		double res = 0;
-		double gamma = _configuration.GasModelsConfiguration["Air"].GetPropertyValue("SpecificHeatRatio").first;	//ask EKR
+		double res = 0;		
 
 		if (pStar > pR) {
 			//Right shock
-			double AR = 2 / ((gamma + 1.0) * roR);
-			double BR = pR * (gamma - 1.0) / (gamma + 1.0);
+			double AR = 2 / ((gammaR + 1.0) * roR);
+			double BR = pR * (gammaR - 1.0) / (gammaR + 1.0);
 			res = (pStar - pR) * sqrt(AR / (pStar + BR));
 		} else {
 			//Right rarefaction
-			double aR = sqrt(gamma * pR / roR);
-			res = pow(pStar/pR, (gamma - 1.0)/(2*gamma)) - 1.0;
-			res *= 2*aR/(gamma - 1.0);
+			double aR = sqrt(gammaR * pR / roR);
+			res = pow(pStar/pR, (gammaR - 1.0)/(2*gammaR)) - 1.0;
+			res *= 2*aR/(gammaR - 1.0);
 		};
 
 		return res;
 	};
 
-	//Target function for pressure equation in exact RP solver TO DO ask Ekr about object
+	//Target function callback for pressure equation in exact RP solver
 	static void fFunction(const alglib::real_1d_array &x, alglib::real_1d_array &fi, void *object)
 	{
 		ToroTest* params = (ToroTest*)object;
@@ -364,25 +375,24 @@ public:
 		//Compute star region velocity
 		starValues.uStar = 0.5*(uL + uR) + 0.5*(f2(starValues.pStar) - f1(starValues.pStar));
 
-		//Determine nonlinear wave type and properties
-		double gamma = _configuration.GasModelsConfiguration["Air"].GetPropertyValue("SpecificHeatRatio").first;	//ask EKR
-		double C = (gamma - 1.0) / (gamma + 1.0);
+		//Determine nonlinear wave type and properties				
 		starValues.MaxSpeed = 0;
 
 		//Left side of contact
 		double pRatioL = starValues.pStar / pL;
-		double aL = sqrt(gamma * pL / roL);
+		double aL = sqrt(gammaL * pL / roL);
+		double CL = (gammaL - 1.0) / (gammaL + 1.0);
 		if (starValues.pStar > pL) {
 			//Left shock
 			starValues.leftWave = Godunov3DSolverPerfectGas::Shock;
 
 			//Determine density in star region			
-			starValues.roStarL = pRatioL + C;
-			starValues.roStarL /= C * pRatioL + 1.0;
+			starValues.roStarL = pRatioL + CL;
+			starValues.roStarL /= CL * pRatioL + 1.0;
 			starValues.roStarL *= roL;
 
 			//Determine shock propagation speed			
-			starValues.SL = sqrt((gamma + 1) * pRatioL / (2*gamma) + (gamma - 1) / (2*gamma));
+			starValues.SL = sqrt((gammaL + 1) * pRatioL / (2*gammaL) + (gammaL - 1) / (2*gammaL));
 			starValues.SL = uL - aL * starValues.SL;
 
 			starValues.MaxSpeed = max(starValues.MaxSpeed, std::abs(starValues.SL));
@@ -391,13 +401,13 @@ public:
 			starValues.leftWave = Godunov3DSolverPerfectGas::Rarefaction;
 
 			//Determine density in star region
-			starValues.roStarL = roL * pow(pRatioL , 1.0 / gamma);
+			starValues.roStarL = roL * pow(pRatioL , 1.0 / gammaL);
 
 			//Determine rarefaction head propagation speed		
 			starValues.SHL = uL - aL;
 
 			//Determine rarefaction tail propagation speed		
-			double aStarL = aL * pow(pRatioL, (gamma - 1) / (2*gamma));
+			double aStarL = aL * pow(pRatioL, (gammaL - 1) / (2*gammaL));
 			starValues.STL = starValues.uStar - aStarL;		
 
 			starValues.MaxSpeed = max(starValues.MaxSpeed, std::abs(starValues.SHL));
@@ -405,18 +415,19 @@ public:
 
 		//Right side of contact
 		double pRatioR = starValues.pStar / pR;
-		double aR = sqrt(gamma * pR / roR);
+		double aR = sqrt(gammaR * pR / roR);
+		double CR = (gammaR - 1.0) / (gammaR + 1.0);
 		if (starValues.pStar > pR) {
 			//Right shock
 			starValues.rightWave = Godunov3DSolverPerfectGas::Shock;
 
 			//Determine density in star region			
-			starValues.roStarR = pRatioR + C;
-			starValues.roStarR /= C * pRatioR + 1.0;
+			starValues.roStarR = pRatioR + CR;
+			starValues.roStarR /= CR * pRatioR + 1.0;
 			starValues.roStarR *= roR;
 
 			//Determine shock propagation speed			
-			starValues.SR = sqrt((gamma + 1) * pRatioR / (2*gamma) + (gamma - 1) / (2*gamma));
+			starValues.SR = sqrt((gammaR + 1) * pRatioR / (2*gammaR) + (gammaR - 1) / (2*gammaR));
 			starValues.SR = uL + aR * starValues.SR;
 
 			starValues.MaxSpeed = max(starValues.MaxSpeed, std::abs(starValues.SR));
@@ -425,13 +436,13 @@ public:
 			starValues.rightWave = Godunov3DSolverPerfectGas::Rarefaction;
 
 			//Determine density in star region
-			starValues.roStarR = roR * pow(pRatioR , 1.0 / gamma);
+			starValues.roStarR = roR * pow(pRatioR , 1.0 / gammaR);
 
 			//Determine rarefaction head propagation speed		
 			starValues.SHR = uL + aR;
 
 			//Determine rarefaction tail propagation speed		
-			double aStarR = aR * pow(pRatioL, (gamma - 1) / (2*gamma));
+			double aStarR = aR * pow(pRatioL, (gammaR - 1) / (2*gammaR));
 			starValues.STR = starValues.uStar + aStarR;			
 
 			starValues.MaxSpeed = max(starValues.MaxSpeed, std::abs(starValues.SHR));
@@ -440,19 +451,17 @@ public:
 		return starValues;
 	};
 
-	//compute ro u and p in x point at moment t ([0] - r0, [1] - u, [2] - p)
+	//compute ro u and p in x point at moment t ([0] - r0, [1] - u, [2] - p) star variables must be computed in advance
 	std::vector<double> ComputeExactValuesInCell(double x, double t) {
 		//Compute flux (Toro p. 219) 
 		//Sample exact solution at S = x/t
 		double S = x/t;
 		double ro;
 		double u;
-		double p;
-		double gamma = _configuration.GasModelsConfiguration["Air"].GetPropertyValue("SpecificHeatRatio").first;	//ask EKR
+		double p;		
 		
 		if (starValues.uStar >= S) {
 			//Left side of contact
-
 			//Shock wave
 			if (starValues.leftWave == Godunov3DSolverPerfectGas::Shock) {
 				if (starValues.SL >= S) {
@@ -484,19 +493,19 @@ public:
 					p = starValues.pStar;
 				} else {
 					//Rarefaction fan region
-					double aL = sqrt(gamma * pL / roL);
-					double C = 2 / (gamma + 1) + (gamma-1) * (uL - S) / ((gamma + 1) * aL);
-					C = pow(C, 2 / (gamma - 1));
+					double aL = sqrt(gammaL * pL / roL);
+					double CL = 2 / (gammaL + 1) + (gammaL-1) * (uL - S) / ((gammaL + 1) * aL);
+					CL = pow(CL, 2 / (gammaL - 1));
 
 					//Density
-					ro = C * roL;
+					ro = CL * roL;
 
 					//Velocity
-					u = aL + (gamma - 1) * uL/ 2.0 + S;
-					u *= 2 / (gamma + 1);
+					u = aL + (gammaL - 1) * uL/ 2.0 + S;
+					u *= 2 / (gammaL + 1);
 
 					//Pressure					
-					p = C * pL;
+					p = CL * pL;
 				};
 			};
 
@@ -534,19 +543,19 @@ public:
 					p = starValues.pStar;
 				} else {
 					//Rarefaction fan region
-					double aR = sqrt(gamma * pR / roR);
-					double C = 2 / (gamma + 1) - (gamma-1) * (uR - S) / ((gamma + 1) * aR);
-					C = pow(C, 2 / (gamma - 1));
+					double aR = sqrt(gammaR * pR / roR);
+					double CR = 2 / (gammaR + 1) - (gammaR-1) * (uR - S) / ((gammaR + 1) * aR);
+					CR = pow(CR, 2 / (gammaR - 1));
 
 					//Density
-					ro = C * roR;
+					ro = CR * roR;
 
 					//Velocity
-					u = -aR + (gamma - 1) * uR/ 2.0 + S;
-					u *= 2 / (gamma + 1);
+					u = -aR + (gammaR - 1) * uR/ 2.0 + S;
+					u *= 2 / (gammaR + 1);
 
 					//Pressure					
-					p = C * pR;
+					p = CR * pR;
 				};
 			};
 		};
@@ -557,33 +566,81 @@ public:
 		result.push_back(p);
 		return result;
 	};
-	
-	void ComputeExactSolution(double eps = 1.0e-10) {
-		//Add specifik heat ratio of our gas
-		_configuration.AddGasModel("Air");
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatRatio", 1.4);
 
-		//compute star variables at first		
-		starValues = ComputeStarVariables(eps);
+	//compute conservative variables at some point, star variables must be computed in advance
+	std::vector<double> ComputeExactConservativeValuesInCell(Vector r, double time) {
+		double x = r.x - discontinuity_pos;
+		double gamma = _configuration.GasModelsConfiguration["Air"].GetPropertyValue("SpecificHeatRatio").first;	//ask EKR
+		std::vector<double> result = ComputeExactValuesInCell(x, time);
+		std::vector<double> U(5);
+		double ro = U[0] = result[0];
+		double u = result[1];
+		double P = result[2];
+		U[1] = ro * u;
+		U[2] = 0;
+		U[3] = 0;
+		U[4] = P/(gamma - 1.0) + ro * u * u / 2.0;
+		return U;
+	};			
 
-		std::string exact_sol_file = "exact_solution.dat";
-		std::ofstream ofs(exact_sol_file);
-		for (int cellIndex = 0; cellIndex < nCells; cellIndex++) {
-			double x;
-			double hx = Lx/nCells;	//grid step for UNIFORM GRID
-			x = hx*(0.5 + cellIndex);
-			//compute ro u and p in x point at moment t
-			std::vector<double> res =  ComputeExactValuesInCell(x - discontinuity_pos, TimeMax);
-			ofs << x << ' ' << res[0] << ' ' << res[1] << ' ' << res[2] << '\n';
-		};
-		ofs.close();
+	//Calculate and write exact solution to cgns
+	void WriteExactSolution(std::string filename, std::string solutionName) {
+		starValues = ComputeStarVariables(_eps);
+		std::function<std::vector<double>(Vector)> FVariables = std::bind(&ToroTest::ComputeExactConservativeValuesInCell, this, std::placeholders::_1, TimeMax);
+		std::function<int(Vector)> FMaterial = [](Vector r) { return 0; };
+		_kernel->FillInitialConditions(FVariables, FMaterial);
+		_kernel->SaveSolution(filename, solutionName);
 	};
 
+	//Calculate various error measures
+	RiemanProblemTestReport CompareWithAnalyticalSolution() {
+		//Result structure initialization
+		RiemanProblemTestReport report;
+		report.L2 = 0;
+		report.LInf = 0;
 
+		//Star variables
+		starValues = ComputeStarVariables(_eps);
 
-	void WriteExactSolution(Kernel *kernel, std::string filename, std::string solutionName) {
-		//std::bind(ComputeExactValuesInCell());
-		//kernel->FillInitialConditions();
+		//Compute local part of error for each cell
+		for (int cellIndex = 0; cellIndex < _kernel->GetLocalCellsNumber(); cellIndex++) {
+			//Obtain current solution values
+			double x = _kernel->GetLocalCell(cellIndex).CellCenter.x;
+			double pFact = _kernel->GetCellPressure(cellIndex);
+			//double uFact = _kernel->GetCellVelocityX(cellIndex);
+			//double roFact = _kernel->GetCellDensity(cellIndex);
+
+			//Compute exact solution
+			std::vector<double> exactValues = ComputeExactValuesInCell(x - _initSettings.discontinuityPosition, TimeMax);
+			double pExact = exactValues[2];
+			double uExact = exactValues[1];
+			double roExact = exactValues[0];
+
+			//Compute particular errors
+			double dp = pFact - pExact;
+			double dx = _kernel->GetLocalCell(cellIndex).CellVolume;
+			report.L2 += std::pow(dp * dx, 2.0);
+			report.LInf = std::max(std::abs(dp), report.LInf);
+		};
+
+		//Syncronize and aggregate
+		report.L2 = _kernel->getParallelHelper()->SumDouble(report.L2);
+		report.L2 = std::sqrt(report.L2);
+		report.LInf = _kernel->getParallelHelper()->Max(report.LInf);
+
+		//Return result
+		return report;
+	};
+
+	//Test result function
+	virtual TestCaseResultInfo GetTestCaseResultInfo() override //Get results of test run 
+	{
+		RiemanProblemTestReport report = CompareWithAnalyticalSolution();
+		std::cout<<"L2norm = "<<report.L2<<" "<<"LInfnorm = "<<report.LInf<<"\n";
+
+		TestCaseResultInfo result;
+		result.testStatus = TestCaseResultInfo::TestStatusType::Passed;
+		return result;
 	};
 
 }; //TestCase

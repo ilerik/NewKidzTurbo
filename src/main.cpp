@@ -211,16 +211,21 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
-	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSPb test(750);
-	//test.RunTest(&argc, &argv);
-
-	//ToroTests::ToroTest1 test;
-	//test.SetParams();
-	//test.RunTest(&argc, &argv);
-	//test.ComputeExactSolution(1.0e-16);
-	ToroTests::AutomaticTest1 test(100, 0.2);
+	//Fill task settings for Test 1
+	ToroTests::ToroTestsInit test1Settings;
+	test1Settings.discontinuityPosition = 0.5;
+	test1Settings.Lx = 1.0;
+	test1Settings.nCells = 1600;
+	test1Settings.TimeMax = 0.2;
+	test1Settings.gammaL = 1.4;
+	test1Settings.roL = 1.0;
+	test1Settings.uL = 0.0;
+	test1Settings.pL = 1.0;
+	test1Settings.gammaR = 1.4;
+	test1Settings.roR = 0.125;
+	test1Settings.uR = 0.0;
+	test1Settings.pR = 0.1;
+	ToroTests::ToroTestComposite test(test1Settings);
 	test.RunTest(&argc, &argv);
 	return 0;
 	

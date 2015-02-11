@@ -184,7 +184,7 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h" />
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest.h" />
-    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest1.h" />
+    <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTestComposite.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
