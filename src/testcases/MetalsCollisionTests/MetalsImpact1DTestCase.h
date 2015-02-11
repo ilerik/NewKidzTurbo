@@ -102,15 +102,22 @@ public:
 
 		//Right
 		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
+		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 		//_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
 		_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::FreeSurface;
-		_configuration.BoundaryConditions["right"].MaterialName = "Air";
+		_configuration.BoundaryConditions["right"].MaterialName = "MetalRight";
+		_configuration.BoundaryConditions["right"].SetPropertyValue("Density", _roRight);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityX", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityY", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityZ", 0);
+		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", 0);
+		/*_configuration.BoundaryConditions["right"].MaterialName = "Air";
 		_configuration.BoundaryConditions["right"].SetPropertyValue("Density", _roBoundary);
 		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityX", _uBoundary);
 		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityY", 0);
 		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityZ", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", _pBoundary / ((gamma - 1.0) * _roBoundary));
+		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", _pBoundary / ((gamma - 1.0) * _roBoundary));*/
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -120,7 +127,7 @@ public:
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::Linear1D;
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
 		//Run settings

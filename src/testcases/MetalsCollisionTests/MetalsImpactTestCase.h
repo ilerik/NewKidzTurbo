@@ -18,6 +18,8 @@ enum class MetalType {
 //simultaneously a shock wave, a contact discontinuity, and an expansion fan.
 class MetalsImpactTestCase: public TestCase {
 protected:	
+	Grid _grid;					  //Grid object	
+	Configuration _configuration; //Configuration object
 
 	//Test parameters
 	int _nSnapshots;

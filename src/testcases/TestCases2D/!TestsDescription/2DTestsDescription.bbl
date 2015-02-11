@@ -1,5 +1,5 @@
 % $ biblatex auxiliary file $
-% $ biblatex version 2.4 $
+% $ biblatex version 2.3 $
 % Do not modify the above lines!
 %
 % This is an auxiliary file used by the 'biblatex' package.
@@ -15,6 +15,39 @@
       \aftergroup\endinput}
   {}
 \endgroup
+
+\entry{Dukowicz1992}{article}{}
+  \name{author}{2}{}{%
+    {{}%
+     {Dukowicz}{D.}%
+     {J~K}{J.~K.}%
+     {}{}%
+     {}{}}%
+    {{}%
+     {Meltz}{M.}%
+     {B~J~a}{B.~J.~a.}%
+     {}{}%
+     {}{}}%
+  }
+  \keyw{Saltzman's problem}
+  \strng{namehash}{DJKMBJa1}
+  \strng{fullhash}{DJKMBJa1}
+  \field{sortinit}{1}
+  \verb{doi}
+  \verb 10.1016/0021-9991(92)90280-C
+  \endverb
+  \field{issn}{00219991}
+  \field{pages}{115\bibrangedash 134}
+  \field{title}{{Vorticity Errors in Multidimensional Lagrangian Codes}}
+  \field{volume}{99}
+  \verb{file}
+  \verb :C$\backslash$:/Users/Erik/AppData/Local/Mendeley Ltd./Mendeley Desktop
+  \verb /Downloaded/Dukowicz, Meltz - 1992 - Vorticity Errors in Multidimension
+  \verb al Lagrangian Codes.pdf:pdf
+  \endverb
+  \field{journaltitle}{Journal of Computational Physics}
+  \field{year}{1992}
+\endentry
 
 \entry{Ni2013}{article}{}
   \name{author}{3}{}{%

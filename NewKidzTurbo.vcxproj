@@ -191,6 +191,7 @@
     <ClInclude Include="src\testcases\TestCase.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h" />

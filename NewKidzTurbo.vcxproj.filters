@@ -282,6 +282,9 @@
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h">
       <Filter>Header Files\TestCases\TestCases1D</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

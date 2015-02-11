@@ -156,8 +156,8 @@ public:
 
 		virtual std::vector<double> getInitialValues(const Cell& cell) {
 			int nmat = getInitialGasModelIndex(cell); //get material index
+			std::vector<double> initValues;
 
-			std::vector<double> initValues;				
 			//Other velocities
 			double v = 0;
 			double w = 0;

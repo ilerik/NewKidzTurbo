@@ -82,6 +82,8 @@ $!VIEW FIT
 $!LINEMAP [9]  NAME = 'Левая граница зоны плавления'
 $!LINEMAP [10]  NAME = 'Правая граница зоны плавления'
 $!LINEMAP [11]  NAME = 'Граница раздела сред'
+$!LINEMAP [12]  NAME = 'Граница стали'
+$!LINEMAP [13]  NAME = 'Граница свинца'
 $!PICK ADDATPOSITION
   X = 7.80406852248
   Y = 4.35278372591

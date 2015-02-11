@@ -20,6 +20,7 @@
 #include "testcases\TestCases1D\TestCase1DALE3_RK1.h"
 #include "testcases\TestCases1D\TestCase1DALE3_RK2.h"
 #include "testcases\TestCases1D\TestCase1DALE3_RK4.h"
+#include "testcases\TestCases1D\TestCase1DALE4.h"
 #include "testcases\RMInstabilityTests\RMITest_1.h"
 #include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
 #include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
@@ -294,7 +295,7 @@ int main(int argc, char *argv[]) {
 	//Test 1
 	double widthSteel = 3e-3; //3 mm
 	double widthPb = 2e-3; //2 mm
-	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 100,
 	//	100, //snapshots
 	//	widthSteel, //
 	//	widthPb, 
@@ -333,7 +334,8 @@ int main(int argc, char *argv[]) {
 	//	-470.0
 	//	);
 
-	TestCases1D::TestCase1DALE3_RK1 test;
+	TestCases1D::TestCase1DALE3_RK4 test;
+	//TestCases1D::TestCase1DALE4 test;
 	test.RunTest(&argc, &argv);
 	return 0;
 

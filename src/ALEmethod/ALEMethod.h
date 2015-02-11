@@ -125,7 +125,7 @@ public:
 			double pR = 0;
 			double cR = 0;
 			double GrR = 0;
-			double GammaR = 0;				
+			double GammaR = 0;
 			assert(roR > 0);
 			gasModelRight->GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
 			double phiR = cR*cR - GrR * pR / roR;

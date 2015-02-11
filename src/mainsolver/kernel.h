@@ -1431,6 +1431,7 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "isExternal = ", f.isExternal);
 			
 			std::vector<double> flux;
+			int ALEIndicator = ALEindicators[i];
 
 			//Solution reconstruction
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
@@ -1457,22 +1458,26 @@ public:
 				faceVelocityAverage = _ALEmethod.facesVelocity[f.GlobalIndex];
 			};
 
-			//Compute flux			
+			//Compute flux		
 			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, faceVelocityAverage);			
-			//Store interface velocity and pressure for ALE
-			//_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
-			//_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
-			//Store wave speeds
-			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
-			//Store flux
-			fluxes[f.GlobalIndex] = result.Fluxes;
 
-			//If it's material interface
-			if (nmatL != nmatR) {
+			//Store interface velocity and pressure for ALE
+			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;			
+
+			//Store wave speeds			
+			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
+
+			//Compute flux exactly for Lagrangian interfaces				
+			if (ALEIndicator == 1.0) {				
 				result.Fluxes[0] = 0;
-				assert(result.Fluxes[0] == 0);
+				result.Fluxes[1] = f.FaceNormal.x * result.Pressure;
+				result.Fluxes[2] = f.FaceNormal.y * result.Pressure;
+				result.Fluxes[3] = f.FaceNormal.z * result.Pressure;
+				result.Fluxes[4] = (faceVelocityAverage * f.FaceNormal) * result.Pressure;
 			};
-		
+
+			//Store flux
+			fluxes[f.GlobalIndex] = result.Fluxes;								
 
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("

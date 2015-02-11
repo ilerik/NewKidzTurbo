@@ -26,14 +26,21 @@ public:
 		res[1] = 0;
 		res[2] = 0;
 		res[3] = 0;
-		res[4] = pressure / (0.4);*/
-		//res[4] = pressure / (0.4);
-		/*res[0] = inV[0];
+		res[4] = pressure / (0.4);
+		*/	
+
+		//For metals free surface
+		/*
+		double ro = inV[0];
+		double u = inV[1]/inV[0];
+		double v = inV[2]/inV[0];
+		double w = inV[3]/inV[0];
+		res[0] = inV[0];
 		res[1] = inV[1];
 		res[2] = inV[2];
 		res[3] = inV[3];
-		res[4] = 0;*/
-		Vector roU(inV[1], inV[2], inV[3]);					
+		res[4] = ro*(u*u + v*v + w*w)/2.0;
+		Vector roU(inV[1], inV[2], inV[3]);*/
 		return res;
 	};
 
