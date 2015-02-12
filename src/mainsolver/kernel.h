@@ -92,6 +92,7 @@ private:
 
 	//Solver (TO DO)
 	SimulationType_t _simulationType; //Simulation type
+	bool _isVerbose;				  //If standart output is on during calculation
 	double CFL;
 	int RungeKuttaOrder;
 	double MaxIteration;
@@ -136,9 +137,7 @@ private:
 	std::vector<Vector> GradientT;
 	std::vector<Vector> GradientP;
 
-public:
-	//Accessors
-
+public:	
 	//Parallel helper
 	inline ParallelHelper* getParallelHelper() {
 		return &_parallelHelper;
@@ -247,12 +246,16 @@ public:
 		//Solver settings
 		bool isSolverSpecified = false;
 		//Instantiate solver depending on user choice
-		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::HLLC) {
 			rSolver = new HLLCSolverGeneralEOS();
 			isSolverSpecified = true;
 		};
-		if (_configuration.RiemannSolverConfiguration.RiemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Roe) {
 			rSolver = new Roe3DSolverPerfectGas();
+			isSolverSpecified = true;
+		};
+		if (_configuration.RiemannSolverConfiguration.riemannSolverType == RiemannSolverConfiguration::RiemannSolverType::Godunov) {
+			rSolver = new Godunov3DSolverPerfectGas();
 			isSolverSpecified = true;
 		};
 		if (!isSolverSpecified) {
@@ -359,7 +362,7 @@ public:
 			msg.str(std::string());
 			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
-			if (_parallelHelper.IsMaster()) {
+			if (_parallelHelper.IsMaster() && _isVerbose) {
 				std::cout<<msg.str();
 			};
 
@@ -1250,6 +1253,27 @@ public:
 		return TURBO_OK;
 	};
 
+	turbo_errt FillInitialConditions(std::function<std::vector<double>(Vector)> FVariables, std::function<int(Vector)> FMaterial) {
+		//For each local cell write initial conditions
+		for (int i = 0; i < _grid.nCellsLocal; i++) {
+			Cell* cell = _grid.localCells[i];
+
+			//Get initial values
+			std::vector<double> values = FVariables(cell->CellCenter);						
+			for (int j = 0; j<nVariables; j++) {				
+				Values[i * nVariables + j] = values[j];
+			};
+
+			//Get material distribution
+			CellGasModel[i] = FMaterial(cell->CellCenter);
+		};
+
+		//Synchronize		
+		_parallelHelper.Barrier();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished generating initial conditions");	
+		return TURBO_OK;
+	};
+
 	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
 		//Open file
 		_cgnsWriter.OpenFile(fname);
@@ -1854,6 +1878,11 @@ public:
 	//	return;
 	//};
 
+	//Return number of local cells (stored on this process)
+	inline int GetLocalCellsNumber() {
+		return _grid.nCellsLocal;
+	};
+
 	inline bool IsLocalCell(int globalIndex) {
 		return _grid.GetCellPart(globalIndex) == _parallelHelper.getRank();
 	};
@@ -1864,8 +1893,9 @@ public:
 
 	inline bool IsBoundaryFace(Face& face) {
 		return _grid.IsBoundaryFace(face);
-	};
+	};	
 
+	//Get face boundary condition reference
 	inline BoundaryConditions::BoundaryCondition* GetFaceBoundaryCondition(Face& face) {
 		if (!IsBoundaryFace(face)) throw 1; //TO DO check
 		return GetCellBoundaryCondition(face.FaceCell_2);
@@ -1876,7 +1906,7 @@ public:
 		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
 		Cell& cell = _grid.Cells[globalIndex];						
 		return _boundaryConditions[cell.BCMarker];
-	};
+	};	
 
 	//Get cell gas model index
 	inline int GetCellGasModelIndex(int globalIndex, int localIndex = -1) {		
@@ -1940,6 +1970,23 @@ public:
 			return _parallelHelper.RequestedValues[globalIndex];
 		};
 	};
-};
+
+	//Switch verbose state
+	inline void VerboseOn() { _isVerbose = true; };
+	inline void VerboseOff() { _isVerbose = false; };	
+
+	//Grid elements accessors
+	inline const Cell& GetLocalCell(int localIndex) {
+		return *_grid.localCells[localIndex];
+	};
+
+	//Medium properties accessors
+	inline double GetCellPressure(int localIndex) {
+		int nmat = CellGasModel[localIndex];
+		double p = _gasModels[nmat]->GetPressure(GasModel::ConservativeVariables(&Values[nVariables * localIndex]));
+		return p;
+	};
+
+}; //Kernel
 
 #endif

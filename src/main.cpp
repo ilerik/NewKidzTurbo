@@ -14,6 +14,7 @@
 #include <cuda_runtime.h>
 
 //Test cases
+#include "test_list.h"
 #include "testcases\TestCases1D\TestCase1D_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_1.h"
 #include "testcases\TestCases1D\TestCase1D_ALE_2.h"

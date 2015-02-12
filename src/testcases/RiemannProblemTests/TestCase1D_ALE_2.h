@@ -1,5 +1,5 @@
-#ifndef TURBO_TestCases_TestCases1D_TestCaseALE1
-#define TURBO_TestCases_TestCases1D_TestCaseALE1
+#ifndef TURBO_TestCases_TestCases1D_TestCaseALE2
+#define TURBO_TestCases_TestCases1D_TestCaseALE2
 
 #include "TestCase.h"
 #include "gengrid1D.h"
@@ -7,10 +7,9 @@
 namespace TestCases1D {
 
 //Numerical test for ALE method from Luo et al 2004
-//The first test case is the material interface problem, whose solution represents a single contact discontinuity in gas dynamics
-//A shocktube is filled with low-density fluid on the left and high-density on the right under different ratios of specific heat
-//Velocity and pressure equilibrium are assumed along the whole tube
-class TestCaseALE1 : public TestCase {
+//The well-known Sod shocktube problem is considered in this test case, whose solution contains 
+//simultaneously a shock wave, a contact discontinuity, and an expansion fan.
+class TestCaseALE2 : public TestCase {
 protected:
 	Kernel* _kernel; //Computational kernel object
 	Grid _grid;					  //Grid object	
@@ -46,7 +45,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 
 		//Availible gas models		
 
@@ -76,8 +75,8 @@ public:
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.85;
-		_configuration.RungeKuttaOrder = 4;		
+		_configuration.CFL = 0.5;
+		_configuration.RungeKuttaOrder = 1;		
 
 		//ALE settings
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
@@ -201,21 +200,21 @@ public:
 }; //TestCase
 
 //Test constant's
-const int TestCaseALE1::nCells = 100;
-const double TestCaseALE1::Lx = 1.0;
-const double TestCaseALE1::TimeMax = 0.2;
+const int TestCaseALE2::nCells = 100;
+const double TestCaseALE2::Lx = 1.0;
+const double TestCaseALE2::TimeMax = 0.2;
 
 //Left state density, pressure and velocity
-const double TestCaseALE1::roL = 1.0;
-const double TestCaseALE1::pL = 1.0;
-const double TestCaseALE1::uL = 1.0;
-const double TestCaseALE1::gammaL = 1.4;
+const double TestCaseALE2::roL = 1.0;
+const double TestCaseALE2::pL = 1.0;
+const double TestCaseALE2::uL = 0.0;
+const double TestCaseALE2::gammaL = 1.4;
 
 //Right state density, pressure and velocity
-const double TestCaseALE1::roR = 0.1;
-const double TestCaseALE1::pR = 1;
-const double TestCaseALE1::uR = 1.0;
-const double TestCaseALE1::gammaR = 1.2;
+const double TestCaseALE2::roR = 0.125;
+const double TestCaseALE2::pR = 0.1;
+const double TestCaseALE2::uR = 0.0;
+const double TestCaseALE2::gammaR = 1.4;
 
 }; //namespace
 
