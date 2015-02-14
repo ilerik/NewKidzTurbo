@@ -10,7 +10,7 @@ template<class T>
 class DSUClusteredSet {
 private:
 	//Size of set
-	int _size;
+	size_t _size;
 
 	//Storage for set elements
 	std::vector<T> _elements;
@@ -67,7 +67,7 @@ public:
 		};
 
 		//For each cluster assemble elements
-		int nClusters = rootsSet.size();	
+		size_t nClusters = rootsSet.size();	
 		std::vector<int> roots;	
 		std::map<int, int> rootToClusterIndex;
 		std::vector< std::vector<T*> > clusterIndexToElements;

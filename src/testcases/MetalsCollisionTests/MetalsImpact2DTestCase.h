@@ -103,7 +103,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 
 		//Availible gas models		
 		//Left metal
@@ -122,10 +122,10 @@ public:
 		std::string boundaryMaterialName = "Air";
 		_configuration.AddGasModel(boundaryMaterialName);
 		_configuration.GasModelsConfiguration[boundaryMaterialName] = GetBoundaryGasModelConfiguration();				
-		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration(boundaryMaterialName);
-		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration(boundaryMaterialName);		
-		_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName);		
-		_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName);				
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::Wall);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
+		_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
+		_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);				
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -133,7 +133,7 @@ public:
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
-		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;
+		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
 		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
 		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
@@ -148,6 +148,12 @@ public:
 
 		return _configuration;
 	};	
+
+	//Get results of test run 
+	virtual TestCaseResultInfo GetTestCaseResultInfo() override { 
+		throw new Exception("Not implemented");
+		return TestCaseResultInfo();
+	};
 	
 	//Prepare kernel
 	void PrepareKernel(Kernel* kernel) {				
@@ -161,7 +167,7 @@ public:
 	};
 
 	//Run kernel
-	void RunKernel(Kernel *kernel) {
+	virtual void RunTestWithKernel(Kernel* kernel) override {
 		//Set history logger
 		_kernel->setStepHistoryLogger(new TestCaseHistoryLogger());
 		
@@ -193,7 +199,7 @@ public:
 	};
 
 	//Run test with program arguments
-	virtual void RunTest(int* argc, char** argv[]) override {
+	virtual void RunTest(int* argc, char** argv[]) {
 		_kernel = new Kernel();
 		_kernel->Initilize(argc, argv);
 		
@@ -202,7 +208,7 @@ public:
 		MetalsImpact2DTestCase::PrepareConfiguration();
 
 		//Call main function
-		RunKernel(_kernel);
+		MetalsImpact2DTestCase::RunTestWithKernel(_kernel);
 
 		_kernel->Finalize();
 	}; 

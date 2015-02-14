@@ -15,20 +15,7 @@
 
 //Test cases
 #include "test_list.h"
-#include "testcases\TestCases1D\TestCase1D_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_1.h"
-#include "testcases\TestCases1D\TestCase1D_ALE_2.h"
-#include "testcases\TestCases1D\TestCase1DALE3_RK1.h"
-#include "testcases\TestCases1D\TestCase1DALE3_RK2.h"
-#include "testcases\TestCases1D\TestCase1DALE3_RK4.h"
-#include "testcases\TestCases1D\TestCase1DALE4.h"
-#include "testcases\RMInstabilityTests\RMITest_1.h"
-#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h"
-#include "testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h"
-#include "testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h"
-#include "testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h"
+
 
 template< typename T >
 std::string int_to_hex( T i )
@@ -296,16 +283,16 @@ int main(int argc, char *argv[]) {
 	//Test 1
 	double widthSteel = 3e-3; //3 mm
 	double widthPb = 2e-3; //2 mm
-	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 100,
-	//	100, //snapshots
-	//	widthSteel, //
-	//	widthPb, 
-	//	10e-6, // time = 8 mks
-	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
-	//	0.0,
-	//	TestCasesMetalsImpact::MetalType::Plumbum,
-	//	-470.0
-	//	);
+	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+		1000, //snapshots
+		widthSteel, //
+		widthPb, 
+		10e-6, // time = 8 mks
+		TestCasesMetalsImpact::MetalType::StainlessSteel,
+		0.0,
+		TestCasesMetalsImpact::MetalType::Plumbum,
+		-470.0
+		);
 
 	//Test 2
 	//widthSteel = 3e-3; //3 mm
@@ -335,10 +322,8 @@ int main(int argc, char *argv[]) {
 	//	-470.0
 	//	);
 
-	TestCases1D::TestCase1DALE3_RK4 test;
+	//TestCases1D::TestCase1DALE3_RK4 test;
 	//TestCases1D::TestCase1DALE4 test;
-	test.RunTest(&argc, &argv);
-	return 0;
 
 	//Test 1 2D
 	//double width = 10e-3;
@@ -353,7 +338,7 @@ int main(int argc, char *argv[]) {
 	//	TestCasesMetalsImpact::MetalType::Plumbum,
 	//	-470.0
 	//	);
-	//test.RunTest(&argc, &argv);
+	test.RunTest(&argc, &argv);
 	return 0;
 
 };

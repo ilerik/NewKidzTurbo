@@ -139,6 +139,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\ALEmethod\ALEMethod.h" />
+    <ClInclude Include="src\boundaryconditions\BCGeneral.h" />
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
@@ -194,7 +195,6 @@
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h" />
-    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h" />
     <ClInclude Include="src\testcases\test_list.h" />

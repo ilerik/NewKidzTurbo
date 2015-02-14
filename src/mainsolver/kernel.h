@@ -1161,6 +1161,11 @@ public:
 				_boundaryConditions[bcMarker] = bc;
 				bcTypeCheckPassed = true;
 			};
+			if (bcType == BCType_t::BCGeneral) {
+				BoundaryConditions::BCGeneral* bc = new BoundaryConditions::BCGeneral();
+				_boundaryConditions[bcMarker] = bc;
+				bcTypeCheckPassed = true;
+			};
 
 			if (!bcTypeCheckPassed) {
 				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "BCType is not supported.");
@@ -1474,7 +1479,11 @@ public:
 			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
 			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/		
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/	
+
+			if (IsBoundaryFace(f)) {
+				nmatR = nmatL;
+			};
 
 			//Determine face velocity
 			Vector faceVelocityAverage = Vector(0,0,0);

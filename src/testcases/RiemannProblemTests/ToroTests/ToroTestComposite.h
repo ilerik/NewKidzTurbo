@@ -126,7 +126,7 @@ public:
 			
 			//If any of tests failed
 			if (status != TestCaseResultInfo::TestStatusType::Passed) {
-				result.testStatus == TestCaseResultInfo::TestStatusType::Failed;
+				result.testStatus = TestCaseResultInfo::TestStatusType::Failed;
 			};
 		};
 		return result;

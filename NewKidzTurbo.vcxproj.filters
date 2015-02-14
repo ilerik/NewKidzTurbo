@@ -120,9 +120,6 @@
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h">
       <Filter>Header Files\RiemannSolvers</Filter>
     </ClInclude>
-    <ClInclude Include="src\riemannsolvers\perfect_gas_godunov_3d.h">
-      <Filter>Header Files\RiemannSolvers</Filter>
-    </ClInclude>
     <ClInclude Include="src\linearsolvers\bicgstab.h">
       <Filter>Header Files\LinearSolvers</Filter>
     </ClInclude>
@@ -225,9 +222,6 @@
     <ClInclude Include="src\utility\meshquality.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h">
-      <Filter>Header Files\TestCases\TestCases1D</Filter>
-    </ClInclude>
     <ClInclude Include="src\testcases\TestCase.h">
       <Filter>Header Files\TestCases</Filter>
     </ClInclude>
@@ -305,6 +299,12 @@
     </ClInclude>
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h">
       <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCGeneral.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -105,18 +105,43 @@ public:
 		return conf;		
 	};
 
-	BoundaryConditionConfiguration GetBoundaryConditionConfiguration(std::string materialName) {
-		BoundaryConditionConfiguration conf;
-		conf.BoundaryConditionType = BCType_t::BCInflowSupersonic;
-		//conf.MovementType = BoundaryConditionMovementType::Fixed;
-		conf.MovementType = BoundaryConditionMovementType::FreeSurface;
-		conf.MaterialName = materialName;
-		conf.SetPropertyValue("Density", _roBoundary);
-		conf.SetPropertyValue("VelocityX", _uBoundary);
-		conf.SetPropertyValue("VelocityY", 0);
-		conf.SetPropertyValue("VelocityZ", 0);
-		conf.SetPropertyValue("InternalEnergy", _pBoundary / ((_gammaBoundary - 1.0) * _roBoundary));
+	enum class BoundaryConditionType {
+		FreeSurface,
+		FixedValues,
+		Natural,
+		Wall
+	};
 
+	BoundaryConditionConfiguration GetBoundaryConditionConfiguration(std::string materialName, BoundaryConditionType type) {
+		BoundaryConditionConfiguration conf;
+		if (type == BoundaryConditionType::FixedValues) {
+			conf.BoundaryConditionType = BCType_t::BCInflowSupersonic;
+			//conf.MovementType = BoundaryConditionMovementType::Fixed;
+			conf.MovementType = BoundaryConditionMovementType::FreeSurface;
+			conf.MaterialName = materialName;
+			conf.SetPropertyValue("Density", _roBoundary);
+			conf.SetPropertyValue("VelocityX", _uBoundary);
+			conf.SetPropertyValue("VelocityY", 0);
+			conf.SetPropertyValue("VelocityZ", 0);
+			conf.SetPropertyValue("InternalEnergy", _pBoundary / ((_gammaBoundary - 1.0) * _roBoundary));
+			return conf;
+		};
+
+		if (type == BoundaryConditionType::Wall) {
+			conf.BoundaryConditionType = BCType_t::BCSymmetryPlane;
+			conf.MovementType = BoundaryConditionMovementType::FreeSurface;
+			conf.MaterialName = materialName;
+			return conf;
+		};
+
+		if (type == BoundaryConditionType::FreeSurface) {			
+			conf.BoundaryConditionType = BCType_t::BCGeneral;
+			conf.MovementType = BoundaryConditionMovementType::FreeSurface;
+			conf.MaterialName = materialName;
+			return conf;
+		};
+
+		throw new Exception("Unspecified boundary condition type");
 		return conf;
 	};
 

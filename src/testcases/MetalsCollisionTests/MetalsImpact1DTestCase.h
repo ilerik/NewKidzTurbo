@@ -64,7 +64,7 @@ public:
 		_configuration.OutputCGNSFile = "result.cgns";
 
 		//Rieman solver settings
-		_configuration.RiemannSolverConfiguration.RiemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
+		_configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::HLLC;
 
 		//Availible gas models		
 		//Left metal
@@ -88,36 +88,9 @@ public:
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
 
-		//Left
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
-		//_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
-		_configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::FreeSurface;
-		_configuration.BoundaryConditions["left"].MaterialName = "MetalLeft";
-		_configuration.BoundaryConditions["left"].SetPropertyValue("Density", _roBoundary);
-		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", _uBoundary);
-		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0);
-		_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0);
-		_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", _pBoundary / ((gamma - 1.0) * _roBoundary));
-
-		//Right
-		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		//_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
-		_configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::FreeSurface;
-		_configuration.BoundaryConditions["right"].MaterialName = "MetalRight";
-		_configuration.BoundaryConditions["right"].SetPropertyValue("Density", _roRight);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityX", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityY", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityZ", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", 0);
-		/*_configuration.BoundaryConditions["right"].MaterialName = "Air";
-		_configuration.BoundaryConditions["right"].SetPropertyValue("Density", _roBoundary);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityX", _uBoundary);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityY", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("VelocityZ", 0);
-		_configuration.BoundaryConditions["right"].SetPropertyValue("InternalEnergy", _pBoundary / ((gamma - 1.0) * _roBoundary));*/
+		//Boundary conditions
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Wall);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::FreeSurface);		
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -126,8 +99,8 @@ public:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::Linear1D;
-		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
-		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
+		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
 		//Run settings
@@ -136,14 +109,21 @@ public:
 		_configuration.SaveSolutionSnapshotIterations = 0;
 		_configuration.SaveSolutionSnapshotTime = _TimeMax / _nSnapshots;
 
+		_kernel->VerboseOn();
 		_kernel->BindConfiguration(_configuration);	
 
 		return _configuration;
-	};	
+	};
+
+	//Get results of test run 
+	virtual TestCaseResultInfo GetTestCaseResultInfo() override { 
+		throw new Exception("Not implemented");
+		return TestCaseResultInfo();
+	};
 	
 	//Prepare kernel
 	void PrepareKernel(Kernel* kernel) {				
-		_kernel = kernel; //Save reference to kernel
+		_kernel = kernel; //Save reference to kernel		
 		
 		//Get grid
 		PrepareGrid();
@@ -152,8 +132,8 @@ public:
 		PrepareConfiguration();
 	};
 
-	//Run kernel
-	void RunKernel(Kernel *kernel) {
+	//Main interface function for running test case code
+	virtual void RunTestWithKernel(Kernel* kernel) override {
 		//Set history logger
 		_kernel->setStepHistoryLogger(new TestCaseHistoryLogger());
 		
@@ -185,7 +165,7 @@ public:
 	};
 
 	//Run test with program arguments
-	virtual void RunTest(int* argc, char** argv[]) override {
+	virtual void RunTest(int* argc, char** argv[]) {
 		_kernel = new Kernel();
 		_kernel->Initilize(argc, argv);
 		
@@ -194,7 +174,7 @@ public:
 		MetalsImpact1DTestCase::PrepareConfiguration();
 
 		//Call main function
-		RunKernel(_kernel);
+		MetalsImpact1DTestCase::RunTestWithKernel(_kernel);
 
 		_kernel->Finalize();
 	}; 
