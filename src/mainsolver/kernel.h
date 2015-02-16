@@ -1606,6 +1606,9 @@ public:
 				if (ALEindicator == 0) continue; //Skip face that don't participate in obligatory motion
 				int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 				int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+				if (IsBoundaryFace(f)) {
+					nmatR = nmatL;
+				};
 				GasModel::ConservativeVariables UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
 				GasModel::ConservativeVariables UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));															
 				Vector faceVelocity = _ALEmethod.ComputeFaceVelocity(_gasModels[nmatL], UL, _gasModels[nmatR], UR, f, ALEindicator);

@@ -28,7 +28,7 @@ protected:
 	//Pertrubation position
 	double _pFunction(Vector r) {	
 		if (std::abs(r.y) > _D / 2.0) return r.x;
-		double x = _A * std::cos(2.0 * PI * r.y / (_n * _D));
+		double x = _A * (1.0 + std::cos(2.0 * PI * r.y / (_n * _D)));
 		return r.x - x;
 	};
 
@@ -42,7 +42,7 @@ public:
 		_nCellsY = nCellsY;
 
 		//Pertrubation parameters
-		_D = 0.2e-3;
+		_D = 1.0e-3;
 		_A = 0.1e-3;
 		_n = 1;
 	};
@@ -53,7 +53,7 @@ public:
 		double xMax = _widthRight;
 		double yMin = - (_widthY / 2.0);
 		double yMax = + (_widthY / 2.0);
-		_grid = GenGrid2D(_kernel->getParallelHelper(), _nCellsX, _nCellsY, xMin, xMax, yMin, yMax, 1.0, 1.0, false, false);
+		_grid = GenGrid2D(_kernel->getParallelHelper(), _nCellsX, _nCellsY, xMin, xMax, yMin, yMax, 1.0, 1.0, false, true);
 		_kernel->PartitionGrid(_grid);
 		_kernel->GenerateGridGeometry(_grid);
 
@@ -67,8 +67,9 @@ public:
 				interfaceNodeXs[y] = x;
 				continue;
 			};
-			Vector leader = Vector(interfaceNodeXs[y], y, 0);
-			if (std::abs(_pFunction(node.P)) <  std::abs(_pFunction(leader))) {
+			//Vector leader = Vector(interfaceNodeXs[y], y, 0);
+			//if (std::abs(_pFunction(node.P)) <  std::abs(_pFunction(leader))) {
+			if (std::abs(x) <  std::abs(interfaceNodeXs[y])) {
 				interfaceNodeXs[y] = x;
 				interfaceNodeIndexes[y] = node.GlobalIndex;
 			};
@@ -124,8 +125,8 @@ public:
 		_configuration.GasModelsConfiguration[boundaryMaterialName] = GetBoundaryGasModelConfiguration();				
 		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::Wall);
 		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
-		_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
-		_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);				
+		//_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
+		//_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);				
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -144,6 +145,7 @@ public:
 		_configuration.SaveSolutionSnapshotIterations = 0;
 		_configuration.SaveSolutionSnapshotTime = _TimeMax / _nSnapshots;
 
+		_kernel->VerboseOn();
 		_kernel->BindConfiguration(_configuration);	
 
 		return _configuration;
@@ -175,6 +177,7 @@ public:
 		_kernel->InitCalculation();
 
 		//Initial conditions
+		//getPertrubationPositionFunction = std::bind(&TestCasesMetalsImpact::MetalsImpact2DTestCase::_pFunction, this, std::placeholders::_1);
 		_kernel->GenerateInitialConditions(new TestCaseInitialConditions( getPertrubationPositionFunction,
 			_uLeft, 
 			_roLeft,

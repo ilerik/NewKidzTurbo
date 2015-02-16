@@ -23,7 +23,7 @@ public:
 		if (abs(dr) < 1e-15) return 1;
 		double Ai = 1;
 		double Ldef = 1e-2;
-		double alpha = 0.1;
+		double alpha = 1.0;
 		double a = 3.0;				
 		double b = 5;
 		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));

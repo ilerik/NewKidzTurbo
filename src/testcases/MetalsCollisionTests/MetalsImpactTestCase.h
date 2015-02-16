@@ -373,7 +373,7 @@ public:
 			//if (x > LRight) return nmetAir;
 
 			//Split in 2 halfs
-			if (x <= 0) {
+			if ( _pFunction(cell.CellCenter) < 0) {
 				return _nmatLeft; //First
 			} else {
 				return _nmatRight; //Second
@@ -405,7 +405,7 @@ public:
 			double u = 0;
 			double roE = 0;		
 			double ro = 0;
-			if (x <= 0) {
+			if ( _pFunction(cell.CellCenter) < 0) {
 				u = uL;	
 				ro = _roLeft;
 			} else {
