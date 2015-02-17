@@ -88,6 +88,16 @@ public:
 			nodes.push_back(nodeIndex);
 		};
 
+		//Add unmovable nodes
+		for (Node& node : _grid.localNodes) {
+			double x = node.P.x;
+			double y = node.P.y;
+			if ((x == -_widthLeft) || (x == _widthRight) || (std::abs(y) == _widthY / 2.0)) {				
+				displacements.push_back(Vector(0, 0, 0));
+				nodes.push_back(node.GlobalIndex);
+			};
+		};
+
 		//Move mesh
 		MeshMovement moveHelper;
 		moveHelper.meshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
@@ -135,8 +145,8 @@ public:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
+		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
 		//Run settings
