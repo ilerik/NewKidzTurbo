@@ -7,7 +7,7 @@
 class PerfectGasModel : public GasModel {
 public:	
 	//Constructor
-	PerfectGasModel() {
+	PerfectGasModel(Logger& logger) : GasModel(&logger) {
 		//Model information
 		GasModelName = "PerfectGasModel";
 		GasModelType = ModelType_t::CaloricallyPerfect;		
@@ -55,6 +55,12 @@ public:
 	//Obtain information about phase
 	virtual GasModel::MediumPhase GetPhase(GasModel::ConservativeVariables U) {
 		return GasModel::MediumPhase::BelowMeltingPoint;
+	};
+
+	//Given density and pressure find internal energy
+	virtual double FindInternalEnergy(double ro, double p) {
+		double e = p / (ro * (Gamma - 1.0));
+		return e;
 	};
 
 

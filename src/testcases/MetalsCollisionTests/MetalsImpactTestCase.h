@@ -129,7 +129,7 @@ public:
 
 		if (type == BoundaryConditionType::Wall) {
 			conf.BoundaryConditionType = BCType_t::BCSymmetryPlane;
-			conf.MovementType = BoundaryConditionMovementType::FreeSurface;
+			conf.MovementType = BoundaryConditionMovementType::Fixed;
 			conf.MaterialName = materialName;
 			return conf;
 		};

@@ -213,6 +213,38 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
+ //   LomonosovFortovGasModel* gasModel = new LomonosovFortovGasModel(Logger());
+
+	//GasModelConfiguration conf;		
+	//conf.GasModelName = "LomonosovFortovGasModel";
+	//conf.SetPropertyValue("MaterialIndex", 1);
+	//conf.SetPropertyValue("SpecificHeatVolume", 130); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
+	//conf.SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
+	//double roMetal = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
+	//gasModel->loadConfiguration(conf);
+
+	////double V = 8.820E-02;
+	////double E = -3.240E-08;
+	//double V = 6.132E-02;
+	//double E = 6.855E-01;
+
+	//GasModel::ConservativeVariables U;
+	//U.ro = 1000.0 / V;//0.88200003E-01;
+	//U.rou = 0;
+	//U.rov = 0;
+	//U.row = 0;
+	//U.roE = U.ro * E * 1e6;
+	//double C = 0;
+	//double Gr= 0;
+	//double P = 0; //gasModel->GetPressure(U);
+	//double e = 0;
+	//bool NF = false;
+	//gasModel->EOSE5(1.0 / V, E, P, C, Gr, NF);
+	//gasModel->EOSP5(1.0 / V, P, e, C, Gr, NF);
+	//GasModel::MediumPhase phase = gasModel->GetPhase(U);
+
+	//return 0;
+
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
 	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
 
@@ -283,16 +315,16 @@ int main(int argc, char *argv[]) {
 	//Test 1
 	double widthSteel = 3e-3; //3 mm
 	double widthPb = 2e-3; //2 mm
-	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
-	//	1000, //snapshots
-	//	widthSteel, //
-	//	widthPb, 
-	//	10e-6, // time = 8 mks
-	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
-	//	0.0,
-	//	TestCasesMetalsImpact::MetalType::Plumbum,
-	//	-470.0
-	//	);
+	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 500,
+		300, //snapshots
+		widthSteel, //
+		widthPb, 
+		3e-6, // time = 8 mks
+		TestCasesMetalsImpact::MetalType::StainlessSteel,
+		0.0,
+		TestCasesMetalsImpact::MetalType::Plumbum,
+		-470.0
+		);
 
 	//Test 2
 	//widthSteel = 3e-3; //3 mm
@@ -326,18 +358,18 @@ int main(int argc, char *argv[]) {
 	//TestCases1D::TestCase1DALE4 test;
 
 	//Test 1 2D
-	double width = 10e-3;
-	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 200, 200,
-		1000, //snapshots
-		width, //
-		widthSteel, //
-		widthPb, 
-		5e-6, // time = 5 mks
-		TestCasesMetalsImpact::MetalType::StainlessSteel,
-		0.0,
-		TestCasesMetalsImpact::MetalType::Plumbum,
-		-470.0
-		);
+	//double width = 10e-3;
+	//TestCasesMetalsImpact::MetalsImpact2DTestCase test( 200, 200,
+	//	1000, //snapshots
+	//	width, //
+	//	widthSteel, //
+	//	widthPb, 
+	//	5e-6, // time = 5 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
 	test.RunTest(&argc, &argv);
 	return 0;
 

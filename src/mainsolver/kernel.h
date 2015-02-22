@@ -216,10 +216,10 @@ public:
 			int gmIndex = _configuration.GasModelNameToIndex[pair.first];
 			std::string gmName = pair.second.GasModelName;
 			if (gmName == "PerfectGasModel") {
-				_gasModels[gmIndex] = new PerfectGasModel();				
+				_gasModels[gmIndex] = new PerfectGasModel(_logger);				
 			};
 			if (gmName == "LomonosovFortovGasModel") {
-				_gasModels[gmIndex] = new LomonosovFortovGasModel();
+				_gasModels[gmIndex] = new LomonosovFortovGasModel(_logger);
 			};
 
 			//Load configuration for gas model
@@ -1301,6 +1301,8 @@ public:
 
 		//Write physical quantities
 		std::vector<double> buffer(_grid.nCellsLocal);
+		std::vector<double> buffer2(_grid.nCellsLocal);
+		std::vector<double> buffer3(_grid.nCellsLocal);
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 
 		//Stored fields
@@ -1349,13 +1351,20 @@ public:
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "VelocityZ", buffer); 
 
-		//Pressure		
+		//Pressure and sound speed and Gruneisen coef
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
 			int nmat = CellGasModel[i];
-			double P = _gasModels[nmat]->GetPressure(&Values[i * nv + 0]);
+			double P = 0;
+			double C = 0;
+			double Gr = 0;
+			_gasModels[nmat]->GetPressureAndSoundSpeed(&Values[i * nv + 0], P, C, Gr);
 			buffer[i] = P;
+			buffer2[i] = C;
+			buffer3[i] = Gr;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer); 
+		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer);
+		_cgnsWriter.WriteField(_grid, solutionName, "SoundSpeed", buffer2);
+		_cgnsWriter.WriteField(_grid, solutionName, "Gruneisen", buffer3);
 
 		//Internal energy
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
@@ -1501,7 +1510,8 @@ public:
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
 
 			//Compute flux exactly for Lagrangian interfaces				
-			if (ALEIndicator == 1.0) {				
+			if (ALEIndicator == 1.0) {
+				if (IsBoundaryFace(f)) result.Pressure = 1e5;
 				result.Fluxes[0] = 0;
 				result.Fluxes[1] = f.FaceNormal.x * result.Pressure;
 				result.Fluxes[2] = f.FaceNormal.y * result.Pressure;
@@ -1962,8 +1972,10 @@ public:
 				msg<<"Cells = "<<globalIndex;
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 				Cell& cell = _grid.Cells[globalIndex];				
+				//Obtain neighbour
+				int nmat = GetCellGasModelIndex(cell.NeigbourCells[0]);
 				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );				
-				return _boundaryConditions[cell.BCMarker]->getDummyValues(0, Values, cell); //TO DO now boundary always 0 gas model
+				return _boundaryConditions[cell.BCMarker]->getDummyValues(nmat, Values, cell); //TO DO now boundary always 0 gas model
 			} else {
 				//If proper cell return part of Values array				
 				if (localIndex == -1) {
