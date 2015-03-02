@@ -20,7 +20,6 @@ protected:
 	double _A;
 	double _n;
 
-
 	//Pertrubation parameters
 	//double lamda = 1e-3; // 1mm
 	//d
@@ -133,8 +132,8 @@ public:
 		std::string boundaryMaterialName = "Air";
 		_configuration.AddGasModel(boundaryMaterialName);
 		_configuration.GasModelsConfiguration[boundaryMaterialName] = GetBoundaryGasModelConfiguration();				
-		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::Wall);
-		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Wall);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::FreeSurface);			
 		//_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
 		//_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);				
 		
@@ -145,12 +144,12 @@ public:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
-		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
+		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
 		//Run settings
-		_configuration.MaxIteration = 1000000;
+		_configuration.MaxIteration = 100;
 		_configuration.MaxTime = _TimeMax;
 		_configuration.SaveSolutionSnapshotIterations = 0;
 		_configuration.SaveSolutionSnapshotTime = _TimeMax / _nSnapshots;

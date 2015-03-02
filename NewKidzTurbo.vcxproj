@@ -173,6 +173,7 @@
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />
     <ClInclude Include="src\mainsolver\patch.h" />
+    <ClInclude Include="src\mainsolver\perfomanceHelper.h" />
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
@@ -209,6 +210,7 @@
     <ClInclude Include="src\utility\DSUClusteredSet.h" />
     <ClInclude Include="src\utility\geomfunctions.h" />
     <ClInclude Include="src\utility\meshquality.h" />
+    <ClInclude Include="src\utility\Timer.h" />
     <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>

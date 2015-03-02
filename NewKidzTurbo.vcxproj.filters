@@ -85,6 +85,9 @@
     <Filter Include="Header Files\TestCases\RiemannProblemTests\ToroTests">
       <UniqueIdentifier>{f66f4658-b403-4eca-b532-be7faecbfa6d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\MainSolver\SpatialDiscretization">
+      <UniqueIdentifier>{7f65475a-8354-411b-b64b-9568d8de088c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -305,6 +308,15 @@
     </ClInclude>
     <ClInclude Include="src\boundaryconditions\BCGeneral.h">
       <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\perfomanceHelper.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\Timer.h">
+      <Filter>Header Files\Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -315,16 +315,16 @@ int main(int argc, char *argv[]) {
 	//Test 1
 	double widthSteel = 3e-3; //3 mm
 	double widthPb = 2e-3; //2 mm
-	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 500,
-		300, //snapshots
-		widthSteel, //
-		widthPb, 
-		3e-6, // time = 8 mks
-		TestCasesMetalsImpact::MetalType::StainlessSteel,
-		0.0,
-		TestCasesMetalsImpact::MetalType::Plumbum,
-		-470.0
-		);
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 500,
+	//	300, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	3e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
 
 	//Test 2
 	//widthSteel = 3e-3; //3 mm
@@ -358,18 +358,18 @@ int main(int argc, char *argv[]) {
 	//TestCases1D::TestCase1DALE4 test;
 
 	//Test 1 2D
-	//double width = 10e-3;
-	//TestCasesMetalsImpact::MetalsImpact2DTestCase test( 200, 200,
-	//	1000, //snapshots
-	//	width, //
-	//	widthSteel, //
-	//	widthPb, 
-	//	5e-6, // time = 5 mks
-	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
-	//	0.0,
-	//	TestCasesMetalsImpact::MetalType::Plumbum,
-	//	-470.0
-	//	);
+	double width = 1e-3;
+	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 10, 10,
+		0, //snapshots
+		width, //
+		widthSteel, //
+		widthPb, 
+		3e-6, // time = 5 mks
+		TestCasesMetalsImpact::MetalType::StainlessSteel,
+		0.0,
+		TestCasesMetalsImpact::MetalType::Plumbum,
+		-470.0
+		);
 	test.RunTest(&argc, &argv);
 	return 0;
 

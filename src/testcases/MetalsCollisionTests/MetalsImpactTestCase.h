@@ -168,10 +168,12 @@ public:
 				historyFile<<"\""<<"TotalMeltedVolume"<<"\" ";
 				historyFile<<"\""<<"xMin"<<"\" ";
 				historyFile<<"\""<<"xMax"<<"\" ";
-				historyFile<<"\""<<"xInterface"<<"\" ";
+				historyFile<<"\""<<"xInterfaceMax"<<"\" ";
 				historyFile<<"\""<<"xLeftBorder"<<"\" ";
 				historyFile<<"\""<<"xRightBorder"<<"\" ";
 				historyFile<<"\""<<"avgMeltedZoneTemperature"<<"\" ";
+				historyFile<<"\""<<"xInterfaceMin"<<"\" ";
+				historyFile<<"\""<<"dxInterface"<<"\" ";
 				historyFile<<std::endl;
 			};
 
@@ -232,7 +234,9 @@ public:
 			//Iterate through all faces
 			double xMin = 1000; bool isXMinSet = false;
 			double xMax = 1000; bool isXMaxSet = false;
-			double xInterface = 1000; bool isXInterfaceSet = false;
+			bool isXInterfaceSet = false;
+			double xInterfaceMin = 1000; 
+			double xInterfaceMax = -1000;
 			double xLeftBorder = 1000;
 			double xRightBorder = -1000;
 			for (Face& face : _grid->localFaces) {
@@ -244,7 +248,8 @@ public:
 				double faceX = face.FaceCenter.x;
 				if (_grid->IsBoundaryFace(face)) continue;
 				if (nmatL != nmatR) {
-					xInterface = faceX;
+					if (xInterfaceMax < faceX) xInterfaceMax = faceX;
+					if (xInterfaceMin > faceX) xInterfaceMin = faceX;
 				};
 				if (faceX > xRightBorder) xRightBorder = faceX;
 				if (faceX < xLeftBorder) xLeftBorder = faceX;
@@ -299,7 +304,7 @@ public:
 			};
 
 			if (biggestCluster == -1) {
-				xMax = xMin = xInterface;
+				xMax = xMin = xInterfaceMax;
 			};
 
 			//Compute other quantities
@@ -314,10 +319,12 @@ public:
 				historyFile<<totalMeltedVolume<<" ";
 				historyFile<<xMin<<" ";
 				historyFile<<xMax<<" ";
-				historyFile<<xInterface<<" ";
+				historyFile<<xInterfaceMax<<" ";
 				historyFile<<xLeftBorder<<" ";
 				historyFile<<xRightBorder<<" ";
 				historyFile<<biggestClusterAvgTemperature<<" ";
+				historyFile<<xInterfaceMin<<" ";
+				historyFile<<xInterfaceMax - xInterfaceMin<<" ";
 				historyFile<<std::endl;
 			};
 
