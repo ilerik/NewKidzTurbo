@@ -139,7 +139,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\ALEmethod\ALEMethod.h" />
-    <ClInclude Include="src\boundaryconditions\BCGeneral.h" />
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
@@ -173,7 +172,6 @@
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />
     <ClInclude Include="src\mainsolver\patch.h" />
-    <ClInclude Include="src\mainsolver\perfomanceHelper.h" />
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
@@ -186,8 +184,11 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h" />
+<<<<<<< HEAD
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest.h" />
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTestComposite.h" />
+=======
+>>>>>>> 149fac8860f8a46ec27dc1bfc5fc73eb291dc9d5
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
@@ -195,12 +196,14 @@
     <ClInclude Include="src\testcases\TestCase.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h" />
-    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h" />
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1D_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h" />
+<<<<<<< HEAD
     <ClInclude Include="src\testcases\test_list.h" />
+=======
+>>>>>>> 149fac8860f8a46ec27dc1bfc5fc73eb291dc9d5
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK1.h" />
-    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h" />
     <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h" />
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h" />
     <ClInclude Include="src\turbulentmodels\garbarukmodel.h" />
@@ -210,7 +213,6 @@
     <ClInclude Include="src\utility\DSUClusteredSet.h" />
     <ClInclude Include="src\utility\geomfunctions.h" />
     <ClInclude Include="src\utility\meshquality.h" />
-    <ClInclude Include="src\utility\Timer.h" />
     <ClInclude Include="src\utility\utilityfunctions.h" />
   </ItemGroup>
   <ItemGroup>

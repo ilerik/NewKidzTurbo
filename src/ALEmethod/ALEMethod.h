@@ -9,12 +9,12 @@
 //Define ALE integration method
 class ALEMethod {	
 	Grid* _grid;
-	MeshMovement _moveHelper;
 
 	// map faceIndex to [0,1] indicator value. 1.0 - F
 	double (*_indicatorFunction)(int); 
 public:
-	//Set pointer to indicator function
+	//Move algorithm implementation
+	MeshMovement _moveHelper;
 
 	//Set reference to grid
 	void SetGrid(Grid& grid) {
@@ -125,7 +125,7 @@ public:
 			double pR = 0;
 			double cR = 0;
 			double GrR = 0;
-			double GammaR = 0;				
+			double GammaR = 0;
 			assert(roR > 0);
 			gasModelRight->GetPressureAndSoundSpeed(UR, pR, cR, GrR);			
 			double phiR = cR*cR - GrR * pR / roR;
@@ -227,35 +227,10 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
-		//_moveHelper.IDWComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
-		//return;
-
-		//TO DO 1D implementation temporary
-		std::vector<double> coordinates;
-		std::map<double, Vector> velocitiesByCoordinate;
-
-		for (int nodeIndex : movingNodes) {
-			double coord = _grid->localNodes[nodeIndex].P.x;
-			coordinates.push_back(coord);
-			velocitiesByCoordinate[coord] = nodesVelocity[nodeIndex];
-		};
+		_moveHelper.ComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
 		
-		std::sort(coordinates.begin(), coordinates.end());
-
-		for (int nodeIndex : freeNodes) {
-			Vector nodeVelocity; //Resulting node velocity
-			double x = _grid->localNodes[nodeIndex].P.x;
-			for (int i = 1; i < coordinates.size(); i++) {
-				double xL = coordinates[i-1];
-				double xR = coordinates[i];
-				Vector vL = velocitiesByCoordinate[xL];
-				Vector vR = velocitiesByCoordinate[xR];
-				if ((xR >= x) && (xL <= x)) {
-					nodeVelocity = vL + (x - xL) * (vR - vL) / (xR - xL);
-				};
-			};
-			nodesVelocity[nodeIndex] = nodeVelocity;
-		};
+		//TO DO Sync
+		return;
 	};
 
 	//Move mesh

@@ -16,7 +16,7 @@ private:
 	double _meltingTemperature;
 public:
 	//Constructor specifies material to use
-	LomonosovFortovGasModel() {
+	LomonosovFortovGasModel(Logger& logger) : GasModel(&logger) {
 		//Model information
 		GasModelName = "LomonosovFortovGasModel";
 		GasModelType = ModelType_t::ModelTypeUserDefined;		
@@ -51,6 +51,44 @@ public:
 		if (!res.second) {
 			//Error TO DO
 			throw 1;
+		};
+
+		if (_nmat == 1) {
+			//Fill melting curve info
+			const int nvalues = 39; 
+			double v[nvalues] =
+				{ 1.000000000E+000,9.998000264E-001,9.997000098E-001,9.995999932E-001,9.994999766E-001,9.993000031E-001,9.991999865E-001,9.988999963E-001,9.986000061E-001,9.983999729E-001,
+				9.977999926E-001,9.973000288E-001,9.958999753E-001,9.945999980E-001,9.932000041E-001,9.919000268E-001,9.894000292E-001,9.868000150E-001,9.843000174E-001,9.794999957E-001,
+				9.749000072E-001,9.642000198E-001,9.545000196E-001,9.456999898E-001,9.376999736E-001,9.228000045E-001,9.089000225E-001,8.960999846E-001,8.729000092E-001,8.525999784E-001,
+				8.105000257E-001,7.771000266E-001,7.494999766E-001,7.261000276E-001,6.880000234E-001,6.578000188E-001,6.327999830E-001,5.932999849E-001,5.627999902E-001};
+
+			//double e[nvalues] = 
+			//	{ 1.098600030E-001,1.099600047E-001,1.099900007E-001,1.100600064E-001,1.101099998E-001,
+			//	1.101800054E-001,1.102399975E-001,1.103700027E-001,1.105000004E-001,1.106199995E-001,
+			//	1.108900011E-001,1.111500040E-001,1.117800027E-001,1.124200076E-001,1.130499989E-001,
+			//	1.136899963E-001,1.149399951E-001,1.161900014E-001,1.174300015E-001,1.199200004E-001,
+			//	1.224000007E-001,1.286199987E-001,1.349200010E-001,1.412799954E-001,1.477299929E-001,
+			//	1.610700041E-001,1.754100025E-001,1.910299957E-001,2.253600061E-001,2.630999982E-001,
+			//	3.680999875E-001,4.835999906E-001,6.054999828E-001,7.319999933E-001,9.925999641E-001,
+			//	1.259200096E+000,1.528300047E+000,2.067500114E+000,2.605000019E+000};
+
+			double e[nvalues] = { 4.343000054E-002,4.348000139E-002,4.349000007E-002,4.351999983E-002,
+				4.354000092E-002,4.357000068E-002,4.360000044E-002,4.365000129E-002,4.371000081E-002,
+				4.376000166E-002,4.388000071E-002,4.399000108E-002,4.425999895E-002,4.453000054E-002,
+				4.479999840E-002,4.506999999E-002,4.558999836E-002,4.611000046E-002,4.662000015E-002,
+				4.763999954E-002,4.864000157E-002,5.115000159E-002,5.370000005E-002,5.629000068E-002,
+				5.894000083E-002,6.456000358E-002,7.080999762E-002,7.773000002E-002,9.325999767E-002,
+				1.106999964E-001,1.600999981E-001,2.152999938E-001,2.741000056E-001,3.355000019E-001,
+				4.625999928E-001,5.931000113E-001,7.251999974E-001,9.904999733E-001,1.254999995E+000};
+
+			for (int i = 0; i < nvalues; i++) {
+				double ro = 1000.0 / (v[i] * V0[_nmat]);
+				MeltingCurve[ro] = e[i] * 1e6;
+				MeltingCurveDensity.push_back(ro);
+			};
+
+			//Sort argument
+			std::sort(std::begin(MeltingCurveDensity), std::end(MeltingCurveDensity));			
 		};
 	};
 
@@ -104,12 +142,50 @@ public:
 
 	//Obtain information about phase
 	virtual GasModel::MediumPhase GetPhase(GasModel::ConservativeVariables U) {
-		double T = GetTemperature(U);
-		if (T >= _meltingTemperature) {
-			return GasModel::MediumPhase::AboveMeltingPoint; 
+		double ro = U.ro;
+		double u = U.rou / ro;
+		double v = U.rov / ro;
+		double w = U.row / ro;	
+		double e = (U.roE / ro) - (u*u + v*v + w*w) / 2.0;
+		
+		if (_nmat == 1) {
+			double eMelt = 0;
+			//Border cases
+			double roMin = MeltingCurveDensity.front();
+			if (ro <= roMin) {
+				eMelt = MeltingCurve[ roMin ];
+			};
+
+			double roMax = MeltingCurveDensity.back();
+			if (ro >= roMax) {
+				eMelt = MeltingCurve[ roMax ];
+			};
+
+			//Interpolate
+			if ((ro < roMax) && (ro > roMin)) {
+				for (size_t i = 0; i < MeltingCurveDensity.size(); i++) {
+					if ((ro <= MeltingCurveDensity[i + 1]) && (ro >= MeltingCurveDensity[i])) {
+						double eL = MeltingCurve[MeltingCurveDensity[i]];
+						double roL = MeltingCurveDensity[i];
+						double eR = MeltingCurve[MeltingCurveDensity[i+1]];
+						double roR = MeltingCurveDensity[i+1];
+						double alpha = (ro - roL) / (roR - roL);
+						eMelt = alpha * (eR - eL) + eL;
+						break;
+					};
+				};
+			};
+
+			if (e > eMelt) {
+				return GasModel::MediumPhase::AboveMeltingPoint; 
+			} else {
+				return GasModel::MediumPhase::BelowMeltingPoint;
+			};	
 		} else {
 			return GasModel::MediumPhase::BelowMeltingPoint;
 		};
+		
+		return GasModel::MediumPhase::BelowMeltingPoint;
 	};
 
 	//Get internal energy	
@@ -137,42 +213,12 @@ public:
 		ro /= 1e3; //to g/cc
 		p /= 1e9; //to GPa
 
-		//Init vectors
-		alglib::real_1d_array x;
-		alglib::real_1d_array bl;
-		alglib::real_1d_array bu;
-		x.setlength(1);		
-		bl.setlength(1);
-		bu.setlength(1);
-
-		//Set boundary constraints (non negative specific energy)
-		bl[0] = 0.0;
-		bu[0] = 100.0;
-
-		//Initial guess (possible othe choises, the simplest for now)
-		x[0] = 1.0;
-		
-		EOSIdentityParams params;
-		params.ro = ro;
-		params.p = p;
-		params.gasModel = this;
-
-		//Iterative scheme parameters
-		double epsg = 1e-14;
-		double epsf = 0;
-		double epsx = 0;
-		double diffstep = 1e-10;
-		alglib::ae_int_t maxits = 0;
-		alglib::minlmstate state;
-		alglib::minlmreport rep;
-		
-		alglib::minlmcreatev(1, x, diffstep, state);
-		alglib::minlmsetbc(state, bl, bu);
-		alglib::minlmsetcond(state, epsg, epsf, epsx, maxits);				
-		alglib::minlmoptimize(state, EOSIndentity, NULL, (void*)this);		
-		alglib::minlmresults(state, x, rep);
-
-		double e = x[0];
+		//run computation
+		double e = 0;
+		double c = 0;
+		double Gr = 0; 
+		bool NF = false;
+		EOSP5(ro, p, e, c, Gr, NF);
 
 		//convert enery units to SI
 		e *= 1e6; //kJ/g to J/kg
@@ -271,6 +317,14 @@ public:
 			nonPhysical = true;
 			P=1.E-8; //dummy value for pressure
 			C=1.E-4; //dummy value for sound speed
+			
+			std::stringstream msg;
+			msg.str("");
+			msg<<"Unphysical state detected while computing pressure.\n";
+			msg<<"e = "<< e << "kJ/g\n";
+			msg<<"ro = "<<  ro  << "g/cm^3\n";
+			_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, msg.str());
+			throw new Exception("Non physical state obtained");
 			return;
 		} else {
 			//Correct physical state
@@ -290,6 +344,122 @@ public:
 			};
 		};
 		C = c2s;
+		return;
+	};
+
+	void EOSP5(double ro, double P, double& e, double& C, double& g, bool& nonPhysical) {
+		int nmet = _nmat;
+		double x = log(ro * V0[nmet]);
+		double vr = exp(x);
+		double v = DX[nmet] * vr;
+
+		double px = 0; //Pressure cold part
+		double ex = 0; //Internal energy cold part
+		double v0 = V0[nmet]; //Specific material volume at T = 0
+
+		double gx = 0; //?
+		double c2x = 0;
+		double et = 0;
+		double g1x = 0;
+
+		if ((1.0 - v) > 0) {
+			//Cold lattice contribution for liquid
+			double cm = 0;
+			if (x > -100.0/GM[nmet]) cm = CMN[nmet]*pow(v, GM[nmet]);
+			double cn = 0;
+			if (x > -100.0/GN[nmet]) cn = CMN[nmet]*pow(v, GN[nmet]);
+			px = cm - cn;
+			ex = cm / GM[nmet] - cn / GN[nmet] + ES[nmet];
+			c2x = px + cm * GM[nmet] - cn * GN[nmet];
+			px = px * v / (v0 * DX[nmet]);
+			double sq = GC[nmet] * pow(v, QS[nmet]);
+			double sr = sq*pow(v/SM[nmet], RS[nmet]);
+			g = sq/QS[nmet];
+			double gr = sr/(QS[nmet] + RS[nmet]);
+			gx = GGI + g - gr;
+			double g1x = sq - sr;
+		} else {
+			//Cold lattice contribution for solid
+			double v13 = pow(v,R13);
+			double v23 = v13*v13;
+			double v33 = v;
+			double v43 = v23*v23;
+			double v53 = v23*v33;
+			double v1 = A1[nmet]*v13;
+			double v2 = A2[nmet]*v23;
+			double v3 = A3[nmet]*v33;
+			double v4 = A4[nmet]*v43;
+			double v5 = A5[nmet]*v53;
+			ex = 3.0 * (v1-A1[nmet] 
+			+ 0.5*(v2-A2[nmet]) 
+			+ (v3 - A3[nmet])/3.0
+			+ 0.25*(v4-A4[nmet]) 
+			+ 0.2*(v5-A5[nmet])
+			);
+			double r0 = v1 + v2 + v3 + v4 + v5;
+			double r1 = 4./3.*v1+5./3.*v2+2.*v3+7./3.*v4+8./3.*v5;
+			double r2 = 4./9.*v1+10./9.*v2+2.*v3+28./9.*v4+40./9.*v5;
+			double r3 = -8./27.*v1-10./27.*v2+28./27.*v4+80./27.*v5;
+			ex = ex*V0[nmet]*DX[nmet];
+			px = r0*v;
+			double c2x = r1*V0[nmet]*DX[nmet];
+			r3 = r3 + TA[nmet] * ((r1*(TA[nmet] + 1.0) - r2) * 3.
+			- r0 * (TA[nmet] + 1.) * (TA[nmet] + 2.0));
+			r2 = r2 + TA[nmet] * (r0*(TA[nmet] + 1.0) - 2.*r1);
+			r1 = r1 - r0*TA[nmet];
+			double gr = r2/r1;
+			gx = 0.5 * (TA[nmet] + gr + GGI);
+			et = e - ex;
+			g1x = 0.5 * (gr*(1.-gr)+r3/r1);
+		};
+
+		// Full pressure, sound speedcalculations ---
+		double eav = EA[nmet] * pow(v, GGI);
+		v = V0[nmet]/vr;
+		double pt = P - px;
+		double c2s = 0;
+
+		// Check pressure position  ---
+		if (pt < 0) {
+			//Non physical state
+			nonPhysical = true;
+			P=1.E-8; //dummy value for pressure
+			C=1.E-4; //dummy value for sound speed
+			
+			std::stringstream msg;
+			msg.str("");
+			msg<<"Unphysical state detected while computing internal energy.\n";
+			msg<<"P = "<< P << "kJ/g\n";
+			msg<<"ro = "<<  ro  << "g/cm^3\n";
+			_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, msg.str());
+			throw new Exception("Non physical state obtained");
+			return;
+		} else {
+			//Correct physical state
+			nonPhysical = false;
+			double B = (gx - GI[nmet]) * GF[nmet] + GI[nmet] - pt*v/eav; //B=(GX-GI(NMET))*GF(NMET)+GI(NMET)-PT*V/EAV
+			double D = std::sqrt(B*B + 4.0 * GI[nmet] * pt*v/eav); //D=SQRT(B*B+4.*GI(NMET)*PT*V/EAV)
+			et = (-B+D) * 0.5 * eav / GI[nmet]; //ET=(-B+D)*.5*EAV/GI(NMET)
+			g = GI[nmet] + (gx - GI[nmet]) * GF[nmet] / (1.0 + et/eav); //G=GI(NMET)+(GX-GI(NMET))*GF(NMET)/(1.+ET/EAV)
+			e = ex + et - E0[nmet]; //E=EX+ET-E0(NMET)
+			double e1x = GGI*EA[nmet]; //E1X=GGI*EA(NMET)
+			double ga = g - GF[nmet] * (gx - GI[nmet])/(1.+et/eav)/(1.+et/eav)*et/eav; ///GA=G-GF(NMET)*(GX-GI(NMET))/(1.+ET/EAV)/(1.+ET/EAV)*ET/EAV
+				
+			//Choose sound speed
+			if ((P < 1.E-4) && (vr < 0.7)) { //TO DO why hardcode?
+				c2s = CR[nmet]*CR[nmet]*GI[nmet]*(et+pt*v)/C1R[nmet];
+				c2s = sign(c2s) * sqrt(abs(c2s));
+			} else {
+				c2s = c2x 
+					+ ga*P*v 
+					+ g*(et-px*v) 
+					+ et*GF[nmet]/(1.+et/eav)*(g1x+(gx-GI[nmet])/(et+eav)*(px*v+et*e1x/eav));            
+				c2x = sign(c2x) * sqrt(abs(c2x)); 
+				c2s = sign(c2s) * sqrt(abs(c2s));
+			};
+		};
+		C = c2s;
+
 		return;
 	};
 private:
@@ -320,10 +490,17 @@ private:
 	std::vector<double> EA;
 	std::vector<double> CR;
 	std::vector<double> C1R;
+
+	//Temperature as a function of internal energy density
+	std::map<double, double> MeltingCurve; //Points on plane (e, ro) as e(ro)
+	std::vector<double> MeltingCurveDensity; //Density
 	
 	// fill corresponding vectors of coeffiecients
 	void _prepareData()
 	{
+		if (_nmat == 0) {
+		};
+
 		//0 - stainless steel
 		V0.push_back(0.12700000E+00);
 		DX.push_back(0.98664743E+00);
@@ -371,6 +548,8 @@ private:
 		EA.push_back(0.93000002E+01);
 		CR.push_back(0.16488581E+01);
 		C1R.push_back(0.81879050E+00);
+
+
 		/*V0.push_back(0.54200000E+00);V0.push_back(0.57700002E+00);V0.push_back(0.36899999E+00);V0.push_back(0.12000000E+00);
 		V0.push_back(0.13900000E+00);V0.push_back(0.11300000E+00);V0.push_back(0.11200000E+00);V0.push_back(0.11200000E+00);
 		V0.push_back(0.88200003E-01);V0.push_back(0.97800002E-01);V0.push_back(0.11400000E+00);V0.push_back(0.59700001E-01);

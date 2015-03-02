@@ -2,12 +2,13 @@
 #define TURBO_MAINSOLVER_PARALLELHELPER
 
 #include <mpi.h>
-#include <time.h>
 #include <cassert>
+#include <chrono>
 #include "GasModel.h"
 
 //Class that implements MPI-based operations for distributed memory architecture
 class ParallelHelper {
+	std::chrono::high_resolution_clock::duration _idleDuration; //total idle time
 	bool isInitilized; //was MPI initialization successful
 	int _nProcessors; //total number of processes
 	int _rank;  //current processor rank in _comm
@@ -27,6 +28,10 @@ public:
 		return _nProcessors;
 	};
 
+	inline std::chrono::high_resolution_clock::duration getIdleTime() {
+		return _idleDuration;
+	};
+
 	//Constructor
 	ParallelHelper() {
 		isInitilized = false;
@@ -39,6 +44,7 @@ public:
 		MPI_Comm_size(_comm, &_nProcessors);
 		MPI_Comm_rank(_comm, &_rank);
 		isInitilized = true;
+		_idleDuration = std::chrono::high_resolution_clock::duration(0);
 	};
 
 	//Finilize MPI programm
@@ -53,17 +59,11 @@ public:
 	};
 
 	//Barrier
-	double Barrier() {
-		double t = 0.0;
-		clock_t start, stop;
-		/* Start timer */
-		assert((start = clock())!=-1);
+	void Barrier() {
+		auto before = std::chrono::high_resolution_clock::now();
 		MPI_Barrier(_comm);
-
-		/* Stop timer */
-		stop = clock();
-		t = (double) (stop-start)/CLOCKS_PER_SEC;
-		return t;		
+		auto after = std::chrono::high_resolution_clock::now();
+		_idleDuration += after - before; // update idle time duration
 	};
 
 	//Gather one integer from each process

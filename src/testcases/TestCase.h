@@ -15,7 +15,7 @@ struct TestCaseResultInfo {
 class TestCase {
 protected:
 	Kernel* _kernel; //Computational kernel object
-public:
+public:	
 	virtual void RunTestWithKernel(Kernel* kernel) = 0; //Main interface function for running test case code
 
 	virtual TestCaseResultInfo GetTestCaseResultInfo() = 0; //Get results of test run 

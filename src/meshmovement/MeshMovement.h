@@ -11,20 +11,57 @@
 //Impelementation of mesh movement algorithms
 class MeshMovement {
 public:
+	enum class MeshMovementAlgorithm {
+		IDW,
+		IDWnoRotation,
+		Linear1D
+	} meshMovementAlgorithm;
+
 	//Weighting Function
 	double W(Vector d_r) {	
-		double dr = d_r.mod();
-		double drx = d_r.x;
+		double dr = d_r.mod();		
 		if (abs(dr) < 1e-15) return 1;
 		double Ai = 1;
 		double Ldef = 1e-2;
-		double alpha = 0.1;
-		double a = 3.0;
-		dr = d_r.mod();
-		//double a = 2.5;
+		double alpha = 1.0;
+		double a = 3.0;				
 		double b = 5;
 		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));
 		return res;
+	};
+
+	void LinearInterpolationComputeDisplacements(Grid& grid, 
+		const std::unordered_set<int> movingNodes, 
+		std::map<int, Vector>& movingNodesDisplacements, 
+		const std::unordered_set<int> freeNodes, 
+		std::map<int, Vector>& freeNodesDisplacements) 
+	{
+		//TO DO 1D implementation temporary
+		std::vector<double> coordinates;
+		std::map<double, Vector> velocitiesByCoordinate;
+
+		for (int nodeIndex : movingNodes) {
+			double coord = grid.localNodes[nodeIndex].P.x;
+			coordinates.push_back(coord);
+			velocitiesByCoordinate[coord] = movingNodesDisplacements[nodeIndex];
+		};
+		
+		std::sort(coordinates.begin(), coordinates.end());
+
+		for (int nodeIndex : freeNodes) {
+			Vector nodeVelocity; //Resulting node velocity
+			double x = grid.localNodes[nodeIndex].P.x;
+			for (int i = 1; i < coordinates.size(); i++) {
+				double xL = coordinates[i-1];
+				double xR = coordinates[i];
+				Vector vL = velocitiesByCoordinate[xL];
+				Vector vR = velocitiesByCoordinate[xR];
+				if ((xR >= x) && (xL <= x)) {
+					nodeVelocity = vL + (x - xL) * (vR - vL) / (xR - xL);
+				};
+			};
+			freeNodesDisplacements[nodeIndex] = nodeVelocity;
+		};
 	};
 
 
@@ -143,7 +180,78 @@ public:
 		//Sync
 	};
 
-	void IDWMoveNodes(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
+	void IDWNoRotationComputeDisplacements(Grid& grid, 
+		const std::unordered_set<int> movingNodes, 
+		std::map<int, Vector>& movingNodesDisplacements, 
+		const std::unordered_set<int> freeNodes, 
+		std::map<int, Vector>& freeNodesDisplacements) 
+	{		
+		//assert(movingNodesDisplacements.size() == movingNodes.size());
+		//For all nodes allocate memory to store rotation and displacements
+		std::map<int, Vector> dR;
+		std::map<int, Vector> b;
+		std::map<int, RotationMatrix> R;
+		std::map<int, std::set<int> > bFaces;
+
+		//For all nodes
+		for (int movingNodeIndex : movingNodes) {
+			if (movingNodesDisplacements.find(movingNodeIndex) == movingNodesDisplacements.end()) throw new Exception("Displacement for node is absent");
+			dR[movingNodeIndex] = movingNodesDisplacements[movingNodeIndex];
+		};					
+
+		//Compute displacement for free nodes
+		int counter = 0;
+		double percent = 0;
+		for (int nodeIndex : freeNodes) {
+			counter++;		
+			Node& ni = grid.localNodes[nodeIndex];
+			std::vector<Vector> displacements;
+			dR[nodeIndex] = Vector(0,0,0);
+			double sum = 0;		
+
+			for (int movingNodeIndex : movingNodes) {			
+				Node& nb = grid.localNodes[movingNodeIndex];				
+				Vector dr = ni.P - nb.P;							
+				Vector displ = dR[movingNodeIndex];				
+				double w = W(dr);	//TO DO		
+				dR[nodeIndex] += w * displ; 
+				sum += w; //			
+			}					
+			dR[nodeIndex] /= sum;	
+
+			//Save result
+			freeNodesDisplacements[nodeIndex] = dR[nodeIndex];
+		};
+
+		//Sync
+	};
+
+
+	//Main function
+	void ComputeDisplacements(Grid& grid, 
+		const std::unordered_set<int> movingNodes, 
+		std::map<int, Vector>& movingNodesDisplacements, 
+		const std::unordered_set<int> freeNodes, 
+		std::map<int, Vector>& freeNodesDisplacements) {
+		//Compute displacements
+		if (meshMovementAlgorithm == MeshMovement::MeshMovementAlgorithm::Linear1D) {
+			LinearInterpolationComputeDisplacements(grid, movingNodes, movingNodesDisplacements, freeNodes, freeNodesDisplacements);
+			return;
+		};
+		if (meshMovementAlgorithm == MeshMovement::MeshMovementAlgorithm::IDW) {
+			IDWComputeDisplacements(grid, movingNodes, movingNodesDisplacements, freeNodes, freeNodesDisplacements);
+			return;
+		};
+		if (meshMovementAlgorithm == MeshMovement::MeshMovementAlgorithm::IDWnoRotation) {
+			IDWNoRotationComputeDisplacements(grid, movingNodes, movingNodesDisplacements, freeNodes, freeNodesDisplacements);
+			return;
+		};
+		//TO DO
+		throw new Exception("Unsupported mesh movement algorithm");
+	};
+
+	//Main function
+	void MoveNodes(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
 		assert(displacements.size() == nodes.size());
 
 		//Determine set of boundary nodes
@@ -152,12 +260,11 @@ public:
 		//Determine set of inner nodes		
 		std::unordered_set<int> freeNodes;
 		int cb = 0;
-		for (int i = 0; i < grid.localNodes.size(); i++) {
-			if (i == nodes[cb]) {
-				cb++;
-				continue;
-			};
+		for (int i = 0; i < grid.localNodes.size(); i++) {			
 			freeNodes.insert(i);
+		};		
+		for (int nodeI : movingNodes) {			
+			freeNodes.erase(nodeI);
 		};		
 
 		//For all nodes allocate memory to store rotation and displacements
@@ -172,7 +279,7 @@ public:
 		};
 
 		//Compute displacements
-		IDWComputeDisplacements(grid, movingNodes, dRmoving, freeNodes, dRfree);
+		ComputeDisplacements(grid, movingNodes, dRmoving, freeNodes, dRfree);
 
 		//Change grid according to displacements	
 		//Nodes first
@@ -185,7 +292,9 @@ public:
 
 		//Recalculate Face normals and other grid geometric properties
 		grid.UpdateGeometricProperties();
-	};
+
+	}; //MoveMesh
+
 };
 
 #endif

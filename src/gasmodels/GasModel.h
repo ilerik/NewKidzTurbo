@@ -4,9 +4,14 @@
 #include "cgnslib.h"
 #include "configuration.h"
 
+class Logger;
+
 //Gas model base class
 class GasModel {
-public:
+protected:
+	//Logger object referece
+	Logger* _logger;	
+public:	
 	//Thermodynamic gas model
 	std::string GasModelName;
 	ModelType_t GasModelType;
@@ -14,10 +19,13 @@ public:
 	//Number of variables
 	int nConservativeVariables;
 
+	//Constructor
+	GasModel(Logger* logger) : _logger(logger) { };
+
 	//Conservative variables class
 	struct ConservativeVariables {
 	public:
-		double ro; //Density
+		double ro;	//Density
 		double rou; //Specific momentum X
 		double rov; //Specific momentum Y
 		double row; //Specific momentum Z
@@ -71,6 +79,9 @@ public:
 
 	//Obtain medium pressure, soundspeed, Gruneisen coefficient and adiabatic exponent values
 	virtual void GetPressureAndSoundSpeed(GasModel::ConservativeVariables U, double& pressure, double& soundspeed, double& gruneisen) = 0;
+
+	//Given pressure and density numerically find specific internal energy
+	virtual double FindInternalEnergy(double density, double pressure) = 0;
 
 	//Read configuration
 	virtual void loadConfiguration(GasModelConfiguration configuration) = 0;

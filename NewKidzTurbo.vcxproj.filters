@@ -64,6 +64,9 @@
     <Filter Include="Header Files\TestCases">
       <UniqueIdentifier>{8e781f7e-e76e-4d15-bf31-c6f04eb34a75}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases\TestCases1D">
+      <UniqueIdentifier>{2c32ba89-a344-4f0e-94bf-d541f43a8db5}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\TestCases\RMInstabilityTests">
       <UniqueIdentifier>{310677d9-61c0-426a-aa4f-72c809867636}</UniqueIdentifier>
     </Filter>
@@ -81,6 +84,9 @@
     </Filter>
     <Filter Include="Header Files\TestCases\RiemannProblemTests\ToroTests">
       <UniqueIdentifier>{f66f4658-b403-4eca-b532-be7faecbfa6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MainSolver\SpatialDiscretization">
+      <UniqueIdentifier>{7f65475a-8354-411b-b64b-9568d8de088c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -219,6 +225,9 @@
     <ClInclude Include="src\utility\meshquality.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCase.h">
+      <Filter>Header Files\TestCases</Filter>
+    </ClInclude>
     <ClInclude Include="src\mainsolver\Configuration\ALEConfiguration.h">
       <Filter>Header Files\MainSolver\Configuration</Filter>
     </ClInclude>
@@ -232,13 +241,13 @@
       <Filter>Header Files\TestCases\RMInstabilityTests</Filter>
     </ClInclude>
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_1.h">
-      <Filter>Header Files\TestCases\RiemannProblemTests</Filter>
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
     </ClInclude>
     <ClInclude Include="src\ALEmethod\ALEMethod.h">
       <Filter>Header Files\ALEMethod</Filter>
     </ClInclude>
     <ClInclude Include="src\testcases\TestCases1D\TestCase1D_ALE_2.h">
-      <Filter>Header Files\TestCases\RiemannProblemTests</Filter>
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
     </ClInclude>
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h">
       <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
@@ -258,17 +267,56 @@
     <ClInclude Include="src\testcases\TestCase.h">
       <Filter>Header Files\TestCases</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
     <ClInclude Include="src\testcases\test_list.h">
       <Filter>Header Files\TestCases</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
+    </ClInclude>
     <ClInclude Include="src\riemannsolvers\PerfectGas_Godunov_3d.h">
       <Filter>Header Files\RiemannSolvers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpactTestCase.h">
+      <Filter>Header Files\TestCases\MetalsCollisionTests</Filter>
     </ClInclude>
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest.h">
       <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
     </ClInclude>
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTestComposite.h">
       <Filter>Header Files\TestCases\RiemannProblemTests\ToroTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files\TestCases\TestCases2D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK1.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE4.h">
+      <Filter>Header Files\TestCases\TestCases1D</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCGeneral.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainsolver\perfomanceHelper.h">
+      <Filter>Header Files\MainSolver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utility\Timer.h">
+      <Filter>Header Files\Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

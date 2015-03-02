@@ -16,6 +16,7 @@
 //Test cases
 #include "test_list.h"
 
+
 template< typename T >
 std::string int_to_hex( T i )
 {
@@ -25,6 +26,7 @@ std::string int_to_hex( T i )
          << std::hex << i;
   return stream.str();
 }
+
 
 //Shear layer computation
 class ImpactShockInitialConditions : public InitialConditions::InitialConditions
@@ -211,22 +213,164 @@ void runImpactShockTest(int argc, char *argv[]) {
 
 //Main program ))
 int main(int argc, char *argv[]) {	
-	//Fill task settings for Test 1
-	ToroTests::ToroTestsInit test1Settings;
-	test1Settings.discontinuityPosition = 0.5;
-	test1Settings.Lx = 1.0;
-	test1Settings.nCells = 1600;
-	test1Settings.TimeMax = 0.2;
-	test1Settings.gammaL = 1.4;
-	test1Settings.roL = 1.0;
-	test1Settings.uL = 0.0;
-	test1Settings.pL = 1.0;
-	test1Settings.gammaR = 1.4;
-	test1Settings.roR = 0.125;
-	test1Settings.uR = 0.0;
-	test1Settings.pR = 0.1;
-	ToroTests::ToroTestComposite test(test1Settings);
+ //   LomonosovFortovGasModel* gasModel = new LomonosovFortovGasModel(Logger());
+
+	//GasModelConfiguration conf;		
+	//conf.GasModelName = "LomonosovFortovGasModel";
+	//conf.SetPropertyValue("MaterialIndex", 1);
+	//conf.SetPropertyValue("SpecificHeatVolume", 130); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
+	//conf.SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
+	//double roMetal = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
+	//gasModel->loadConfiguration(conf);
+
+	////double V = 8.820E-02;
+	////double E = -3.240E-08;
+	//double V = 6.132E-02;
+	//double E = 6.855E-01;
+
+	//GasModel::ConservativeVariables U;
+	//U.ro = 1000.0 / V;//0.88200003E-01;
+	//U.rou = 0;
+	//U.rov = 0;
+	//U.row = 0;
+	//U.roE = U.ro * E * 1e6;
+	//double C = 0;
+	//double Gr= 0;
+	//double P = 0; //gasModel->GetPressure(U);
+	//double e = 0;
+	//bool NF = false;
+	//gasModel->EOSE5(1.0 / V, E, P, C, Gr, NF);
+	//gasModel->EOSP5(1.0 / V, P, e, C, Gr, NF);
+	//GasModel::MediumPhase phase = gasModel->GetPhase(U);
+
+	//return 0;
+
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_SteelVSSteel test(500);
+	//TestCasesMetalsImpact::TestCaseMetalsImpact_1D_PbVSPb test(1000);
+
+	//2:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	80, //snapshots
+	//	30e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//4:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	80, //snapshots
+	//	60e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//3:1 width ratio
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	80, //snapshots
+	//	45e-3, //
+	//	15e-3, 
+	//	8e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	////3:1 width ratio
+	////PbWidth = 2x15
+	//double widthPb = 30e-3;
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	200, //snapshots
+	//	3*widthPb, //
+	//	widthPb, 
+	//	20e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-750.0
+	//	);
+
+	//3:1 width ratio
+	//PbWidth = 15, V = 1000
+	//double widthPb = 15e-3;
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 2000,
+	//	100, //snapshots
+	//	3*widthPb, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-1000.0
+	//	);
+
+	//Test 1
+	double widthSteel = 3e-3; //3 mm
+	double widthPb = 2e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 500,
+	//	300, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	3e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
+
+	//Test 2
+	//widthSteel = 3e-3; //3 mm
+	//widthPb = 9e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
+	//	100, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
+
+	//Test 3
+	//widthSteel = 30e-3; //3 mm
+	//widthPb = 2e-3; //2 mm
+	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 3000,
+	//	100, //snapshots
+	//	widthSteel, //
+	//	widthPb, 
+	//	10e-6, // time = 8 mks
+	//	TestCasesMetalsImpact::MetalType::StainlessSteel,
+	//	0.0,
+	//	TestCasesMetalsImpact::MetalType::Plumbum,
+	//	-470.0
+	//	);
+
+	//TestCases1D::TestCase1DALE3_RK4 test;
+	//TestCases1D::TestCase1DALE4 test;
+
+	//Test 1 2D
+	double width = 1e-3;
+	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 10, 10,
+		0, //snapshots
+		width, //
+		widthSteel, //
+		widthPb, 
+		3e-6, // time = 5 mks
+		TestCasesMetalsImpact::MetalType::StainlessSteel,
+		0.0,
+		TestCasesMetalsImpact::MetalType::Plumbum,
+		-470.0
+		);
 	test.RunTest(&argc, &argv);
 	return 0;
-	
+
 };

@@ -8,11 +8,11 @@
 #include "CGNSReader.h"
 #include "CGNSWriter.h"
 #include "parallelHelper.h"
+#include "perfomanceHelper.h"
 #include "BoundaryConditions.h"
 #include "InitialConditions.h"
 #include "cmath"
-//#include "BoundaryCondition.h"
-//#include "BCSymmetryPlane.h"
+#include <direct.h>
 #include "geomfunctions.h"
 #include "configuration.h"
 #include "riemannsolvers.h"
@@ -33,7 +33,13 @@ public:
 	double Time;
 	double TimeStep;	
 	int Iteration;
-	std::vector<double> Residual;	
+	std::vector<double> Residual;
+
+	//Perfomance times report
+	double ConvectiveFluxesTime;
+	double ComputeResidualTime;
+	double ALETime;
+
 };
 
 //Forward declaration
@@ -99,12 +105,7 @@ private:
 	double CurrentTime;
 	double NextSnapshotTime;
 	double SaveSolutionSnapshotTime;
-	int SaveSolutionSnapshotIterations;
-
-	//Arbitrary Eulerian-Lagrange treatment type	
-
-	//Roe3DSolverPerfectGas rSolver;
-	//Godunov3DSolverPerfectGas rSolver;
+	int SaveSolutionSnapshotIterations;	
 
 	//Riemann solver
 	RiemannSolver* rSolver;
@@ -116,6 +117,12 @@ private:
 	ParallelHelper _parallelHelper;
 	int _rank;
 	int _nProcessors;
+
+	//Perfomance measurement helper
+	PerfomanceHelper _perfomanceHelper;
+	Timer timerResidual;
+	Timer timerALE;
+	Timer timerConvective;
 
 	//Boundary conditions
 	std::map<int, int> _boundaryGasModelIndex;
@@ -171,8 +178,11 @@ public:
 			_rank = _parallelHelper.getRank();
 			_nProcessors = _parallelHelper.getProcessorNumber();
 
-			//Initialize loggin subsistem
-			_logfilename = "kernel.log"; //TO DO
+			//Initialize perfomance watching subsystem
+			_perfomanceHelper.Init(_parallelHelper);
+
+			//Initialize loggin subsystem
+			_logfilename = "kernel"; //TO DO
 			_logger.InitLogging(_parallelHelper, _logfilename);
 
 			//Initialize cgns i\o subsystem
@@ -198,10 +208,17 @@ public:
 		_cgnsWriter.Finalize();
 		_parallelHelper.Finalize();			
 		_logger.FinilizeLogging();
+		_perfomanceHelper.Finalize();
 		return TURBO_OK;
 	};
 
-	turbo_errt InitCalculation() {				
+	turbo_errt InitCalculation() {
+		//Change working directory
+		if (_configuration.WorkingDirectory != "") {
+			//const wchar_t *ptr = _configuration.WorkingDirectory.c_str();
+			//_wchdir();
+		};
+
 		//Gas models setup
 		//List of availible gas models
 		_gasModels.resize(_configuration.GasModelsConfiguration.size());
@@ -209,10 +226,10 @@ public:
 			int gmIndex = _configuration.GasModelNameToIndex[pair.first];
 			std::string gmName = pair.second.GasModelName;
 			if (gmName == "PerfectGasModel") {
-				_gasModels[gmIndex] = new PerfectGasModel();				
+				_gasModels[gmIndex] = new PerfectGasModel(_logger);				
 			};
 			if (gmName == "LomonosovFortovGasModel") {
-				_gasModels[gmIndex] = new LomonosovFortovGasModel();
+				_gasModels[gmIndex] = new LomonosovFortovGasModel(_logger);
 			};
 
 			//Load configuration for gas model
@@ -283,6 +300,7 @@ public:
 		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
 
 		//ALE settings
+		_ALEmethod._moveHelper.meshMovementAlgorithm = _configuration.ALEConfiguration.MeshMovementAlgorithm;
 		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
 		};
@@ -331,41 +349,32 @@ public:
 	};
 
 	turbo_errt RunCalculation() {
-		//Start timer
-		double workTime = 0.0;
-		clock_t start, stop;
-		/* Start timer */
-		assert((start = clock())!=-1);
+		//Start phase
+		std::shared_ptr<PerfomancePhase> runCalculationPhase = _perfomanceHelper.RootPhase->CreateSubPhase("RunCalculation").lock();
+		runCalculationPhase->Start();
 
-		//Calc loop
+		//Calculate snapshot times order of magnitude
+		int snapshotTimePrecision = 0;
+		if (SaveSolutionSnapshotTime > 0) {
+			snapshotTimePrecision = 1 - std::floor(std::log10(SaveSolutionSnapshotTime));
+		};
+
+		//Calc loop start
 		std::stringstream msg;	
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation started!");
+		//Create phases for time step calculations
+		std::shared_ptr<PerfomancePhase> computationPhase = runCalculationPhase->CreateSubPhase("Computation").lock();
+		std::shared_ptr<PerfomancePhase> snapshotsPhase = runCalculationPhase->CreateSubPhase("Snapshots").lock();
+		std::shared_ptr<PerfomancePhase> saveHistoryPhase = runCalculationPhase->CreateSubPhase("SaveHistory").lock();
 		for (stepInfo.Iteration = 0; stepInfo.Iteration <= MaxIteration; stepInfo.Iteration++) {
+			//Perform timestep
+			computationPhase->Start();
 			ExplicitTimeStep();
-
-			//Output step information
-			msg.clear();
-			msg.str(std::string());
-			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
-			if (_parallelHelper.IsMaster() && _isVerbose) {
-				std::cout<<msg.str();
-			};
-
-			//Debug
-			//Output values
-			/*msg.clear();
-			msg.str(std::string());
-			msg<<"Values:\n";
-			for (int i = 0; i<_grid.nCellsLocal; i++) {
-				Cell* c = _grid.localCells[i];				
-				msg<<"ID = "<<c->GlobalIndex<<", ( ";
-				for (int j = 0; j<_gasModel.nConservativeVariables; j++) msg<<Values[i * _gasModel.nConservativeVariables + j]<<" ";
-				msg<<"\n";
-			};
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
+			computationPhase->Stop();
 
 			//Solution snapshots
+			snapshotsPhase->Start();
+
 			//Every few iterations
 			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
 				//Save snapshot
@@ -382,7 +391,7 @@ public:
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
 				snapshotFileName<<std::fixed;
-				snapshotFileName.precision(7);								
+				snapshotFileName.precision(snapshotTimePrecision);								
 				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
@@ -390,9 +399,25 @@ public:
 				//Adjust next snapshot time
 				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
+			snapshotsPhase->Stop();
 
 			//Save history
+			saveHistoryPhase->Start();
 			if (_stepHistoryLogger != NULL) _stepHistoryLogger->SaveHistory();
+			saveHistoryPhase->Stop();
+
+			//Output step information
+			msg.clear();
+			msg.str(std::string());
+			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
+			msg<<"ALEtoFluxRation = "<<stepInfo.ALETime / stepInfo.ConvectiveFluxesTime <<"; ConvectiveFluxTime = "<<stepInfo.ConvectiveFluxesTime << "; ALETime = " << stepInfo.ALETime<<"\n";
+			msg<<"Computation time = "<<computationPhase->GetTotalTimeMilliseconds()<<std::endl;
+			msg<<"Snapshot time = "<<snapshotsPhase->GetTotalTimeMilliseconds()<<std::endl;
+			msg<<"Save history time = "<<saveHistoryPhase->GetTotalTimeMilliseconds()<<std::endl;
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
+			if (_parallelHelper.IsMaster() && _isVerbose) {
+				std::cout<<msg.str();
+			};
 
 			//Convergence criteria
 			if (stepInfo.Iteration == MaxIteration) {
@@ -412,19 +437,16 @@ public:
 			};
 
 			//Synchronize
-			_parallelHelper.Barrier();
+			runCalculationPhase->Sync();
 		};
 
 		//Synchronize
-		_parallelHelper.Barrier();
+		runCalculationPhase->StopAndSync();
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation finished!");	
 
-		/* Stop timer */
-		stop = clock();
-		workTime = (double) (stop-start)/CLOCKS_PER_SEC;
-		msg.clear();
+		//Output total run time
 		msg.str(std::string());
-		msg<<workTime;
+		msg<<runCalculationPhase->GetTotalTimeMilliseconds();
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Total work time = " + msg.str() + " seconds.");	
 		return TURBO_OK;
 	};
@@ -1147,6 +1169,11 @@ public:
 				_boundaryConditions[bcMarker] = bc;
 				bcTypeCheckPassed = true;
 			};
+			if (bcType == BCType_t::BCGeneral) {
+				BoundaryConditions::BCGeneral* bc = new BoundaryConditions::BCGeneral();
+				_boundaryConditions[bcMarker] = bc;
+				bcTypeCheckPassed = true;
+			};
 
 			if (!bcTypeCheckPassed) {
 				_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, "BCType is not supported.");
@@ -1282,6 +1309,8 @@ public:
 
 		//Write physical quantities
 		std::vector<double> buffer(_grid.nCellsLocal);
+		std::vector<double> buffer2(_grid.nCellsLocal);
+		std::vector<double> buffer3(_grid.nCellsLocal);
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 
 		//Stored fields
@@ -1330,13 +1359,20 @@ public:
 		};
 		_cgnsWriter.WriteField(_grid, solutionName, "VelocityZ", buffer); 
 
-		//Pressure		
+		//Pressure and sound speed and Gruneisen coef
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
 			int nmat = CellGasModel[i];
-			double P = _gasModels[nmat]->GetPressure(&Values[i * nv + 0]);
+			double P = 0;
+			double C = 0;
+			double Gr = 0;
+			_gasModels[nmat]->GetPressureAndSoundSpeed(&Values[i * nv + 0], P, C, Gr);
 			buffer[i] = P;
+			buffer2[i] = C;
+			buffer3[i] = Gr;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer); 
+		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer);
+		_cgnsWriter.WriteField(_grid, solutionName, "SoundSpeed", buffer2);
+		_cgnsWriter.WriteField(_grid, solutionName, "Gruneisen", buffer3);
 
 		//Internal energy
 		for (int i = 0; i<_grid.nCellsLocal; i++) {
@@ -1399,6 +1435,8 @@ public:
 
 	//Compute convective flux and max wave propagation speed throught each face
 	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {
+		timerConvective.Resume();
+
 		//Nullify all fluxes
 		for (std::vector<double>& flux : fluxes) {
 			for (double& v : flux) v = 0;
@@ -1441,6 +1479,7 @@ public:
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "isExternal = ", f.isExternal);
 			
 			std::vector<double> flux;
+			int ALEIndicator = ALEindicators[i];
 
 			//Solution reconstruction
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
@@ -1459,7 +1498,11 @@ public:
 			msg<<"cRight.GlobalIndex = "<< cRightGlobalIndex << "\n";
 			msg<<"cellIndexLeft = "<< cellIndexLeft << "\n";
 			msg<<"cellIndexRight = "<< cellIndexRight << "\n";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/		
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/	
+
+			if (IsBoundaryFace(f)) {
+				nmatR = nmatL;
+			};
 
 			//Determine face velocity
 			Vector faceVelocityAverage = Vector(0,0,0);
@@ -1467,22 +1510,27 @@ public:
 				faceVelocityAverage = _ALEmethod.facesVelocity[f.GlobalIndex];
 			};
 
-			//Compute flux			
+			//Compute flux		
 			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, faceVelocityAverage);			
-			//Store interface velocity and pressure for ALE
-			//_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;
-			//_ALEmethod.facesVelocity[f.GlobalIndex] = result.Velocity;
-			//Store wave speeds
-			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
-			//Store flux
-			fluxes[f.GlobalIndex] = result.Fluxes;
 
-			//If it's material interface
-			if (nmatL != nmatR) {
+			//Store interface velocity and pressure for ALE
+			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;			
+
+			//Store wave speeds			
+			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
+
+			//Compute flux exactly for Lagrangian interfaces				
+			if (ALEIndicator == 1.0) {
+				if (IsBoundaryFace(f)) result.Pressure = 1e5;
 				result.Fluxes[0] = 0;
-				assert(result.Fluxes[0] == 0);
+				result.Fluxes[1] = f.FaceNormal.x * result.Pressure;
+				result.Fluxes[2] = f.FaceNormal.y * result.Pressure;
+				result.Fluxes[3] = f.FaceNormal.z * result.Pressure;
+				result.Fluxes[4] = (faceVelocityAverage * f.FaceNormal) * result.Pressure;
 			};
-		
+
+			//Store flux
+			fluxes[f.GlobalIndex] = result.Fluxes;								
 
 			/*msg.str("");		
 			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
@@ -1529,16 +1577,18 @@ public:
 			//	};
 			//	flux = rSolver.ComputeFlux( UL,  UR, f);
 			//};				
-					
+				
 		};
 
 		//Synchronyze
 		_parallelHelper.Barrier();
+		timerConvective.Pause();
 	};	
 
 	////Compute residual for each cell		
 	void ComputeResidual(std::vector<double>& residual, std::vector<double>& cellValues) {	
 		//Compute ALE indicator values
+		timerALE.Resume();
 		std::vector<double> ALEindicators(_grid.nFaces, 0);
 		for (Face& f : _grid.localFaces) {
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
@@ -1578,6 +1628,9 @@ public:
 				if (ALEindicator == 0) continue; //Skip face that don't participate in obligatory motion
 				int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 				int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+				if (IsBoundaryFace(f)) {
+					nmatR = nmatL;
+				};
 				GasModel::ConservativeVariables UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));
 				GasModel::ConservativeVariables UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));															
 				Vector faceVelocity = _ALEmethod.ComputeFaceVelocity(_gasModels[nmatL], UL, _gasModels[nmatR], UR, f, ALEindicator);
@@ -1604,11 +1657,11 @@ public:
 			for (Face& f : _grid.localFaces) {
 				_ALEmethod.facesVelocity[f.GlobalIndex] = _ALEmethod.ComputeFaceVelocityByNodes(f);
 			};
-			
 		};
+		timerALE.Pause();
 
 
-		//Compute convective fluxes and max wave speeds		
+		//Compute convective fluxes and max wave speeds
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
 
@@ -1679,8 +1732,10 @@ public:
 	void ExplicitTimeStep() {
 		std::stringstream msg;
 
-		//Compute residual		
+		//Compute residual	
+		timerResidual.Resume();
 		ComputeResidual(Residual, Values);
+		timerResidual.Pause();
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1689,28 +1744,12 @@ public:
 		std::map<int, double> spectralRadius;
 		ComputeSpectralRadius(spectralRadius, MaxWaveSpeed, Values);
 
-		/*msg.clear();
-		msg.str(std::string());
-		msg<<"MaxWaveSpeed :\n";
-		int ind = 0;
-		for (auto p : MaxWaveSpeed) {
-			msg<<"Face = "<<ind++<<" MaxWaveSpeed = "<<p<<"\n";
-		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
 
 		//Synchronize
 		_parallelHelper.Barrier();
 
 		std::map<int, double> localTimeStep;
 		ComputeLocalTimeStep(localTimeStep, spectralRadius);
-		
-		/*msg.clear();
-		msg.str(std::string());
-		msg<<"Local time step :\n";
-		for (auto p : localTimeStep) {
-			msg<<"cell= "<<p.first<<" timeStep= "<<p.second<<"\n";
-		};*/
-		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1750,41 +1789,49 @@ public:
 			alpha.push_back(0.5052);
 			alpha.push_back(1.0);
 		};
+		double sumAlpha = 0;
+		for (double a : alpha) sumAlpha += a;
 
-		stepInfo.Residual = std::vector<double>(5, 0.0);	
+		stepInfo.Residual = std::vector<double>(5, 0.0);
 		
 		//Time stepping
 		for (int stage = 0; stage<nStages; stage++) {
+			double stageTimeStep = stepInfo.TimeStep * alpha[stage] / sumAlpha;
+
+			timerALE.Resume();
 			//ALE step mesh transformation
 			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
 				//Move mesh
-				_ALEmethod.MoveMesh(stepInfo.TimeStep);			
+				_ALEmethod.MoveMesh(stageTimeStep);			
 
 				//Regenerate geometric entities
 				GenerateGridGeometry(_grid);
-			};		
+			};
+			timerALE.Pause();
 
 			for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 			{
 				Cell* cell = _grid.localCells[cellIndex];			
 				//Update values
 				for (int i = 0; i < nVariables; i++) {
-					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (-stepInfo.TimeStep / cell->CellVolume) * alpha[stage];
+					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (- stageTimeStep / cell->CellVolume);
 					stepInfo.Residual[i] += pow(Residual[cellIndex*nVariables + i], 2);
 				};
 			};
+
 			//Synchronize
 			_parallelHelper.Barrier();
 
 			if (stage == nStages - 1) break;
 
 			//Compute new residual
+			timerResidual.Resume();
 			ComputeResidual(Residual, Values);
+			timerResidual.Pause();
+
 			//Synchronize
 			_parallelHelper.Barrier();
-		};
-
-	
+		};	
 
 		//Compute new result and residual
 		//Compute RMS residual		
@@ -1795,6 +1842,15 @@ public:
 
 		//Advance total time
 		stepInfo.Time += stepInfo.TimeStep;
+		
+		//Update perfomance statistics
+		stepInfo.ComputeResidualTime = timerResidual.ElapsedTimeMilliseconds();
+		stepInfo.ALETime = timerALE.ElapsedTimeMilliseconds();
+		stepInfo.ConvectiveFluxesTime = timerConvective.ElapsedTimeMilliseconds();
+
+		timerALE.Reset();
+		timerConvective.Reset();
+		timerResidual.Reset();
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1928,8 +1984,10 @@ public:
 				msg<<"Cells = "<<globalIndex;
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
 				Cell& cell = _grid.Cells[globalIndex];				
+				//Obtain neighbour
+				int nmat = GetCellGasModelIndex(cell.NeigbourCells[0]);
 				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );				
-				return _boundaryConditions[cell.BCMarker]->getDummyValues(0, Values, cell); //TO DO now boundary always 0 gas model
+				return _boundaryConditions[cell.BCMarker]->getDummyValues(nmat, Values, cell); //TO DO now boundary always 0 gas model
 			} else {
 				//If proper cell return part of Values array				
 				if (localIndex == -1) {

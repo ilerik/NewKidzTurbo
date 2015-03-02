@@ -2,6 +2,7 @@
 #define TURBO_MAINSOLVER_CONFIGURATION_ALEConfiguration
 
 #include "cgnslib.h"
+#include "MeshMovement.h"
 
 class ALEConfiguration
 {
@@ -9,6 +10,9 @@ class ALEConfiguration
 public:
 	//ALE motion type
 	std::string ALEMotionType;
+
+	//Mesh movement algorithm
+	MeshMovement::MeshMovementAlgorithm MeshMovementAlgorithm;
 
 	//Checks if property was set
 	bool IsPropertySet(std::string name) {

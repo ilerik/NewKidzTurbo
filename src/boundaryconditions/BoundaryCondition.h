@@ -8,11 +8,19 @@
 
 namespace BoundaryConditions {
 
+	//Dummy values info
+	struct DummyValuesInfo {
+		std::vector<double> dummyValues;
+		std::vector<double> dummyFluxes;
+		int dummyMaterialIndex;
+		int nVariables;
+	};
+
 	//Boundary condition result type
 	enum class BoundaryConditionResultType
 	{
 		Dirichlet, //Fixed value
-		Neumann    //Fixed flux
+		Neumann    //Fixed gradient
 	};	
 
 	//Base class for all boundary conditions

@@ -18,22 +18,8 @@ public:
 		std::vector<double> inV(&values[nCellIndex * nVariables], &values[nVariables * nCellIndex] + nVariables);
 
 		//Compute dummy values
-		std::vector<double> res = inV;
-		double pressure = 1e11;
-		/*
-		double density = 1.0;
-		res[0] = density;
-		res[1] = 0;
-		res[2] = 0;
-		res[3] = 0;
-		res[4] = pressure / (0.4);*/
-		//res[4] = pressure / (0.4);
-		/*res[0] = inV[0];
-		res[1] = inV[1];
-		res[2] = inV[2];
-		res[3] = inV[3];
-		res[4] = 0;*/
-		Vector roU(inV[1], inV[2], inV[3]);					
+		std::vector<double> res = inV;		
+		
 		return res;
 	};
 

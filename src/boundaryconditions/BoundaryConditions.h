@@ -8,6 +8,7 @@
 #include "BCSymmetryPlane.h"
 #include "BCOutflowSupersonic.h"
 #include "BCInflowSupersonic.h"
+#include "BCGeneral.h"
 
 
 #endif
