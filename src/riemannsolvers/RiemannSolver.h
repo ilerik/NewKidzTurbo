@@ -13,8 +13,6 @@
 class RiemannProblemSolutionResult {
 public:
 	std::vector<double> Fluxes;
-	std::vector<double> FluxesLeft; //Conservative flux to the left state
-	std::vector<double> FluxesRight; //Conservative flux to the right state
 	double MaxEigenvalue; //Maximal local eigenvalue of Jacobian
 	Vector Velocity; //Interface velocity estimate
 	double Pressure; //Interface pressure estimate

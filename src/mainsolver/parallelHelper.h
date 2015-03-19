@@ -82,7 +82,7 @@ public:
 		MPI_Allgather(&N, 1, MPI_INT, &result[0], 1, MPI_INT, _comm);			
 	};
 
-	//Gather arrays of double of different size on master node
+	//Gather arrays of int of different size on master node
 	void GathervInt(std::vector<cgsize_t>& local, std::vector<int>& counts, std::vector<cgsize_t>& result) {		
 		if (IsMaster()) {			
 			//Make displacement array
@@ -142,7 +142,7 @@ public:
 			totalSize += counts[i];
 		};
 		result.resize(totalSize);
-		MPI_Allgatherv(&local[0], local.size(), MPI_INT, &result[0], &counts[0], &displs[0], MPI_INT, _comm);		
+		MPI_Allgatherv(&local.front(), local.size(), MPI_INT, &result[0], &counts[0], &displs[0], MPI_INT, _comm);		
 	};
 	////Agregation
 	

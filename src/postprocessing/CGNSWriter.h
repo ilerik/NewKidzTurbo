@@ -93,7 +93,7 @@ protected:
 		cgsize_t normalListFlag;
 		DataType_t normalDataType;
 		int nDataSet;
-	} m_boco; 
+	} m_boco;
 
 	std::string fileLocation; //File location
 

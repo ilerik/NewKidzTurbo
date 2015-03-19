@@ -17,7 +17,7 @@ public:
 	double Gamma;
 	double Cv;
 	double Cp;	
-	double R;		
+	double R;	
 
 	//Obtain medium pressure
 	virtual double GetPressure(GasModel::ConservativeVariables U) {

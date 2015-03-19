@@ -659,8 +659,7 @@ public:
 		return TURBO_OK;
 	}; 
 
-	//Load required geometric grid data to appropriate data structures
-	//Provided we have partioned grid
+	//Load required geometric grid data to appropriate data structures (provided we have partioned grid)
 	turbo_errt GenerateGridGeometry(Grid& grid) {
 		//return turbo_errt::TURBO_OK;
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Geometry generation started");
