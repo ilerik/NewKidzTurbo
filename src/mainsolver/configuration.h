@@ -38,6 +38,9 @@ public:
 	SimulationType_t SimulationType; //Simulation type
 	double CFL; //CFL number
 	int RungeKuttaOrder; //Runge-Kutta time stepping scheme order
+
+	//Gravity
+	Vector g;
 	
 	//ALE configuration
 	ALEConfiguration ALEConfiguration;

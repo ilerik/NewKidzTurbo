@@ -73,23 +73,45 @@ public:
 		_gammaBoundary = 1.4;
 	};
 
-	GasModelConfiguration GetGasModelConfiguration(MetalType metal, double &roMetal) {
+	GasModelConfiguration GetGasModelConfiguration(std::string gasModelName, MetalType metal, double &roMetal) {
 		GasModelConfiguration conf;
-		if (metal == MetalType::StainlessSteel) {
-			conf.GasModelName = "LomonosovFortovGasModel";
-			conf.SetPropertyValue("MaterialIndex", 0);
-			conf.SetPropertyValue("SpecificHeatVolume", 510); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
-			conf.SetPropertyValue("MeltingTemperature", 1800); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
-			roMetal = 1000 * 1.0 / 0.127; //SI	for stainless steel;
-			return conf;
+		if (gasModelName == "LomonosovFortovGasModel") {
+			if (metal == MetalType::StainlessSteel) {
+				conf.GasModelName = "LomonosovFortovGasModel";
+				conf.SetPropertyValue("MaterialIndex", 0);
+				conf.SetPropertyValue("SpecificHeatVolume", 510); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
+				conf.SetPropertyValue("MeltingTemperature", 1800); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
+				roMetal = 1000 * 1.0 / 0.127; //SI	for stainless steel;
+				return conf;
+			};
+			if (metal == MetalType::Plumbum) {
+				conf.GasModelName = "LomonosovFortovGasModel";
+				conf.SetPropertyValue("MaterialIndex", 1);
+				conf.SetPropertyValue("SpecificHeatVolume", 130); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
+				conf.SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
+				roMetal = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
+				return conf;
+			};
 		};
-		if (metal == MetalType::Plumbum) {
-			conf.GasModelName = "LomonosovFortovGasModel";
-			conf.SetPropertyValue("MaterialIndex", 1);
-			conf.SetPropertyValue("SpecificHeatVolume", 130); //From http://www.diracdelta.co.uk/science/source/s/p/specific%20heat%20capacity/source.html#.VMr8MP6sXQI
-			conf.SetPropertyValue("MeltingTemperature", 600.622); //From http://www.diracdelta.co.uk/science/source/m/e/melting%20point/source.html#.VMr8x_6sXQI
-			roMetal = 1000 * 1.0 / 0.88200003E-01;; //SI lead (Pb)
-			return conf;
+
+		if (gasModelName == "BarotropicGasModel") {
+			double Pref = 2e14;	//P0 = 2*10^14 Pa	
+			if (metal == MetalType::StainlessSteel) {
+				roMetal = 4500; //steel reference density (ro2);
+				conf.GasModelName = "BarotropicGasModel";
+				conf.SetPropertyValue("YoungModulus", 200e6); // as for steel in http://en.wikipedia.org/wiki/Young%27s_modulus
+				conf.SetPropertyValue("ReferencePressure", Pref); 
+				conf.SetPropertyValue("ReferenceDensity", roMetal); 
+				return conf;
+			};
+			if (metal == MetalType::Plumbum) {
+				roMetal = 11400; //SI lead (Pb) ro1
+				conf.GasModelName = "BarotropicGasModel";
+				conf.SetPropertyValue("YoungModulus", 16e6); // as in http://en.wikipedia.org/wiki/Lead
+				conf.SetPropertyValue("ReferencePressure", Pref); //
+				conf.SetPropertyValue("ReferenceDensity", roMetal); //				
+				return conf;
+			};
 		};
 	};
 
@@ -109,6 +131,7 @@ public:
 		FreeSurface,
 		FixedValues,
 		Natural,
+		Symmetry,
 		Wall
 	};
 
@@ -132,6 +155,13 @@ public:
 			conf.MovementType = BoundaryConditionMovementType::Fixed;
 			conf.MaterialName = materialName;
 			return conf;
+		};
+
+		if (type == BoundaryConditionType::Natural) {
+			conf.BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+			conf.MovementType = BoundaryConditionMovementType::Fixed;
+			conf.MaterialName = materialName;
+			return conf;			
 		};
 
 		if (type == BoundaryConditionType::FreeSurface) {			
@@ -420,6 +450,20 @@ public:
 				ro = _roRight;
 			};
 
+			//Disturbance			
+			u = 0;
+			double Lx = 0.002;
+			double Ly = 0.5e-3;
+			double A = 0.1e-3;			
+			double lambda = 2e-3;
+			if ((x <= 0) && (std::abs(y) <= Ly / 2.0)) {
+				double dL = std::abs(x);
+				double unew = A * std::cos(2 * PI * y / lambda) * (1.0 - (dL / Lx));
+				//if (unew > 0) unew = 0;
+				u = unew;
+			};
+			//u = 0;
+
 			//Outside is air
 			/*double atm = 1.1e5;
 			double gamma = 1.4;
@@ -429,7 +473,7 @@ public:
 				e = atm / ((gamma - 1.0) * ro);
 			};*/
 			
-			//Convert to conservative variables						
+			//Convert to conservative variables
 			roE = ro*(e + (u*u + v*v + w*w) / 2.0);
 			initValues.resize(_gasModels[nmat]->nConservativeVariables);
 			initValues[0] = ro;

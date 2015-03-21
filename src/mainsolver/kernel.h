@@ -17,9 +17,11 @@
 #include "configuration.h"
 #include "riemannsolvers.h"
 #include "LomonosovFortovGasModel.h"
+#include "BarotropicGasModel.h"
 #include "PerfectGasModel.h"
 #include "meshquality.h"
 #include "ALEMethod.h"
+#include "sources/GravitySource.h"
 
 //Define error types
 enum turbo_errt {
@@ -90,7 +92,10 @@ private:
 	Configuration _configuration;	
 
 	//Gas model (equations of state)
-	std::vector<GasModel*> _gasModels;		
+	std::vector<GasModel*> _gasModels;	
+
+	//Sources (external forces, and so on)
+	std::unique_ptr<GravitySource> _sources;
 
 	//ALE data and logic
 	ALEMethod _ALEmethod;
@@ -231,6 +236,9 @@ public:
 			if (gmName == "LomonosovFortovGasModel") {
 				_gasModels[gmIndex] = new LomonosovFortovGasModel(_logger);
 			};
+			if (gmName == "BarotropicGasModel") {
+				_gasModels[gmIndex] = new BarotropicGasModel(_logger);
+			};
 
 			//Load configuration for gas model
 			_gasModels[gmIndex]->loadConfiguration(pair.second);
@@ -334,6 +342,9 @@ public:
 			exit(0);
 		};
 
+		//Initialize source terms
+		_sources = std::unique_ptr<GravitySource>(new GravitySource(_configuration.g) );
+
 		//Init parallel exchange
 		InitParallelExchange();	
 
@@ -410,10 +421,10 @@ public:
 			msg.clear();
 			msg.str(std::string());
 			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
-			msg<<"ALEtoFluxRation = "<<stepInfo.ALETime / stepInfo.ConvectiveFluxesTime <<"; ConvectiveFluxTime = "<<stepInfo.ConvectiveFluxesTime << "; ALETime = " << stepInfo.ALETime<<"\n";
-			msg<<"Computation time = "<<computationPhase->GetTotalTimeMilliseconds()<<std::endl;
-			msg<<"Snapshot time = "<<snapshotsPhase->GetTotalTimeMilliseconds()<<std::endl;
-			msg<<"Save history time = "<<saveHistoryPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"ALEtoFluxRation = "<<stepInfo.ALETime / stepInfo.ConvectiveFluxesTime <<"; ConvectiveFluxTime = "<<stepInfo.ConvectiveFluxesTime << "; ALETime = " << stepInfo.ALETime<<"\n";
+			//msg<<"Computation time = "<<computationPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"Snapshot time = "<<snapshotsPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"Save history time = "<<saveHistoryPhase->GetTotalTimeMilliseconds()<<std::endl;
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 			if (_parallelHelper.IsMaster() && _isVerbose) {
 				std::cout<<msg.str();
@@ -1659,7 +1670,6 @@ public:
 		};
 		timerALE.Pause();
 
-
 		//Compute convective fluxes and max wave speeds
 		ComputeConvectiveFluxes(FaceFluxes, MaxWaveSpeed, cellValues, ALEindicators);
 		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Convective fluxes calculated");
@@ -1669,7 +1679,7 @@ public:
 
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
-
+		
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 		{
@@ -1694,6 +1704,15 @@ public:
 					};					
 				};
 			};
+		};
+
+		//Compute source term
+		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
+		{
+			Cell* cell = _grid.localCells[cellIndex];						
+			std::vector<double> val(&cellValues[cellIndex * nVariables], &cellValues[cellIndex * nVariables] + nVariables);
+			std::vector<double> RSource = _sources->GetResidual(val);
+			for (int i = 0; i < nVariables; i++) residual[cellIndex*nVariables + i] -= cell->CellVolume * RSource[i];
 		};
 
  		return;
@@ -1742,7 +1761,6 @@ public:
 		//Determine time step as global minimum over local time steps		
 		std::map<int, double> spectralRadius;
 		ComputeSpectralRadius(spectralRadius, MaxWaveSpeed, Values);
-
 
 		//Synchronize
 		_parallelHelper.Barrier();

@@ -358,17 +358,18 @@ int main(int argc, char *argv[]) {
 	//TestCases1D::TestCase1DALE4 test;
 
 	//Test 1 2D
-	double width = 1e-3;
-	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 10, 10,
-		0, //snapshots
+	//double width = 8e-3 * 4.0 / 3.0;
+	double width = 2*1e-3;
+	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 40, 40,
+		50, //snapshots
 		width, //
 		widthSteel, //
 		widthPb, 
-		3e-6, // time = 5 mks
+		5.0e-6, // time = 5 mks
 		TestCasesMetalsImpact::MetalType::StainlessSteel,
 		0.0,
 		TestCasesMetalsImpact::MetalType::Plumbum,
-		-470.0
+		-500.0
 		);
 	test.RunTest(&argc, &argv);
 	return 0;

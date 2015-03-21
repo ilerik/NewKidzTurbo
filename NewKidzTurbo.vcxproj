@@ -146,6 +146,7 @@
     <ClInclude Include="src\boundaryconditions\BCWallViscousIsothermal.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryCondition.h" />
     <ClInclude Include="src\boundaryconditions\BoundaryConditions.h" />
+    <ClInclude Include="src\gasmodels\BarotropicGasModel.h" />
     <ClInclude Include="src\gasmodels\GasModel.h" />
     <ClInclude Include="src\gasmodels\LomonosovFortovGasModel.h" />
     <ClInclude Include="src\gasmodels\PerfectGasModel.h" />
@@ -181,6 +182,8 @@
     <ClInclude Include="src\riemannsolvers\perfect_gas_roe_3d.h" />
     <ClInclude Include="src\riemannsolvers\RiemannSolver.h" />
     <ClInclude Include="src\riemannsolvers\riemannsolvers.h" />
+    <ClInclude Include="src\sources\GravitySource.h" />
+    <ClInclude Include="src\sources\ISource.h" />
     <ClInclude Include="src\stdafx.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpactTestCase.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />

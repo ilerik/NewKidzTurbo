@@ -70,12 +70,12 @@ public:
 		//Left metal
 		_nmatLeft = 0;
 		_configuration.AddGasModel("MetalLeft");
-		_configuration.GasModelsConfiguration["MetalLeft"] = GetGasModelConfiguration(_metalLeft, _roLeft);
+		_configuration.GasModelsConfiguration["MetalLeft"] = GetGasModelConfiguration("LomonosovFortovGasModel", _metalLeft, _roLeft);
 
 		//Right metal
 		_nmatRight = 1;
 		_configuration.AddGasModel("MetalRight");
-		_configuration.GasModelsConfiguration["MetalRight"] = GetGasModelConfiguration(_metalRight, _roRight);
+		_configuration.GasModelsConfiguration["MetalRight"] = GetGasModelConfiguration("LomonosovFortovGasModel", _metalRight, _roRight);
 
 		//Boundary conditions
 		//Air (ideal gas)

@@ -25,9 +25,13 @@ protected:
 	//d
 
 	//Pertrubation position
-	double _pFunction(Vector r) {	
+	double _pFunction(Vector r) {			
 		if (std::abs(r.y) > _D / 2.0) return r.x;
-		double x = _A * (1.0 + std::cos(2.0 * PI * r.y / (_n * _D)));
+		//if (std::abs(r.y) > 10 * _D / 2.0) return r.x;
+		double omega = r.y / (_n * _D);
+		//if ((int)std::floor(omega) % 4 != 0) return r.x;
+		double x = _A * (std::cos(2.0 * PI * omega));
+		//if (x < 0) x = 0;
 		return r.x - x;
 	};
 
@@ -41,9 +45,10 @@ public:
 		_nCellsY = nCellsY;
 
 		//Pertrubation parameters
-		_D = 1.0e-3;
-		_A = 0.1e-3;
-		_n = 1;
+		_D = widthY / 2.0;
+		//_D = 1e-3;
+		_A = 0.0; //0.1e-3;
+		_n = 2.0;
 	};
 
 	//Prepare computational grid
@@ -91,7 +96,8 @@ public:
 		for (Node& node : _grid.localNodes) {
 			double x = node.P.x;
 			double y = node.P.y;
-			if ((x == -_widthLeft) || (x == _widthRight) || (std::abs(y) == _widthY / 2.0)) {				
+			//if ((x == -_widthLeft) || (x == _widthRight) || (std::abs(y) == _widthY / 2.0)) {				
+			if ((x == -_widthLeft) || (x == _widthRight)) {				
 				displacements.push_back(Vector(0, 0, 0));
 				nodes.push_back(node.GlobalIndex);
 			};
@@ -119,12 +125,12 @@ public:
 		//Left metal
 		_nmatLeft = 0;
 		_configuration.AddGasModel("MetalLeft");
-		_configuration.GasModelsConfiguration["MetalLeft"] = GetGasModelConfiguration(_metalLeft, _roLeft);
+		_configuration.GasModelsConfiguration["MetalLeft"] = GetGasModelConfiguration("BarotropicGasModel", _metalLeft, _roLeft);
 
 		//Right metal
 		_nmatRight = 1;
 		_configuration.AddGasModel("MetalRight");
-		_configuration.GasModelsConfiguration["MetalRight"] = GetGasModelConfiguration(_metalRight, _roRight);
+		_configuration.GasModelsConfiguration["MetalRight"] = GetGasModelConfiguration("BarotropicGasModel", _metalRight, _roRight);
 
 		//Boundary conditions
 		//Air (ideal gas)	
@@ -132,8 +138,10 @@ public:
 		std::string boundaryMaterialName = "Air";
 		_configuration.AddGasModel(boundaryMaterialName);
 		_configuration.GasModelsConfiguration[boundaryMaterialName] = GetBoundaryGasModelConfiguration();				
-		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Wall);
-		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::FreeSurface);			
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Natural);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::Natural);
+		//_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Wall);
+		//_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::Wall);
 		//_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);		
 		//_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration(boundaryMaterialName, BoundaryConditionType::FreeSurface);				
 		
@@ -144,15 +152,19 @@ public:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
+		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
 		//Run settings
-		_configuration.MaxIteration = 100;
+		_configuration.MaxIteration = 1000000;
 		_configuration.MaxTime = _TimeMax;
 		_configuration.SaveSolutionSnapshotIterations = 0;
 		_configuration.SaveSolutionSnapshotTime = _TimeMax / _nSnapshots;
+
+		//Gravity
+		_configuration.g = Vector(-1000e6, 0.0, 0.0);
+		//_configuration.g = Vector(0.0, 0.0, 0.0);
 
 		_kernel->VerboseOn();
 		_kernel->BindConfiguration(_configuration);	

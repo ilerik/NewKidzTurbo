@@ -37,9 +37,7 @@ public:
 
 	//Solve riemann problem	
 	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f, Vector faceVelocity) {
-		RiemannProblemSolutionResult result;
-		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
-		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
+		RiemannProblemSolutionResult result;		
 
 		//The Harten, Lax, and van Leer with contact restoration (HLLC) Riemann solver
 		//Left and right states

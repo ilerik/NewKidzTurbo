@@ -469,9 +469,7 @@ public:
 
 	//Solve riemann problem	
 	RiemannProblemSolutionResult Solve(int nmatL, const GasModel::ConservativeVariables& UL, int nmatR, const GasModel::ConservativeVariables& UR, const Face& f,  Vector faceVelocity) {
-		RiemannProblemSolutionResult result;
-		result.FluxesLeft.resize(_gasModels[nmatL]->nConservativeVariables, 0);
-		result.FluxesRight.resize(_gasModels[nmatR]->nConservativeVariables, 0);
+		RiemannProblemSolutionResult result;		
 
 		result.Fluxes = ComputeFlux(UL, UR, f);
 		result.MaxEigenvalue = MaxEigenvalue;

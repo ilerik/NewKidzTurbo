@@ -88,6 +88,12 @@
     <Filter Include="Header Files\MainSolver\SpatialDiscretization">
       <UniqueIdentifier>{7f65475a-8354-411b-b64b-9568d8de088c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Sources">
+      <UniqueIdentifier>{f0f19c43-b266-42d3-8478-7436dead3c6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\TestCases\RTInstabilityTests">
+      <UniqueIdentifier>{7bede7df-aaa2-4cd8-9d3a-2a07a8ef2117}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -317,6 +323,18 @@
     </ClInclude>
     <ClInclude Include="src\utility\Timer.h">
       <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sources\ISource.h">
+      <Filter>Header Files\Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sources\GravitySource.h">
+      <Filter>Header Files\Sources</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gasmodels\BarotropicGasModel.h">
+      <Filter>Header Files\GasModels</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
