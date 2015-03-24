@@ -1,22 +1,21 @@
-#ifndef TURBO_GRIDGENERATION_GENGRID2D
-#define TURBO_GRIDGENERATION_GENGRID2D
+#ifndef NewKidzTurbo_gridgeneration_GenGrid2DUniform
+#define NewKidzTurbo_gridgeneration_GenGrid2DUniform
 
 #include "grid.h"
 #include "cgnslib.h"
-#include "parallelHelper.h"
-#include <cassert>
 
-Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
+#include <cassert>
+#include <functional>
+
+Grid GenGrid2DUniform(std::shared_ptr<ParallelManager> MPIManager, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
 {
+	Grid g(MPIManager);
 	double size_x = x_max - x_min;
 	double size_y = y_max - y_min;
-	int rank = pHelper->getRank();
-	int nProc = pHelper->getProcessorNumber();
-	//int cartI;
-	//int cartJ;
+	int rank = g.gridStructure.rank = MPIManager->rank();
+	int nProc = g.gridStructure.np = MPIManager->np();
 
 	//Generate grid topology
-	Grid g;
 	N++;
 	M++;
 	std::vector<double> x_p(N);
@@ -185,9 +184,9 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 	g.adjncy.clear();
 
 	//TO DO generalize
-	pHelper->part.resize(g.nProperCells);
+	g.gridStructure.cellsPart.resize(g.nProperCells);
 	g.cellsPartitioning.resize(g.nProperCells);
-	int nProcessors = pHelper->getProcessorNumber();
+	int nProcessors = nProc;
 	int vProc = g.nProperCells / nProcessors;
 	int vLeft = g.nProperCells % nProcessors;
 	g.vdist.resize(nProcessors + 1);
@@ -201,15 +200,11 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 
 		//Set initial partitioning
 		for (int j = g.vdist[i]; j < g.vdist[i + 1]; j++) {
-			pHelper->part[j] = i;
+			g.gridStructure.cellsPart[j] = i;
 			g.cellsPartitioning[j] = i;
 		};
 	};
 	g.vdist[nProcessors] = g.nProperCells;
-
-	/*assert(nProc == 1);
-	g.vdist.push_back(0);		
-	g.vdist.push_back(g.nProperCells);*/
 
 	int currentInd = 0;
 	g.xadj.push_back(currentInd);
@@ -241,7 +236,7 @@ Grid GenGrid2D(ParallelHelper* pHelper, int N, int M, double x_min, double x_max
 		g.addPatch("top", 4);
 	};
 	//g.ConstructAndCheckPatches();
-	pHelper->Barrier();
+	MPIManager->Barrier();
 	
 	return g;
 };

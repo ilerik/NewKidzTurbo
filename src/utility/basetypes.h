@@ -156,12 +156,11 @@ inline Vector operator&(const Vector& a, const Vector &b)
 	return Vector(a.y*b.z-b.y*a.z, b.x*a.z-a.x*b.z, a.x*b.y-a.y*b.x);
 };
 
-typedef std::vector<double> Row;
-typedef std::vector<Row> Table;
-
 //Matrix type
 class Matrix {
 private:
+	typedef std::vector<std::vector<double>> Table;
+
 	int size_n;
 	int size_m;
 	Table table;
@@ -172,10 +171,10 @@ public:
 	Matrix(int n, int m) {
 		size_n = n;
 		size_m = m;
-		table.resize(n , Row(m, 0));
+		table.resize(n , std::vector<double>(m, 0));
 	};
 
-	Row& operator[](int i) {		
+	std::vector<double>& operator[](int i) {		
 		return table[i];
 	};	
 

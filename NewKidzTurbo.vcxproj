@@ -152,6 +152,8 @@
     <ClInclude Include="src\gasmodels\PerfectGasModel.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
+    <ClInclude Include="src\gridgeneration\GenGrid2DInterfacePertrubation.h" />
+    <ClInclude Include="src\gridgeneration\GenGrid2DUniform.h" />
     <ClInclude Include="src\gridgeneration\gengrid3D.h" />
     <ClInclude Include="src\gridgeneration\gridgeneration.h" />
     <ClInclude Include="src\gridloading\cgnsload.h" />
@@ -173,8 +175,10 @@
     <ClInclude Include="src\mainsolver\kernel.h" />
     <ClInclude Include="src\mainsolver\logger.h" />
     <ClInclude Include="src\mainsolver\parallelHelper.h" />
+    <ClInclude Include="src\mainsolver\ParallelManager.h" />
     <ClInclude Include="src\mainsolver\patch.h" />
     <ClInclude Include="src\mainsolver\perfomanceHelper.h" />
+    <ClInclude Include="src\mainsolver\SpatialDiscretisation\SpatialDiscretisation.h" />
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
@@ -189,12 +193,14 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSSteel.h" />
+    <ClInclude Include="src\testcases\RiemannProblemTests\TestCase1D_SodShockTube.h" />
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTest.h" />
     <ClInclude Include="src\testcases\RiemannProblemTests\ToroTests\ToroTestComposite.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h" />
+    <ClInclude Include="src\testcases\RTInstabilityTests\RTInstabilityTestCase.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK4.h" />

@@ -47,6 +47,15 @@ public:
 		_idleDuration = std::chrono::high_resolution_clock::duration(0);
 	};
 
+	void Init(MPI_Comm comm) {
+		_comm = comm;
+		int result = MPI_Comm_size(_comm, &_nProcessors);
+		if (result != MPI_SUCCESS) throw new Exception("Init failed");
+		MPI_Comm_rank(_comm, &_rank);
+		isInitilized = true;
+		_idleDuration = std::chrono::high_resolution_clock::duration(0);
+	};
+
 	//Finilize MPI programm
 	void Finalize() {
 		MPI_Finalize();
@@ -141,7 +150,7 @@ public:
 			displs[i] = totalSize;
 			totalSize += counts[i];
 		};
-		result.resize(totalSize);
+		if (result.size() != totalSize) result.resize(totalSize);
 		MPI_Allgatherv(&local.front(), local.size(), MPI_INT, &result[0], &counts[0], &displs[0], MPI_INT, _comm);		
 	};
 	////Agregation

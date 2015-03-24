@@ -22,10 +22,10 @@ public:
 		double dr = d_r.mod();		
 		if (abs(dr) < 1e-15) return 1;
 		double Ai = 1;
-		double Ldef = 1e-2;
-		double alpha = 1.0;
+		double Ldef = 1;
+		double alpha = 0.0;
 		double a = 3.0;				
-		double b = 5;
+		double b = 5.0;
 		double res = Ai *( pow(Ldef / dr, a) + pow(alpha * Ldef / dr, b));
 		return res;
 	};

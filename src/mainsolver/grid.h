@@ -8,15 +8,15 @@
 #include "parmetis.h"
 #include <map>
 #include <set>
-//#include <unordered_set>
-//#include <unordered_map>
 #include <algorithm>
 #include <cassert>
+#include <memory>
+
+#include "ParallelManager.h"
 
 #define DEBUG_GRID true
 
 //Specify supported element types
-
 
 //Grid types
 struct Node {	
@@ -31,9 +31,8 @@ enum FaceType {
 };
 
 struct Face {
-	ElementType_t CGNSType;
 	int GlobalIndex;
-	
+	ElementType_t CGNSType;
 	FaceType Type;		//Type of face (boundary, local, interprocessor)
 	int FaceCell_1;		//Index of cell 1
 	int FaceCell_2;		//Index of cell 2
@@ -47,11 +46,13 @@ struct Face {
 
 	//Constructors
 	Face() {
+		BCMarker = 0;
 	};
 
 	Face(ElementType_t type, std::vector<int> nodes) {
 		CGNSType = type;
 		FaceNodes = nodes;
+		BCMarker = 0;
 	};
 
 	bool operator<( const Face& second ) const
@@ -148,7 +149,7 @@ public:
 	int MainBaseIndex; //base index (one base assumed)
 	std::string MainBaseName; 
 	int MainZoneIndex; //zone index (one zone assumed)
-	std::string MainZoneName;
+	std::string MainZoneName; 
 	std::vector<int> CellsSections; // volume elements sections (possible many)
 	std::vector<int> BoundarySections; // boundary elements sections (possible many)	
 
@@ -163,19 +164,54 @@ public:
 	std::map<idx_t, idx_t> NumberToGlobalIndex;	// number from [0, nCells-1] to cell global index	
 };
 
+class GridStructure {
+public:
+	//Flag set to true if grid was properly created
+	bool Initialized;
+
+	//Grid actual cell dimensions
+	int nCellDimensions;
+
+	//Total number of nodes and cells in grid
+	int nNodesGrid;
+	int nCellsGrid;
+
+	//Cells and partitioning information
+	int rank;	//Rank of current node
+	int np;		//Number of computational nodes
+	std::vector<Cell> cells;	//All cells stored for now
+	std::vector<int> cellsPart; //Partitioning information for cells
+
+	//Grid connectivity graph via METIS style datastructures
+	std::vector<idx_t> vdist;	//cells distribution over processors
+	std::vector<idx_t> xadj;	//adjacency list shift for local cells
+	std::vector<idx_t> adjncy;	//concateneted adjacency lists for each local cell	
+
+	//Local cells, faces and nodes
+	int nProperCellsLocal;  //Number of local non dummy cells
+	int nCellsLocal;		//Number of local cells (including dummy)
+	int nFacesLocal;		//Number of local faces
+	std::vector<std::shared_ptr<Cell> > localNodes;
+	std::vector<std::shared_ptr<Cell> > localFaces;
+	std::vector<std::shared_ptr<Cell> > localCells;
+};
+
 class Grid
 {		
+	//Underlying MPI implementation
+	std::shared_ptr<ParallelManager> _MPIManager;
 public:	
-	//basic grid properties	
+	//basic grid structure
 	GridInfo gridInfo;
 
-	//grid connectivity info
+	//Grid connectivity graph
 	//METIS style datastructures
-	std::vector<idx_t> vdist;  //cells distribution over processors
-	std::vector<idx_t> xadj;   //adjacency list shift for local cells
+	std::vector<idx_t> vdist;	//cells distribution over processors
+	std::vector<idx_t> xadj;	//adjacency list shift for local cells
 	std::vector<idx_t> adjncy;	//concateneted adjacency lists for each local cell	
 
 	//local part of grid
+
 	//Nodes
 	std::vector<Node> localNodes; // all grid nodes
 
@@ -199,17 +235,17 @@ public:
 		return Cells[globalIndex].IsDummy;
 	};
 
-	inline int GetCellPart(int globalIndex) {
-		return cellsPartitioning[globalIndex];
-	};
-
 	inline bool IsBoundaryFace(Face& face) {
 		return IsDummyCell(face.FaceCell_2);
 	};
 
+	inline int GetCellPart(int globalIndex) {
+		return cellsPartitioning[globalIndex];
+	};
+
 	//partitioning info
-	std::vector<int> cellsPartitioning; // map from cell number index to processor rank
-	std::vector<int> localCellIndexes;  // indexes of local non dummy cells
+	std::vector<int> cellsPartitioning; //map from cell number index to processor rank
+	std::vector<int> localCellIndexes;  //indexes of local non dummy cells
 
 	//boundaries information (BCMarker -> Patch)	
 	std::map<int, Patch> patches;
@@ -222,8 +258,7 @@ public:
 	std::set<int> movableBoundaryNodes;
 
 	//Refresh list of boundary nodes
-	void RefreshBoundaryNodes()
-	{		
+	void RefreshBoundaryNodes()	{		
 		for (int i = nCellsLocal; i<localCells.size(); i++) {
 			Cell* dummyCell = localCells[i];			
 			for (int j = 0; j < dummyCell->Nodes.size(); j++) {
@@ -233,13 +268,6 @@ public:
 			};			
 		};					
 	};
-		
-	Grid(void) {	
-		gridInfo.GridDimensions = 2;		//Default value
-	};
-
-	~Grid(void){
-	};	
 
 	//Geometric properties computation
 	std::vector<Face> ObtainFaces(Cell* cell);
@@ -255,21 +283,38 @@ public:
 	//Build alglib kdtree for all boundary nodes
 	void BuildBoundaryKDTree(Patch& patch);
 
+	//Partition grid
+	void PartitionGrid(std::shared_ptr<ParallelManager>);
+
 	//Generate local cells given partitioning
-	void GenerateLocalCells(int rank, std::vector<int>& cellsPart);
+	void GenerateLocalCells(int rank, const std::vector<int>& cellsPart);
+
+	//Generate local faces given partitioning
+	void GenerateLocalFaces(int rank);	
 
 	//Update geometric properties of cells and faces
 	void UpdateGeometricProperties();
 
-	//Generate local faces given partitioning
-	void GenerateLocalFaces();	
-
 	//Construct patches (fill in nodes and faces)
 	bool ConstructAndCheckPatches();
 
+	//Refactored grid implementation
+	GridStructure gridStructure; //Public information of grid structure
+
+	//Constructors
+	Grid() {
+		gridStructure.Initialized = false;
+	};
+	Grid(std::shared_ptr<ParallelManager> MPIManager) : _MPIManager(MPIManager) {
+		gridStructure.Initialized = false;
+	};
+
+	void GenerateLocalCells();	//Generate local cells given partitioning
+	void GenerateLocalFaces();	//Generate local faces given partitioning
+	void GenerateLocalGrid();	//Generate local part of grid
+	//void PartitionGrid();		//Partition grid
+	
 };
-
-
 
 /// Implementation part
 //  Build alglib kdtree for all boundary nodes
@@ -292,10 +337,35 @@ void Grid::BuildBoundaryKDTree(Patch& patch) {
 	alglib::kdtreebuild(a, nx, ny, normtype, patch.kdt);		
 };
 
-
 //Generate local cells given partitioning and processor rank
-void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
+void Grid::GenerateLocalCells(int rank, const std::vector<int>& cellsPart) {
+	cellsPartitioning.resize(nProperCells);	
+
+	//Add dummy cells
+	for (int i = nProperCells; i<nCells; i++) {
+		Cell* cell = &Cells[i];
+		int neigbour = cell->NeigbourCells[0];
+		int p = cellsPartitioning[neigbour];
+		cellsPartitioning.push_back(p);			
+	};
+
+	//Extract local cells indexes		
+	int count = 0;
 	localCells.clear();
+	localCellIndexes.clear();
+	for (int i = 0; i<nCells; i++) {
+		if ((cellsPart[i] == rank) && (!Cells[i].IsDummy)) {
+			localCells.push_back(&Cells[i]);
+			localCellIndexes.push_back(i);				
+		};
+	};		
+	nCellsLocal = localCellIndexes.size(); //Without dummy cells
+	for (int i = 0; i<nCells; i++) {
+		if ((cellsPart[i] == rank) && (Cells[i].IsDummy)) {
+			localCells.push_back(&Cells[i]);
+			localCellIndexes.push_back(i);
+		};
+	};		
 
 	//Assign local indexes
 	int localIndex = 0;
@@ -318,9 +388,105 @@ void Grid::GenerateLocalCells(int rank, std::vector<int>& cellsPart) {
 	};	
 };
 
-//Generate local faces 
-void Grid::GenerateLocalFaces() {
+//Generate local faces
+void Grid::GenerateLocalFaces(int rank) {
+	//Create faces		
+	localFaces.clear();
+	int faceIndex = 0;
+	std::map<std::set<int>, int> faces;	//Face nodes to face index		
+	for (int i = 0; i < localCellIndexes.size(); i++) {
+		//Generate all faces for the cell
+		Cell* cell = localCells[i];		
+		std::vector<Face> newFaces;
+		if (!cell->IsDummy) {
+			newFaces = ObtainFaces(cell);
+		} else {
+			Face boundaryFace;
+			boundaryFace.CGNSType = cell->CGNSType;
+			boundaryFace.FaceNodes = cell->Nodes;
+			boundaryFace.BCMarker = cell->BCMarker;
+			newFaces.clear();
+			newFaces.push_back(boundaryFace);
+		};
+		for (int j = 0; j<newFaces.size(); j++) {
+			Face& face = newFaces[j];				
+			std::set<int> nodes(face.FaceNodes.begin(), face.FaceNodes.end());
+			std::pair<std::set<int>, int> newFaceInfo(nodes, 0);
+			std::pair<std::map<std::set<int>, int>::iterator, bool> result = faces.insert( newFaceInfo );				
+			//Add face and save connectivity info
+			if ( result.second ) {	
+				face.GlobalIndex = faceIndex;
+				result.first->second = face.GlobalIndex;
+				localFaces.push_back(face);
+				localFaces[faceIndex].isExternal = true;
+				//localFaces[faceIndex].FaceCell_1 = i;
+				localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
+				localCells[i]->Faces.push_back(face.GlobalIndex);
+				faceIndex++;
+			} else {					
+				int fIndex = result.first->second;
+				localFaces[fIndex].isExternal = false;
+				if (cell->IsDummy) {
+					localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+				} else {
+					//localFaces[faceIndex].FaceCell_2 = i;
+					localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+				};
+				localCells[i]->Faces.push_back(fIndex);
+			};
+		};
+	};
 
+	//Finish generating external interprocessor faces
+	std::stringstream msg;
+	msg.clear();
+	int nExternal = 0;
+	for (Face& face : localFaces) if (face.isExternal) {
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
+		int faceNodes = face.FaceNodes.size();
+		//msg<<"faceNodes = "<<faceNodes<<"\n";
+		Cell& cell = Cells[face.FaceCell_1];
+		for (int nCellID : cell.NeigbourCells) {
+			//msg<<"nCellID = "<<faceNodes<<"\n";
+			Cell& nCell = Cells[nCellID];
+			int nCommonNodes = 0;
+			std::set<int> cellNodes;
+			for (int cellNodeID : nCell.Nodes) {
+				cellNodes.insert(cellNodeID);
+				//Handle periodic
+				if (periodicNodesIdentityList.find(cellNodeID) != periodicNodesIdentityList.end()) {
+					cellNodes.insert(periodicNodesIdentityList[cellNodeID].begin(), periodicNodesIdentityList[cellNodeID].end());
+				};
+				//msg<<"cellNodeID = "<<cellNodeID<<"\n";
+			};
+			for (int nodeID : face.FaceNodes) {
+				//msg<<"nodeID = "<<nodeID<<"\n";
+				if (cellNodes.find(nodeID) != cellNodes.end()) nCommonNodes++;
+			};
+			if (nCommonNodes == faceNodes) {
+				//We found second cell
+				if (GetCellPart(nCellID) == rank) {
+					face.isExternal = false;
+				} else {
+					face.isExternal = true; nExternal++;
+				};
+				face.FaceCell_2 = nCellID;
+				break;
+			};
+		};
+		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
+	};
+
+	nFaces = faceIndex;	
+};
+
+//Generate local part of grid
+void Grid::GenerateLocalGrid() {
+	if (!gridStructure.Initialized) throw new Exception("Grid wasn't initialized properly before calling GenerateLocalGrid()");
+	GenerateLocalCells();
+	GenerateLocalFaces();
+	UpdateGeometricProperties();
 };
 
 //Given type of element and nodes fill the properties of cell
@@ -725,8 +891,8 @@ void Grid::UpdateGeometricProperties() {
 	};
 };
 
-//Check that all boundary markers are set to some patchs
-//And fill in information about nodes and faces
+/* Check that all boundary markers are set to some patchs 
+And fill in information about nodes and faces */
 bool Grid::ConstructAndCheckPatches() {
 	bool checkResult = true;
 	std::vector<std::string> reasons;	
@@ -749,6 +915,235 @@ bool Grid::ConstructAndCheckPatches() {
 		};
 	};
 	return checkResult;
+};
+
+//New grid implementation
+
+//Partition grid
+void Grid::PartitionGrid(std::shared_ptr<ParallelManager> pHelper) {
+	_MPIManager = std::shared_ptr<ParallelManager>(pHelper);
+	gridStructure.np = _MPIManager->np();
+	gridStructure.rank = _MPIManager->rank();
+
+	//Partitioning settings
+	idx_t *vwgt = NULL; //No vertex weights for now
+	idx_t *adjwgt = NULL; //No edge weights for now
+					
+	/* This is used to indicate if the graph is weighted. wgtflag can take one of four values:
+	0 No weights (vwgt and adjwgt are both NULL).
+	1 Weights on the edges only (vwgt is NULL).
+	2 Weights on the vertices only (adjwgt is NULL).
+	3 Weights on both the vertices and edges. 	*/
+	idx_t wgtflag = 0; 
+
+	idx_t numflag = 0; //C-style numeration
+
+	/* This is used to specify the number of weights that each vertex has. It is also the number of balance
+	constraints that must be satisfied.	*/
+	idx_t ncon = 1;
+
+	//Number of subdomains desired
+	idx_t nparts = gridStructure.np; 
+
+	/* An array of size ncon  nparts that is used to specify the fraction of vertex weight that should
+	be distributed to each sub-domain for each balance constraint. If all of the sub-domains are to be of
+	the same size for every vertex weight, then each of the ncon  nparts elements should be set to
+	a value of 1/nparts. If ncon is greater than 1, the target sub-domain weights for each sub-domain
+	are stored contiguously (similar to the vwgt array). Note that the sum of all of the tpwgts for a
+	give vertex weight should be one. */
+	std::vector<real_t> tpwgts(ncon*nparts);
+	for (int i = 0; i<nparts; i++) tpwgts[i] = 1.0/nparts;
+
+	/* An array of size ncon that is used to specify the imbalance tolerance for each vertex weight, with 1
+	being perfect balance and nparts being perfect imbalance. A value of 1.05 for each of the ncon
+	weights is recommended. */
+	std::vector<real_t> ubvec(ncon);	// imbalance tolerance for each vertex weight,
+	ubvec[0] = 1.02;					// recomended default value 
+
+	//Algoritm options for displaing information
+	idx_t options[3];
+	options[0] = 0; //No information and default values
+
+	idx_t edgecut;	//Upon successful completion, the number of edges that are cut by the partitioning is written to this parameter.
+
+	/* This is an array of size equal to the number of locally-stored vertices. Upon successful completion the
+	partition vector of the locally-stored vertices is written to this array. (See discussion in Section 4.2.4). */		 
+	std::vector<idx_t> part(nCellsLocal);
+
+	//Call partitioning function		
+	MPI_Comm _comm = pHelper->comm();
+	pHelper->Barrier();
+	if (gridStructure.np < nProperCells) { //Make sure that partitioning is needed
+		int result = ParMETIS_V3_PartKway(&vdist[0], &xadj[0], adjncy._Myfirst, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, &tpwgts[0], &ubvec[0], options, &edgecut, &part[0], &_comm);			
+		if (result != METIS_OK) {
+			throw new Exception("ParMETIS_V3_PartKway failed.");
+		};							
+	};
+
+	//Gather partitioning on every processor
+	std::vector<int> recvcounts(gridStructure.np);
+	for (int i = 0; i<gridStructure.np; i++) {
+		recvcounts[i] = vdist[i+1] - vdist[i];
+	};
+		
+	/*msg.clear();
+	msg<<part.size()<<"\n";
+	_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	
+
+	msg.clear();
+	msg<<"recvcounts[] = \n";
+	for (int i = 0; i<_nProcessors; i++) msg<<recvcounts[i]<<" ";
+	msg<<"\n";
+
+	_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());	*/
+	_MPIManager->Allgatherv<int, MPI_INT>( part, recvcounts, cellsPartitioning);
+
+	GenerateLocalCells(pHelper->rank(), cellsPartitioning);
+
+	//Synchronize		
+	pHelper->Barrier();
+};
+
+//Generate local cells given partitioning and processor rank
+void Grid::GenerateLocalCells() {
+	//Add dummy cells
+	//for (int i = nProperCells; i<nCells; i++) {
+	//	Cell* cell = &Cells[i];
+	//	int neigbour = cell->NeigbourCells[0];
+	//	int p = gridStructure.cellsPart[neigbour];
+	//	gridStructure.cellsPart.push_back(p);			
+	//};
+
+	////Extract local cells indexes		
+	//int count = 0;
+	//localCells.clear();
+	//localCellIndexes.clear();
+	//for (int i = 0; i<nCells; i++) {
+	//	if ((gridStructure.cellsPart[i] == gridStructure.rank) && (!gridStructure.cells[i].IsDummy)) {
+	//		localCells.push_back(&Cells[i]);
+	//		localCellIndexes.push_back(i);				
+	//	};
+	//};		
+	//nCellsLocal = localCellIndexes.size(); //Without dummy cells
+	//for (int i = 0; i<nCells; i++) {
+	//	if ((gridStructure.cellsPart[i] == gridStructure.rank) && (gridStructure.cells[i].IsDummy)) {
+	//		localCells.push_back(&Cells[i]);
+	//		localCellIndexes.push_back(i);
+	//	};
+	//};		
+
+	////Assign local indexes
+	//int localIndex = 0;
+	//for (int i = 0; i<cellsPart.size(); i++) {
+	//	if (cellsPart[i] == rank) {
+	//		Cell* newCell = &Cells[i];			
+	//		localCells.push_back(newCell);
+	//		cellsGlobalToLocal[i] = localIndex++;
+	//	};
+	//};
+
+	////Create local cells
+	//localCells.resize(localCellIndexes.size());		
+	//for (int i = 0; i < localCellIndexes.size(); i++) {	
+	//	int cellGlobalIndex = localCellIndexes[i];
+	//	int cellLocalIndex = i;
+	//	localCells[i] = &Cells[cellGlobalIndex];	
+	//	localCells[i]->Faces.clear();
+	//	cellsGlobalToLocal[cellGlobalIndex] = cellLocalIndex;
+	//};	
+};
+
+//Generate local faces
+void Grid::GenerateLocalFaces() {
+	//Create faces		
+	//localFaces.clear();
+	//int faceIndex = 0;
+	//std::map<std::set<int>, int> faces;	//Face nodes to face index		
+	//for (int i = 0; i < localCellIndexes.size(); i++) {
+	//	//Generate all faces for the cell
+	//	Cell* cell = localCells[i];		
+	//	std::vector<Face> newFaces;
+	//	if (!cell->IsDummy) {
+	//		newFaces = ObtainFaces(cell);
+	//	} else {
+	//		Face boundaryFace;
+	//		boundaryFace.CGNSType = cell->CGNSType;
+	//		boundaryFace.FaceNodes = cell->Nodes;
+	//		boundaryFace.BCMarker = cell->BCMarker;
+	//		newFaces.clear();
+	//		newFaces.push_back(boundaryFace);
+	//	};
+	//	for (int j = 0; j<newFaces.size(); j++) {
+	//		Face& face = newFaces[j];				
+	//		std::set<int> nodes(face.FaceNodes.begin(), face.FaceNodes.end());
+	//		std::pair<std::set<int>, int> newFaceInfo(nodes, 0);
+	//		std::pair<std::map<std::set<int>, int>::iterator, bool> result = faces.insert( newFaceInfo );				
+	//		//Add face and save connectivity info
+	//		if ( result.second ) {	
+	//			face.GlobalIndex = faceIndex;
+	//			result.first->second = face.GlobalIndex;
+	//			localFaces.push_back(face);
+	//			localFaces[faceIndex].isExternal = true;
+	//			//localFaces[faceIndex].FaceCell_1 = i;
+	//			localFaces[faceIndex].FaceCell_1 = cell->GlobalIndex;
+	//			localCells[i]->Faces.push_back(face.GlobalIndex);
+	//			faceIndex++;
+	//		} else {					
+	//			int fIndex = result.first->second;
+	//			localFaces[fIndex].isExternal = false;
+	//			if (cell->IsDummy) {
+	//				localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+	//			} else {
+	//				//localFaces[faceIndex].FaceCell_2 = i;
+	//				localFaces[fIndex].FaceCell_2 = cell->GlobalIndex;
+	//			};
+	//			localCells[i]->Faces.push_back(fIndex);
+	//		};
+	//	};
+	//};
+
+	////Finish generating external interprocessor faces
+	//std::stringstream msg;
+	//msg.clear();
+	//int nExternal = 0;
+	//for (Face& face : localFaces) if (face.isExternal) {
+	//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External faceID ", face.GlobalIndex);				
+	//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_1 ", face.FaceCell_1);
+	//	int faceNodes = face.FaceNodes.size();
+	//	//msg<<"faceNodes = "<<faceNodes<<"\n";
+	//	Cell& cell = Cells[face.FaceCell_1];
+	//	for (int nCellID : cell.NeigbourCells) {
+	//		//msg<<"nCellID = "<<faceNodes<<"\n";
+	//		Cell& nCell = Cells[nCellID];
+	//		int nCommonNodes = 0;
+	//		std::set<int> cellNodes;
+	//		for (int cellNodeID : nCell.Nodes) {
+	//			cellNodes.insert(cellNodeID);
+	//			//Handle periodic
+	//			if (periodicNodesIdentityList.find(cellNodeID) != periodicNodesIdentityList.end()) {
+	//				cellNodes.insert(periodicNodesIdentityList[cellNodeID].begin(), periodicNodesIdentityList[cellNodeID].end());
+	//			};
+	//			//msg<<"cellNodeID = "<<cellNodeID<<"\n";
+	//		};
+	//		for (int nodeID : face.FaceNodes) {
+	//			//msg<<"nodeID = "<<nodeID<<"\n";
+	//			if (cellNodes.find(nodeID) != cellNodes.end()) nCommonNodes++;
+	//		};
+	//		if (nCommonNodes == faceNodes) {
+	//			//We found second cell
+	//			if (GetCellPart(nCellID) == rank) {
+	//				face.isExternal = false;
+	//			} else {
+	//				face.isExternal = true; nExternal++;
+	//			};
+	//			face.FaceCell_2 = nCellID;
+	//			break;
+	//		};
+	//	};
+	//	//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "External face FaceCell_2 ", face.FaceCell_2);
+	//};
+
+	//nFaces = faceIndex;	
 };
 
 #endif
