@@ -21,7 +21,7 @@ public:
 	using RiemannSolver::RiemannSolver; //Inherit constructor
 
 	//Check gas models
-	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) {
+	virtual bool BindGasModels(std::vector<std::shared_ptr<GasModel>>& gasModels) {
 		bool isCorrect = true;
 
 		//Pointer to perfect gas model
@@ -29,9 +29,9 @@ public:
 		std::vector<double> gammas;
 
 		//Only several perfect gas models with common value of gamma allowed
-		for (GasModel* gasModel : gasModels) {
+		for (std::shared_ptr<GasModel> gasModel : gasModels) {
 			//Check if it's perfect gas 
-			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel)) {
+			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel.get())) {
 				//and save gamma value
 				gammas.push_back(perfectGasModel->Gamma);
 			} else {

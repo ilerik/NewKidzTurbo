@@ -7,7 +7,7 @@
 #include <cassert>
 #include <functional>
 
-Grid GenGrid2DUniform(std::shared_ptr<ParallelManager> MPIManager, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX = false, bool periodicY = false)
+Grid GenGrid2DUniform(std::shared_ptr<ParallelManager> MPIManager, int N, int M, double x_min, double x_max, double y_min, double y_max , double q_x, double q_y, bool periodicX, bool periodicY)
 {
 	Grid g(MPIManager);
 	double size_x = x_max - x_min;

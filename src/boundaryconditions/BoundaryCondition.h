@@ -27,8 +27,8 @@ namespace BoundaryConditions {
 	class BoundaryCondition {
 	public:	
 		int _nmat; //Gas model index
-		Grid* _grid;
-		std::vector<GasModel*> _gasModels;
+		std::shared_ptr<Grid> _grid;
+		std::vector<std::shared_ptr<GasModel>> _gasModels;
 	
 		//Result types
 		std::vector<BoundaryConditionResultType> bcResultTypes;
@@ -44,11 +44,11 @@ namespace BoundaryConditions {
 		};*/
 		virtual std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) = 0;	
 
-		virtual void setGrid(Grid& grid) {
-			_grid = &grid;
+		virtual void setGrid(std::shared_ptr<Grid>& grid) {
+			_grid = grid;
 		};
 
-		virtual void setGasModel(std::vector<GasModel*>& gasModels) {
+		virtual void setGasModel(std::vector<std::shared_ptr<GasModel>>& gasModels) {
 			_gasModels = gasModels;
 		};
 

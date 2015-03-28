@@ -360,6 +360,9 @@
     <ClInclude Include="src\testcases\RiemannProblemTests\TestCase1D_SodShockTube.h">
       <Filter>Header Files\TestCases\RiemannProblemTests</Filter>
     </ClInclude>
+    <ClInclude Include="src\gridgeneration\GenGrid1DUniform.h">
+      <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

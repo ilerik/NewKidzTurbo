@@ -10,6 +10,7 @@
 class ParallelHelper {
 	std::chrono::high_resolution_clock::duration _idleDuration; //total idle time
 	bool isInitilized; //was MPI initialization successful
+	bool _isMain; //was MPI initialization successful
 	int _nProcessors; //total number of processes
 	int _rank;  //current processor rank in _comm
 	MPI_Comm _comm;	//global communicator
@@ -34,6 +35,7 @@ public:
 
 	//Constructor
 	ParallelHelper() {
+		_isMain = false;
 		isInitilized = false;
 	};
 
@@ -44,6 +46,7 @@ public:
 		MPI_Comm_size(_comm, &_nProcessors);
 		MPI_Comm_rank(_comm, &_rank);
 		isInitilized = true;
+		_isMain = true;
 		_idleDuration = std::chrono::high_resolution_clock::duration(0);
 	};
 
@@ -53,12 +56,13 @@ public:
 		if (result != MPI_SUCCESS) throw new Exception("Init failed");
 		MPI_Comm_rank(_comm, &_rank);
 		isInitilized = true;
+		_isMain = false;
 		_idleDuration = std::chrono::high_resolution_clock::duration(0);
 	};
 
 	//Finilize MPI programm
 	void Finalize() {
-		MPI_Finalize();
+		if (_isMain) MPI_Finalize();
 		isInitilized = false;
 	};
 

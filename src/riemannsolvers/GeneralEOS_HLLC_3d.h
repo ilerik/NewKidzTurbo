@@ -13,9 +13,9 @@ public:
 	using RiemannSolver::RiemannSolver; //Inherit constructor
 
 	//Check gas models
-	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) {
+	virtual bool BindGasModels(std::vector<std::shared_ptr<GasModel>>& gasModels) {
 		bool isCorrect = true;
-		for (GasModel* gasModel : gasModels) {
+		for (std::shared_ptr<GasModel> gasModel : gasModels) {
 			//Check if number of conservative variables is equal to 5
 			if (gasModel->nConservativeVariables != 5) {
 				isCorrect = false;

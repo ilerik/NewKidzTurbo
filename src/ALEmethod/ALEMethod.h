@@ -98,7 +98,7 @@ public:
 	};
 
 	//Compute face velocity
-	Vector ComputeFaceVelocity(GasModel* gasModelLeft, const GasModel::ConservativeVariables& UL, GasModel* gasModelRight, const GasModel::ConservativeVariables& UR, const Face& f, double ALEindicator) {
+	Vector ComputeFaceVelocity(std::shared_ptr<GasModel>& gasModelLeft, const GasModel::ConservativeVariables& UL, std::shared_ptr<GasModel>& gasModelRight, const GasModel::ConservativeVariables& UR, const Face& f, double ALEindicator) {
 		Vector faceVelocity;
 		if (ALEindicator == 0) {
 			faceVelocity = Vector(0,0,0);

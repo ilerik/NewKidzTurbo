@@ -21,10 +21,10 @@ public:
 //Base class for all riemann solvers
 class RiemannSolver {	
 protected:
-	std::vector<GasModel*> _gasModels; //Link to gasmodel to use
+	std::vector<std::shared_ptr<GasModel>> _gasModels; //Link to gasmodel to use
 public:	
 	//Check gas models and bind them to solver
-	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) = 0;
+	virtual bool BindGasModels(std::vector<std::shared_ptr<GasModel>>& gasModels) = 0;
 
 	//Load settings from configuration object
 	virtual bool loadConfiguration(Logger* logger, RiemannSolverConfiguration configuration) = 0;

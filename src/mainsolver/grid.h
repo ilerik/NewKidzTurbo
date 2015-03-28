@@ -191,9 +191,9 @@ public:
 	int nProperCellsLocal;  //Number of local non dummy cells
 	int nCellsLocal;		//Number of local cells (including dummy)
 	int nFacesLocal;		//Number of local faces
-	std::vector<std::shared_ptr<Cell> > localNodes;
-	std::vector<std::shared_ptr<Cell> > localFaces;
-	std::vector<std::shared_ptr<Cell> > localCells;
+	//std::vector<std::shared_ptr<Cell> > localNodes;
+	//std::vector<std::shared_ptr<Cell> > localFaces;
+	//std::vector<std::shared_ptr<Cell> > localCells;
 };
 
 class Grid

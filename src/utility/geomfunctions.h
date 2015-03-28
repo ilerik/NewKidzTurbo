@@ -21,18 +21,15 @@ double ComputeElementMeasure() {
 };
 
 //Compute gradient using least squares
-Vector ComputeGradientByPoints(Vector point, double value, const std::vector<Vector>& points, const std::vector<double>& values) {
-		Vector grad;		
+Vector ComputeGradientByPoints(int nDims, Vector point, double value, const std::vector<Vector>& points, const std::vector<double>& values, bool& status) {
+		Vector grad;	
+		status = true;	
 
-		//Build matrix (depends only on grid)
-		/*alglib::real_1d_array rhs;
-		alglib::real_1d_array x;
-		alglib::ae_int_t info;
-		alglib::densesolverlsreport rep;
-		alglib::real_2d_array matrix;*/
+		//Check 
+		assert(nDims <= points.size());
 		
 		//Input
-		int n = 3; //Number of dimensions (unknowns)
+		int n = nDims; //Number of dimensions (unknowns)
 		int nPoints = points.size(); 
 		int m = nPoints; //Number of equations
 		int nrhs = 1; //Number of right hand side
@@ -49,23 +46,17 @@ Vector ComputeGradientByPoints(Vector point, double value, const std::vector<Vec
 		int _info;
 		int rank;				
 				
-		//matrix.setlength(points.size(), 3);
+		//Build matrix (depends only on grid)
 		for (int i = 0; i<points.size(); i++) {			
-			Vector dr = point - points[i];
-			/*matrix[i][0] = dr.x;
-			matrix[i][1] = dr.y;
-			matrix[i][2] = dr.z;*/
-
+			Vector dr = point - points[i];			
 			a[i + 0*lda] = dr.x;
-			a[i + 1*lda] = dr.y;
-			a[i + 2*lda] = dr.z;
+			if (nDims > 1) a[i + 1*lda] = dr.y;
+			if (nDims > 2) a[i + 2*lda] = dr.z;
 		};
 
-		//rhs.setlength(points.size());		
+		//Fill RHS
 		for (int i = 0; i<points.size(); i++) {						
-			double dU = value - values[i];
-			//rhs[i] = dU;
-
+			double dU = value - values[i];			
 			b[0 * ldb + i] = dU;
 		};
 
@@ -76,28 +67,14 @@ Vector ComputeGradientByPoints(Vector point, double value, const std::vector<Vec
 
 		//Solve problem
 		dgelsy(&m, &n, &nrhs, &a[0], &lda, &b[0], &ldb, &jpvt[0], &rcond, &rank, &work[0], &lwork, &_info);
-		if (_info != 0) throw Exception("Could not solve for gradient");
-		grad = Vector(b[0], b[1], b[2]);
-		//std::cout<<"grad = "<<grad.x<<" "<<grad.y<<" "<<grad.z<<"\n";
-
-		/*x.setlength(3);
-		alglib::rmatrixsolvels(matrix, points.size(), 3, rhs, 0.0, info, rep, x);
-		if (info != 1) throw Exception("Could not solve for gradient");
-		grad = Vector(x[0], x[1], x[2]);	*/
-		//std::cout<<"grad_old = "<<grad.x<<" "<<grad.y<<" "<<grad.z<<"\n";
-
-		//Output for check
-	/*	std::cout<<"Matrix\n";
-		for (int i = 0; i<points.size(); i++) {			
-			Vector dr = point - points[i];
-			std::cout<<dr.x<<" "<<dr.y<<" "<<dr.z<<"\n";			
+		if (_info != 0) {
+			status = false;
+			//throw Exception("Could not solve for gradient");
 		};
-		std::cout<<"RHS\n";		
-		for (int i = 0; i<points.size(); i++) {						
-			double dU = value - values[i];
-			std::cout<<dU<<"\n";	
-		};*/
-
+		grad = Vector(b[0], 0, 0);
+		if (nDims > 1) grad.y = b[1];
+		if (nDims > 2) grad.z = b[2];
+		
 		return grad;
 	};
 

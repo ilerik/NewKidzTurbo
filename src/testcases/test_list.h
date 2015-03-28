@@ -8,7 +8,8 @@
 //#include "testcases\RMInstabilityTests\RMITest_1.h"
 //#include "testcases\RMInstabilityTests\RMITest_ALE_1.h"
 
-#include "testcases\RTInstabilityTests\RTInstabilityTestCase.h"
+//#include "testcases\RTInstabilityTests\RTInstabilityTestCase.h"
+#include "testcases\RiemannProblemTests\TestCase1D_SodShockTube.h"
 
 //#include "testcases\MetalsCollisionTests\MetalsImpact1DTestCase.h"
 //#include "testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h"

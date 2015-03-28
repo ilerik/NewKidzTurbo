@@ -80,7 +80,7 @@ public:
 		return sqrt(x*x+y*y+z*z);
 	};
 
-	double& operator[](int i) {
+	inline double& operator[](int i) {
 		if (i == 0) return x;
 		if (i == 1) return y;
 		if (i == 2) return z;
@@ -356,6 +356,13 @@ template<class T>
 std::vector<T> operator/(const std::vector<T>& a, const double c) {	
 	std::vector<T> res(a.size());
 	for (int i = 0; i<a.size(); i++) res[i] = a[i] / c;
+	return res;
+};
+
+template<class T>
+std::vector<double> operator*(const std::vector<T>& a, const T c) {	
+	std::vector<double> res(a.size());
+	for (int i = 0; i<a.size(); i++) res[i] = a[i] * c;
 	return res;
 };
 

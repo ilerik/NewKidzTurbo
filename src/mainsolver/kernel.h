@@ -95,16 +95,13 @@ private:
 	Configuration _configuration;	
 
 	//Gas model (equations of state)
-	std::vector<GasModel*> _gasModels;	
+	std::vector<std::shared_ptr<GasModel> > _gasModels;	
 
 	//Sources (external forces, and so on)
 	std::unique_ptr<GravitySource> _sources;
 
 	//ALE data and logic
 	ALEMethod _ALEmethod;
-
-	//Spatial discretisation data and logic
-	std::unique_ptr<SpatialDiscretisation> _spatialDiscretisation;
 
 	//Solver (TO DO)
 	SimulationType_t _simulationType; //Simulation type
@@ -130,14 +127,14 @@ private:
 	int _nProcessors;
 
 	//Perfomance measurement helper
-	PerfomanceHelper _perfomanceHelper;
+	//PerfomanceHelper _perfomanceHelper;
 	Timer timerResidual;
 	Timer timerALE;
 	Timer timerConvective;
 
 	//Boundary conditions
 	std::map<int, int> _boundaryGasModelIndex;
-	std::map<int, BoundaryConditions::BoundaryCondition*> _boundaryConditions;
+	std::map<int, std::unique_ptr<BoundaryConditions::BoundaryCondition> > _boundaryConditions;
 
 	//Internal storage		
 	int nVariables; //number of variables in each cell
@@ -167,6 +164,8 @@ public:
 
 	//History logger
 	inline void setStepHistoryLogger(StepHistoryLogger* logger) {
+		return;
+
 		//Delete if exists
 		if (_stepHistoryLogger != NULL) {
 			_stepHistoryLogger->Finalize();
@@ -175,7 +174,7 @@ public:
 
 		//Properly attach object to kernel
 		_stepHistoryLogger = logger;
-		_stepHistoryLogger->setStepHistoryLoggerReferences(this, &_logger, &_grid, &_parallelHelper, &_gasModels);
+		//_stepHistoryLogger->setStepHistoryLoggerReferences(this, &_logger, &_grid, &_parallelHelper, &_gasModels);
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -196,7 +195,7 @@ public:
 			_nProcessors = _parallelHelper.getProcessorNumber();
 
 			//Initialize perfomance watching subsystem
-			_perfomanceHelper.Init(_parallelHelper);
+			//_perfomanceHelper.Init(_parallelHelper);
 
 			//Initialize loggin subsystem
 			_logfilename = "kernel"; //TO DO
@@ -225,7 +224,7 @@ public:
 		_cgnsWriter.Finalize();
 		_parallelHelper.Finalize();			
 		_logger.FinilizeLogging();
-		_perfomanceHelper.Finalize();
+		//_perfomanceHelper.Finalize();
 		return TURBO_OK;
 	};
 
@@ -243,13 +242,13 @@ public:
 			int gmIndex = _configuration.GasModelNameToIndex[pair.first];
 			std::string gmName = pair.second.GasModelName;
 			if (gmName == "PerfectGasModel") {
-				_gasModels[gmIndex] = new PerfectGasModel(_logger);				
+				_gasModels[gmIndex] = std::unique_ptr<GasModel>(new PerfectGasModel(_logger));				
 			};
 			if (gmName == "LomonosovFortovGasModel") {
-				_gasModels[gmIndex] = new LomonosovFortovGasModel(_logger);
+				_gasModels[gmIndex] = std::unique_ptr<GasModel>(new LomonosovFortovGasModel(_logger));
 			};
 			if (gmName == "BarotropicGasModel") {
-				_gasModels[gmIndex] = new BarotropicGasModel(_logger);
+				_gasModels[gmIndex] = std::unique_ptr<GasModel>(new BarotropicGasModel(_logger));
 			};
 
 			//Load configuration for gas model
@@ -257,7 +256,7 @@ public:
 		};
 
 		//TO DO set shifts instead of global nVariables constant
-		for (GasModel* gasModel : _gasModels) {			
+		for (std::shared_ptr<GasModel>& gasModel : _gasModels) {			
 			nVariables = gasModel->nConservativeVariables; //TO DO generalize for now equal number of conservative variables assumed
 		};
 
@@ -314,7 +313,7 @@ public:
 		};
 
 		//Spatial discretisation
-		_spatialDiscretisation = std::unique_ptr<SpatialDiscretisation>(new SpatialDiscretisation(_gridPtr));			
+		//_spatialDiscretisation = std::unique_ptr<SpatialDiscretisation>(new SpatialDiscretisation(_gridPtr));			
 
 		//Simulation settings
 		_simulationType = _configuration.SimulationType;
@@ -322,16 +321,20 @@ public:
 		RungeKuttaOrder = _configuration.RungeKuttaOrder;		
 
 		//ALE settings
+		bool isALEMovementSet = false;
 		_ALEmethod._moveHelper.meshMovementAlgorithm = _configuration.ALEConfiguration.MeshMovementAlgorithm;
 		if (_configuration.ALEConfiguration.ALEMotionType == "Eulerian") {
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureEulerian;		
+			isALEMovementSet = true;
 		};
 		if (_configuration.ALEConfiguration.ALEMotionType == "ALEMaterialInterfaces") {
-			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::ALEMaterialInterfaces;		
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::ALEMaterialInterfaces;	
+			isALEMovementSet = true;
 		};		
 		if (_configuration.ALEConfiguration.ALEMotionType == "Lagrangian") {		
-			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;				
-		}		
+			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;	
+			isALEMovementSet = true;
+		};
 		_ALEmethod.SetGrid(_grid);		
 
 		//Run settings
@@ -375,8 +378,6 @@ public:
 
 	turbo_errt RunCalculation() {
 		//Start phase
-		std::shared_ptr<PerfomancePhase> runCalculationPhase = _perfomanceHelper.RootPhase->CreateSubPhase("RunCalculation").lock();
-		runCalculationPhase->Start();
 
 		//Calculate snapshot times order of magnitude
 		int snapshotTimePrecision = 0;
@@ -388,17 +389,11 @@ public:
 		std::stringstream msg;	
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation started!");
 		//Create phases for time step calculations
-		std::shared_ptr<PerfomancePhase> computationPhase = runCalculationPhase->CreateSubPhase("Computation").lock();
-		std::shared_ptr<PerfomancePhase> snapshotsPhase = runCalculationPhase->CreateSubPhase("Snapshots").lock();
-		std::shared_ptr<PerfomancePhase> saveHistoryPhase = runCalculationPhase->CreateSubPhase("SaveHistory").lock();
 		for (stepInfo.Iteration = 0; stepInfo.Iteration <= MaxIteration; stepInfo.Iteration++) {
 			//Perform timestep
-			computationPhase->Start();
 			ExplicitTimeStep();
-			computationPhase->Stop();
 
 			//Solution snapshots
-			snapshotsPhase->Start();
 
 			//Every few iterations
 			if ((SaveSolutionSnapshotIterations != 0) && (stepInfo.Iteration % SaveSolutionSnapshotIterations) == 0) {
@@ -424,12 +419,9 @@ public:
 				//Adjust next snapshot time
 				NextSnapshotTime += SaveSolutionSnapshotTime;
 			};
-			snapshotsPhase->Stop();
 
 			//Save history
-			saveHistoryPhase->Start();
 			if (_stepHistoryLogger != NULL) _stepHistoryLogger->SaveHistory();
-			saveHistoryPhase->Stop();
 
 			//Output step information
 			msg.clear();
@@ -462,31 +454,20 @@ public:
 			};
 
 			//Synchronize
-			runCalculationPhase->Sync();
+			_parallelHelper.Barrier();
 		};
 
 		//Synchronize
-		runCalculationPhase->StopAndSync();
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Calculation finished!");	
 
 		//Output total run time
 		msg.str(std::string());
-		msg<<runCalculationPhase->GetTotalTimeMilliseconds();
-		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Total work time = " + msg.str() + " seconds.");	
+		/*msg<<runCalculationPhase->GetTotalTimeMilliseconds();
+		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Total work time = " + msg.str() + " seconds.");	*/
 		return TURBO_OK;
 	};
 
 	turbo_errt FinalizeCalculation() {
-		//Free memory		
-
-		//Boundary conditions
-		for (std::pair<int, BoundaryConditions::BoundaryCondition*> p : _boundaryConditions) {
-			delete (p.second);
-		};
-
-		//Riemann solver
-		if (rSolver != NULL) delete rSolver;
-
 		//History logging
 		if (_stepHistoryLogger != NULL) {
 			_stepHistoryLogger->Finalize();
@@ -517,11 +498,9 @@ public:
 	}
 
 	//Bind existing grid to kernel
-	turbo_errt BindGrid(Grid* grid) {
-		_grid = *grid;
-		_gridPtr = std::shared_ptr<Grid>(&_grid);
-		//PartitionGrid(_grid);
-		GenerateGridGeometry(_grid);
+	turbo_errt BindGrid(std::shared_ptr<Grid>& grid) {
+		_grid = *grid.get();
+		_gridPtr = grid;
 		return TURBO_OK;
 	};
 
@@ -704,7 +683,7 @@ public:
 		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Request formation finished");	
 
 		//Init exchange
-		_parallelHelper.InitExchange(_gasModels);
+		//_parallelHelper.InitExchange(_gasModels);
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -950,23 +929,19 @@ public:
 
 			BCType_t bcType = bcConfig.BoundaryConditionType;
 			if (bcType == BCType_t::BCSymmetryPlane) {				
-				BoundaryConditions::BCSymmetryPlane* bc = new BoundaryConditions::BCSymmetryPlane();
-				_boundaryConditions[bcMarker] = bc; 	
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCSymmetryPlane());
 				bcTypeCheckPassed = true;
 			};
 			if (bcType == BCType_t::BCOutflowSupersonic) {
-				BoundaryConditions::BCOutflowSupersonic* bc = new BoundaryConditions::BCOutflowSupersonic();
-				_boundaryConditions[bcMarker] = bc; 
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCOutflowSupersonic());
 				bcTypeCheckPassed = true;
 			};
 			if (bcType == BCType_t::BCInflowSupersonic) {
-				BoundaryConditions::BCInflowSupersonic* bc = new BoundaryConditions::BCInflowSupersonic();
-				_boundaryConditions[bcMarker] = bc;
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCInflowSupersonic());
 				bcTypeCheckPassed = true;
 			};
 			if (bcType == BCType_t::BCGeneral) {
-				BoundaryConditions::BCGeneral* bc = new BoundaryConditions::BCGeneral();
-				_boundaryConditions[bcMarker] = bc;
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCGeneral());
 				bcTypeCheckPassed = true;
 			};
 
@@ -978,7 +953,7 @@ public:
 				return turbo_errt::TURBO_ERROR;			
 			} else {
 				//Attach needed data structures to boundary condition class
-				_boundaryConditions[bcMarker]->setGrid(_grid);
+				_boundaryConditions[bcMarker]->setGrid(_gridPtr);
 				_boundaryConditions[bcMarker]->setGasModel(_gasModels);
 				_boundaryConditions[bcMarker]->setMaterialIndex(materialIndex);
 
@@ -1038,7 +1013,7 @@ public:
 
 	turbo_errt GenerateInitialConditions(InitialConditions::InitialConditions* initConditions) {
 		//Attach data structures
-		initConditions->setGrid(_grid);
+		initConditions->setGrid(_gridPtr);
 		initConditions->setGasModel(_gasModels);
 				
 		//For each local cell write initial conditions
@@ -1238,19 +1213,29 @@ public:
 		//In every cell proper cell reconstruct solution
 		for (int localCellIndex = 0; localCellIndex < _grid.nCellsLocal; localCellIndex++) {
 			Cell* cell = _grid.localCells[localCellIndex];			  			
-			CellSpatialDiscretisation cellSpatial(cell);
+			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
+			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
 
 			//Compute stencil
-			std::vector<int> steincilIndexe = cellSpatial.CalculateStencil();
+			int rootMaterial = GetCellGasModelIndex(cell->GlobalIndex);
+
+			std::function<bool(Cell&)> isGoodCell = [&](Cell& c) {
+				//return (!c.IsDummy);
+				return (!c.IsDummy) && (GetCellGasModelIndex(c.GlobalIndex) == rootMaterial);
+			};
+
+			cellSpatial.CalculateStencil(isGoodCell);
 
 			//Gather cell values according to stencil
+			std::vector< int > stencilMaterials;
 			std::vector< std::vector<double> > stencilValues;				
-			for (int index : cellSpatial.stencil()) {				
-				stencilValues.push_back(std::vector<double>(cellValues.begin() + nv * localCellIndex, cellValues.begin() + nv * (localCellIndex + 1))); 
+			for (int index : cellSpatial.stencilIndexes()) {	
+				stencilMaterials.push_back( GetCellGasModelIndex(index) );
+				stencilValues.push_back(std::vector<double>(cellValues.begin() + nv * index, cellValues.begin() + nv * (index + 1))); 
 			};										
 
 			//Reconstruct solution
-			cellSpatial.ReconstructSolution(stencilValues);
+			cellSpatial.ReconstructSolution(stencilMaterials, stencilValues);
 
 			//Interpolate to every face
 			for (int faceIndex : cell->Faces) {
@@ -1311,8 +1296,8 @@ public:
 			//Solution reconstruction
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
-			GasModel::ConservativeVariables UL = cellValuesL[f.FaceCell_1];
-			GasModel::ConservativeVariables UR = cellValuesL[f.FaceCell_2];						
+			GasModel::ConservativeVariables UL = cellValuesL[f.GlobalIndex];
+			GasModel::ConservativeVariables UR = cellValuesR[f.GlobalIndex];						
 
 			//Determine face velocity
 			Vector faceVelocityAverage = Vector(0,0,0);
@@ -1331,7 +1316,7 @@ public:
 
 			//Compute flux exactly for Lagrangian interfaces				
 			if (ALEIndicator == 1.0) {
-				if (IsBoundaryFace(f)) result.Pressure = 1e5;
+				//if (IsBoundaryFace(f)) result.Pressure = 1e5;
 				result.Fluxes[0] = 0;
 				result.Fluxes[1] = f.FaceNormal.x * result.Pressure;
 				result.Fluxes[2] = f.FaceNormal.y * result.Pressure;
@@ -1342,52 +1327,6 @@ public:
 			//Store flux
 			fluxes[f.GlobalIndex] = result.Fluxes;								
 
-			/*msg.str("");		
-			msg<<"Flux for face = "<<f.GlobalIndex<<" Cell1 = "<<f.FaceCell_1<<" Cell2 = "<<f.FaceCell_2<<" computed. Flux = ("
-				<<flux[0]<<" , "<<flux[1]<<" , "<<flux[2]<<" , "<<flux[3]<<" , "<<flux[4]<<") FaceNormal = ("
-				<<f.FaceNormal.x<<","<<f.FaceNormal.y<<","<<f.FaceNormal.z<<")";
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/
-					
-			
-			//Vector dRL = f.FaceCenter - _grid.cells[f.FaceCell_1].CellCenter;
-			//if (f.isExternal) {				
-			//	//Apply boundary conditions
-			//	UL = cellValues[f.FaceCell_1]; 						
-			//	if (!IsSecondOrder) {
-			//		//Constant reconstruction
-			//	} else {
-			//		//Try linear reconstruction
-			//		dRL = Vector(0,0,0);
-			//		UL.ro = UL.ro + gradCellsRo[f.FaceCell_1] * dRL;
-			//		UL.rou = UL.rou + gradCellsRoU[f.FaceCell_1] * dRL;
-			//		UL.rov = UL.rov + gradCellsRoV[f.FaceCell_1] * dRL;
-			//		UL.row = UL.row + gradCellsRoW[f.FaceCell_1] * dRL;
-			//		UL.roE = UL.roE + gradCellsRoE[f.FaceCell_1] * dRL;
-			//	};
-			//	flux = _boundaryConditions[f.BCMarker]->ComputeConvectiveFlux(f, UL);				
-			//} else {
-			//	UL = cellValues[f.FaceCell_1];
-			//	UR = cellValues[f.FaceCell_2];	
-			//	if (!IsSecondOrder) {
-			//		//Constant reconstruction
-			//	} else {
-			//		//Try linear reconstruction					
-			//		UL.ro = UL.ro + gradCellsRo[f.FaceCell_1] * dRL;
-			//		UL.rou = UL.rou + gradCellsRoU[f.FaceCell_1] * dRL;
-			//		UL.rov = UL.rov + gradCellsRoV[f.FaceCell_1] * dRL;
-			//		UL.row = UL.row + gradCellsRoW[f.FaceCell_1] * dRL;
-			//		UL.roE = UL.roE + gradCellsRoE[f.FaceCell_1] * dRL;
-			//	
-			//		Vector dRR = f.FaceCenter - _grid.cells[f.FaceCell_2].CellCenter;					
-			//		UR.ro = UR.ro + gradCellsRo[f.FaceCell_2] * dRR;
-			//		UR.rou = UR.rou + gradCellsRoU[f.FaceCell_2] * dRR;
-			//		UR.rov = UR.rov + gradCellsRoV[f.FaceCell_2] * dRR;
-			//		UR.row = UR.row + gradCellsRoW[f.FaceCell_2] * dRR;
-			//		UR.roE = UR.roE + gradCellsRoE[f.FaceCell_2] * dRR;				
-			//	};
-			//	flux = rSolver.ComputeFlux( UL,  UR, f);
-			//};				
-				
 		};
 
 		//Synchronyze
@@ -1485,31 +1424,52 @@ public:
 		////Compute viscous fluxes
 		//ComputeViscousFluxes();	
 		
-		//Compute residual for each cell		
+		//Distribute residual to each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			//Get cell reference
+			Cell& cell = GetLocalCell(cellIndex);
+
+			//Nullify residual first
 			for (int i = 0; i < nVariables; i++) residual[cellIndex*nVariables + i] = 0;
-			std::vector<int>& nFaces = cell->Faces;
+
+			//For each face distribute
+			double sweptVolumeTotal = 0;
+			std::vector<int>& nFaces = cell.Faces;
 			for (int nFaceIndex : nFaces)
 			{
-				Face& face = _grid.localFaces[nFaceIndex];
-				int fluxDirection = (face.FaceCell_1 == cell->GlobalIndex) ? 1 : -1;		
+				//Get face reference
+				Face& face = GetLocalFace(nFaceIndex);
+				
+				//Determine direction
+				int fluxDirection = (face.FaceCell_1 == cell.GlobalIndex) ? 1 : -1;		
+
+				//Distribute face flux to cell
 				std::vector<double> fluxc = FaceFluxes[nFaceIndex];
-				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
 					residual[cellIndex * nVariables + j] +=  (fluxc[j]) * face.FaceSquare * fluxDirection;
 				};		
 
 				//Mesh deformation contribution (GCL part statisfied explicitly)
 				if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
-					double sweptVolume = _ALEmethod.facesVelocity[face.GlobalIndex] * face.FaceNormal * face.FaceSquare;
-					for (int j = 0; j<nVariables; j++) {						
-						residual[cellIndex * nVariables + j] += sweptVolume * cellValues[cellIndex * nVariables + j] * fluxDirection;
-					};					
+					//Compute volume swept by current face
+					double sweptVolume = _ALEmethod.facesVelocity[face.GlobalIndex] * face.FaceNormal * face.FaceSquare * fluxDirection;
+					sweptVolumeTotal += sweptVolume;
+
+					//Obtain cell values at moving face
+					std::vector<double>& values =  (face.FaceCell_1 == cell.GlobalIndex) ? cellValuesL[cellIndex] : cellValuesR[cellIndex];		
 				};
 			};
+
+			//Mesh deformation contribution (GCL part statisfied explicitly)
+			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
+				for (int j = 0; j<nVariables; j++) {
+					residual[cellIndex * nVariables + j] += cellValues[cellIndex * nVariables + j] * sweptVolumeTotal;
+				};			
+			}
 		};
+
+		
 
 		//Compute source term
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
@@ -1761,7 +1721,7 @@ public:
 	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
 		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
 		Cell& cell = _grid.Cells[globalIndex];						
-		return _boundaryConditions[cell.BCMarker];
+		return _boundaryConditions[cell.BCMarker].get();
 	};	
 
 	//Get cell gas model index
@@ -1834,8 +1794,12 @@ public:
 	inline void VerboseOff() { _isVerbose = false; };	
 
 	//Grid elements accessors
-	inline const Cell& GetLocalCell(int localIndex) {
+	inline Cell& GetLocalCell(int localIndex) {
 		return *_grid.localCells[localIndex];
+	};
+
+	inline Face& GetLocalFace(int localIndex) {
+		return _grid.localFaces[localIndex];
 	};
 
 	//Medium properties accessors

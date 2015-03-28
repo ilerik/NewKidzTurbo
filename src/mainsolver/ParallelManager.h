@@ -49,8 +49,26 @@ public:
 		if (_MPIinitialized) MPI_Finalize(); 
 	};
 
-	//Synchronisation primitives
+	//=============================== Synchronisation primitives =====================================
+
+	//Barrier synchronisation
 	void Barrier() {
+		auto before = std::chrono::high_resolution_clock::now();
+		MPI_Barrier(_comm);
+		auto after = std::chrono::high_resolution_clock::now();
+		_syncDuration += after - before; // update synchronisation time duration
+	};
+
+	//Send synchronisation signal to target process
+	void SendSignal(int rankDestination) {
+		auto before = std::chrono::high_resolution_clock::now();
+		MPI_Barrier(_comm);
+		auto after = std::chrono::high_resolution_clock::now();
+		_syncDuration += after - before; // update synchronisation time duration
+	};
+
+	//Blocking wait for synchronisation signal from source process
+	void WaitSignal(int rankSource) {
 		auto before = std::chrono::high_resolution_clock::now();
 		MPI_Barrier(_comm);
 		auto after = std::chrono::high_resolution_clock::now();

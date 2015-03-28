@@ -270,7 +270,7 @@ public:
 			_signedDistanceFunction
 			);
 
-		_kernel->BindGrid(&_grid);
+		_kernel->BindGrid(_grid);
 	};
 
 	//Initial materials distribution

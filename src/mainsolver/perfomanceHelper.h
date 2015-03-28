@@ -32,14 +32,14 @@ class PerfomancePhase {
 	inline double _getIdleTime() {
 		//using durationType = std::chrono::duration<double, PeriodType>;
 		//return std::chrono::duration_cast<durationType>(_idleDuration).count();
-		return std::chrono::duration_cast<std::chrono::duration<double, PeriodType>>(_idleDuration).count();
+		return std::chrono::duration_cast<std::chrono::duration<double, PeriodType> >(_idleDuration).count();
 	};
 
 	template <class PeriodType> 
 	inline double _getActiveTime() {
 		//using durationType = std::chrono::duration<double, PeriodType>;
 		//return std::chrono::duration_cast<durationType>(_activeDuration).count();
-		return std::chrono::duration_cast<std::chrono::duration<double, PeriodType>>(_activeDuration).count();
+		return std::chrono::duration_cast<std::chrono::duration<double, PeriodType> >(_activeDuration).count();
 	};
 
 public:

@@ -15,7 +15,7 @@ public:
 	using RiemannSolver::RiemannSolver; //Inherit constructor
 
 	//Check gas models
-	virtual bool BindGasModels(std::vector<GasModel*>& gasModels) {
+	virtual bool BindGasModels(std::vector<std::shared_ptr<GasModel>>& gasModels) {
 		bool isCorrect = true;
 
 		//Pointer to perfect gas model
@@ -23,9 +23,10 @@ public:
 		std::vector<double> gammas;
 
 		//Only several perfect gas models with common value of gamma allowed
-		for (GasModel* gasModel : gasModels) {
+		for (std::shared_ptr<GasModel> gasModel : gasModels) {
 			//Check if it's perfect gas 
-			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel)) {
+			//if (perfectGasModel = dynamic_pointer_cast<PerfectGasModel>(gasModel)) { TO DO upgrade compiler
+			if (perfectGasModel = dynamic_cast<PerfectGasModel*>(gasModel.get())) {
 				//and save gamma value
 				gammas.push_back(perfectGasModel->Gamma);
 			} else {
@@ -36,7 +37,7 @@ public:
 
 		//Check if all gammas are the same
 		for (int i = 0; i<gammas.size() - 1; i++) {
-			if (gammas[i] != gammas[i-1]) {
+			if (gammas[i] != gammas[i+1]) {
 				isCorrect = false;
 				break;
 			};
@@ -311,9 +312,10 @@ public:
 				
 		return result;
 	};
-	  	
-	//Solve riemann problem
-	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
+
+
+	//Sample solution at point
+	std::vector<double> SampleSolution(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f, double S) {
 		std::vector<double> res(5,0);		
 		Vector velocityL = Vector(UL.rou, UL.rov, UL.row) / UL.ro;
 		Vector velocityR = Vector(UR.rou, UR.rov, UR.row) / UR.ro;
@@ -336,9 +338,6 @@ public:
 		//Compute maximum propagation speed		
 		MaxEigenvalue = starValues.MaxSpeed;
 
-		//Compute flux (Toro p. 219) 
-		//Sample exact solution at S = x/t = 0
-		double S = 0;
 		double ro;
 		double u;
 		double p;
@@ -444,7 +443,7 @@ public:
 			};
 		};
 
-		//Compute flux given variables values at point S = 0
+		//Restore solution vector
 		GasModel::ConservativeVariables U;
 		U.ro = ro;
 		Vector V; 
@@ -460,7 +459,18 @@ public:
 		U.row = ro * V.z;
 		double e = p / (ro * (gamma - 1.0));
 		U.roE = (e + V*V / 2.0) * ro;
-		
+
+		return U;
+	};
+
+	  	
+	//Solve riemann problem
+	std::vector<double> ComputeFlux(const GasModel::ConservativeVariables& UL, const GasModel::ConservativeVariables& UR, const Face& f) {
+		//Compute flux (Toro p. 219) 
+		//Sample exact solution at S = x/t = 0
+		GasModel::ConservativeVariables U = SampleSolution(UL, UR, f, 0.0);
+
+		//Compute flux given variables values at point S = 0
 		return F(U, f.FaceNormal);
 	};
 

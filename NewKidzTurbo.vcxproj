@@ -151,6 +151,7 @@
     <ClInclude Include="src\gasmodels\LomonosovFortovGasModel.h" />
     <ClInclude Include="src\gasmodels\PerfectGasModel.h" />
     <ClInclude Include="src\gridgeneration\gengrid1D.h" />
+    <ClInclude Include="src\gridgeneration\GenGrid1DUniform.h" />
     <ClInclude Include="src\gridgeneration\gengrid2D.h" />
     <ClInclude Include="src\gridgeneration\GenGrid2DInterfacePertrubation.h" />
     <ClInclude Include="src\gridgeneration\GenGrid2DUniform.h" />
