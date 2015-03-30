@@ -160,15 +160,15 @@ private:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
+		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
 
 		//Run settings
 		_configuration.MaxIteration = 100000000;
 		_configuration.MaxTime = 0.2;
-		_configuration.SaveSolutionSnapshotIterations = 1;
-		_configuration.SaveSolutionSnapshotTime = 0;
+		_configuration.SaveSolutionSnapshotIterations = 0;
+		_configuration.SaveSolutionSnapshotTime = 0.0;
 
 		//Gravity
 		_configuration.g = Vector(0,0,0);				
@@ -183,7 +183,7 @@ private:
 		_kernel->BindGrid(_grid);
 
 		//Bind configuration
-		_kernel->VerboseOn();
+		_kernel->VerboseOff();
 		_kernel->BindConfiguration(_configuration);	
 	};
 	

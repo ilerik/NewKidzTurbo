@@ -17,20 +17,13 @@
 #include "test_list.h"
 
 //Main program
-int main(int argc, char *argv[]) {	
-	TestCasesEOS::TestCase1D_BarotropicEOS test1D;
-	test1D.Init(argc, argv);
-	test1D.Run(500);
-	test1D.SaveSolutionTecplot();
-
-	return 0;
-
-	/*TestCases1D::TestCase1D_SodShockTube test1D;
+int main(int argc, char *argv[]) {		
+	TestCases1D::TestCase1D_SodShockTube test1D;
 	int nOld = 100;
 	test1D.Init(argc, argv);
 	test1D.Run(nOld);
 	double L2 = test1D.L2error();
-	std::cout<<L2<<std::endl;
+	std::cout<<L2<<std::endl;	
 	int dn = 10;
 	for (int n = nOld + dn; n < 200; n += dn) {
 		test1D.Run(n);
@@ -39,7 +32,7 @@ int main(int argc, char *argv[]) {
 		std::cout<<"n = "<<n<<", L2 = "<<L2new<<", Order : " <<order<<std::endl;
 		L2 = L2new;
 		nOld = n;
-	};*/
+	};
 
 	return 0;
 	//RTInstabilityTests::TestSettings settings;

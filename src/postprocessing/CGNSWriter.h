@@ -172,17 +172,17 @@ public:
 	};	
 
 	//Write grid structure to file
-	void WriteGridToFile(Grid& grid) {
+	void WriteGridToFile(std::shared_ptr<Grid>& grid) {
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Started writing grid.");				
 					
 		//Gather number of cells on master node
 		std::vector<int> nCellsPerProcessor;
-		_parallelHelper->GatherCounts(grid.nCellsLocal, nCellsPerProcessor);						
+		_parallelHelper->GatherCounts(grid->nCellsLocal, nCellsPerProcessor);						
 
 		//Cells elements connectivity for current processor
 		std::vector<cgsize_t> LocalElements;
-		for (int i = 0; i < grid.nCellsLocal; i++) {
-			Cell* cell = grid.localCells[i];
+		for (int i = 0; i < grid->nCellsLocal; i++) {
+			Cell* cell = grid->localCells[i];
 			LocalElements.push_back(cell->CGNSType);
 			for (int j = 0; j<cell->Nodes.size(); j++) LocalElements.push_back(cell->Nodes[j] + 1); //Adjust by 1 for cgns proper numbering
 		};
@@ -198,21 +198,21 @@ public:
 		
 
 		//Compute total number of cells
-		int totalCells = _parallelHelper->SumInt(grid.nCellsLocal);
+		int totalCells = _parallelHelper->SumInt(grid->nCellsLocal);
 
 		//Write to cgns database file
 		if (_parallelHelper->IsMaster()) {
 			//Create base
-			m_base.cell_dim = grid.gridInfo.CellDimensions;
-			m_base.phys_dim = grid.gridInfo.CellDimensions;
+			m_base.cell_dim = grid->gridInfo.CellDimensions;
+			m_base.phys_dim = grid->gridInfo.CellDimensions;
 			CALL_CGNS(cg_base_write(m_file.idx, "Base", m_base.cell_dim, m_base.phys_dim, &m_base.idx));
 				
 
 			//Create zone
-			m_zone.coord_dim = grid.gridInfo.CellDimensions;
+			m_zone.coord_dim = grid->gridInfo.CellDimensions;
 			m_zone.name = "Zone";	
 			m_zone.type = Unstructured;
-			m_zone.size[0] = grid.localNodes.size(); //NVertex			
+			m_zone.size[0] = grid->localNodes.size(); //NVertex			
 			m_zone.size[1] = totalCells; //NCells
 			m_zone.size[2] = 0; //NBoundaryVertex			
 			CALL_CGNS(cg_zone_write(m_file.idx, m_base.idx, m_zone.name.c_str(), m_zone.size, m_zone.type, &m_zone.idx));
@@ -223,24 +223,24 @@ public:
 			//Note that the name "GridCoordinates" is reserved for the original grid and must be the first GridCoordinates_t node to be defined.
 			CALL_CGNS(cg_grid_write(m_file.idx, m_base.idx, m_zone.idx, "GridCoordinates", &G));
 			//Number of nodes
-			int nNodes = grid.localNodes.size();
+			int nNodes = grid->localNodes.size();
 			std::vector<double> coords(nNodes);
 			int C;
 			if (m_base.phys_dim >= 1) {
 				//Write x cartezian coordinates to buffer
-				for (int i = 0; i<nNodes; i++) coords[i] = grid.localNodes[i].P.x;
+				for (int i = 0; i<nNodes; i++) coords[i] = grid->localNodes[i].P.x;
 				//Write coords to file
 				CALL_CGNS(cg_coord_write(m_file.idx, m_base.idx, m_zone.idx, RealDouble, "CoordinateX", &coords[0], &C));
 			};
 			if (m_base.phys_dim >= 2) {
 				//Write y cartezian coordinates to buffer
-				for (int i = 0; i<nNodes; i++) coords[i] = grid.localNodes[i].P.y;
+				for (int i = 0; i<nNodes; i++) coords[i] = grid->localNodes[i].P.y;
 				//Write coords to file
 				CALL_CGNS(cg_coord_write(m_file.idx, m_base.idx, m_zone.idx, RealDouble, "CoordinateY", &coords[0], &C));
 			};
 			if (m_base.phys_dim >= 3) {
 				//Write y cartezian coordinates to buffer
-				for (int i = 0; i<nNodes; i++) coords[i] = grid.localNodes[i].P.z;
+				for (int i = 0; i<nNodes; i++) coords[i] = grid->localNodes[i].P.z;
 				//Write coords to file
 				CALL_CGNS(cg_coord_write(m_file.idx, m_base.idx, m_zone.idx, RealDouble, "CoordinateZ", &coords[0], &C));
 			};			
@@ -282,7 +282,7 @@ public:
 	};
 
 	//Write new solution node to file
-	void WriteSolution(Grid& grid, std::string solutionName) {		
+	void WriteSolution(std::shared_ptr<Grid>& gridPtr, std::string solutionName) {		
 		if (_parallelHelper->IsMaster()) {	
 			//Write solution node		
 			int S;
@@ -296,7 +296,7 @@ public:
 	};
 
 	//Write physical field to file 
-	void WriteField(Grid& grid, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
+	void WriteField(std::shared_ptr<Grid>& gridPtr, std::string solutionName, std::string fieldName, std::vector<double>& variable) {		
 		_logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Started writing field " + fieldName + " to solution" + solutionName + ".");				
 
 		//Check if solution node was created
@@ -313,14 +313,14 @@ public:
 		};
 
 		//Check if variable array lenght equals number of local cells
-		if (variable.size() != grid.nCellsLocal) {
+		if (variable.size() != gridPtr->nCellsLocal) {
 			_logger->WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::FATAL_ERROR, "Number of field variebles doesn't equal to number of cells.");
 			exit(0);
 		};
 
 		//Gather number of cells on master node
 		std::vector<int> nCellsPerProcessor;
-		_parallelHelper->GatherCounts(grid.nCellsLocal, nCellsPerProcessor);				
+		_parallelHelper->GatherCounts(gridPtr->nCellsLocal, nCellsPerProcessor);				
 
 		//Gather all elements on master node
 		std::vector<double> AllVariables;
