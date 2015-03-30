@@ -92,7 +92,10 @@ private:
 	std::shared_ptr<Grid> _gridPtr;
 
 	//Configuration
-	Configuration _configuration;	
+	Configuration _configuration;
+
+	//Spatial scheme
+	SpatialDiscretisationType _spatialDiscretisation;
 
 	//Gas model (equations of state)
 	std::vector<std::shared_ptr<GasModel> > _gasModels;	
@@ -313,7 +316,7 @@ public:
 		};
 
 		//Spatial discretisation
-		//_spatialDiscretisation = std::unique_ptr<SpatialDiscretisation>(new SpatialDiscretisation(_gridPtr));			
+		_spatialDiscretisation = _configuration.SpatialDiscretisation;
 
 		//Simulation settings
 		_simulationType = _configuration.SimulationType;
@@ -1213,8 +1216,7 @@ public:
 		//In every cell proper cell reconstruct solution
 		for (int localCellIndex = 0; localCellIndex < _grid.nCellsLocal; localCellIndex++) {
 			Cell* cell = _grid.localCells[localCellIndex];			  			
-			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
-			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
+			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, _spatialDiscretisation);			
 
 			//Compute stencil
 			int rootMaterial = GetCellGasModelIndex(cell->GlobalIndex);

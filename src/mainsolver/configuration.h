@@ -5,6 +5,7 @@
 #include "GasModelConfiguration.h"
 #include "ALEConfiguration.h"
 #include "RiemannSolverConfiguration.h"
+#include "SpatialDiscretisation\SpatialDiscretisation.h"
 #include "grid.h"
 
 //Class that represents configuration file methods and structure
@@ -36,6 +37,7 @@ public:
 
 	//Simulation parameters
 	SimulationType_t SimulationType; //Simulation type
+	SpatialDiscretisationType SpatialDiscretisation; //Discretisation type
 	double CFL; //CFL number
 	int RungeKuttaOrder; //Runge-Kutta time stepping scheme order
 

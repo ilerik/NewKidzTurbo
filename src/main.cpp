@@ -39,9 +39,9 @@ int main(int argc, char *argv[]) {
 		std::cout<<"n = "<<n<<", L2 = "<<L2new<<", Order : " <<order<<std::endl;
 		L2 = L2new;
 		nOld = n;
-	};
+	};*/
 
-	return 0;*/
+	return 0;
 	//RTInstabilityTests::TestSettings settings;
 
 	////Pertrubation

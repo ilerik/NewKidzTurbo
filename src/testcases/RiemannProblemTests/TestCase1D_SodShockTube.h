@@ -154,6 +154,7 @@ private:
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
+		_configuration.SpatialDiscretisation = SpatialDiscretisationType::ENO;
 		_configuration.CFL = 0.1;
 		_configuration.RungeKuttaOrder = 1;		
 
