@@ -8,7 +8,8 @@
 //Satial discretisation type
 enum class SpatialDiscretisationType {
 	PiecewiseConstant,	
-	WENO
+	WENO,
+	ENO	
 };
 
 //Stencil structure
@@ -63,7 +64,7 @@ public:
 
 	//Oscilation indicator values	
 	std::vector<double> oscilation;
-	std::vector<double> weight;
+	std::vector<double> weight;	
 	double distance;	
 
 	//Reconstruction data	
@@ -73,7 +74,7 @@ public:
 	//Get interpolated values at point
 	std::vector<double> InterpolateValues(SpatialDiscretisationType type, Vector r) {
 		std::vector<double> result = meanValues;
-		if (type == SpatialDiscretisationType::WENO) {
+		if ((type == SpatialDiscretisationType::WENO) || (type == SpatialDiscretisationType::ENO)) {
 			Vector dr = r - center;
 			result += gradients * dr;
 			return result;
@@ -94,6 +95,9 @@ class CellSpatialDiscretisation {
 
 	std::vector<ReconstructionData> _reconstructions;	//Reconstruction data for each substencil
 	std::vector<std::vector<double>> _weights;			//Weight of each substencil
+	double mino; //ENO stencilt total oscilation	
+	Stencil _ENOstencil;	//ENO stencil
+	ReconstructionData _ENOreconstruction; //ENO reconstruction data
 	
 	//Temp
 	std::vector<int> _stencilIndexes;
@@ -113,10 +117,11 @@ public:
 			_settings.minStencilDepth = 0;
 			_settings.stencilCells = 1;
 		};
-		if (type == SpatialDiscretisationType::WENO) {
+		if ((type == SpatialDiscretisationType::WENO) || (type == SpatialDiscretisationType::ENO))
+		{
 			_settings.minStencilDepth = 1;
 			_settings.stencilCells = 1 + _settings.nDims;
-		};
+		};		
 	};
 
 	//Public properties
@@ -244,7 +249,7 @@ public:
 			data.oscilation.resize(nv, 1.0);
 			data.weight.resize(nv, 1.0);
 		};
-		if (_settings.type == SpatialDiscretisationType::WENO) {
+		if ((_settings.type == SpatialDiscretisationType::WENO) || (_settings.type == SpatialDiscretisationType::ENO)) {
 			bool isGradientFailed = false;
 			bool status = true;
 			data.meanValues = *values[rootIndex];
@@ -268,7 +273,7 @@ public:
 				};
 			};
 
-			//Compute oscilation indicator value based on obtained reconstruction
+			//Compute oscilation indicator value based on obtained reconstruction		
 			data.oscilation.resize(nv,0);
 			data.weight.resize(nv, 0);
 
@@ -281,15 +286,15 @@ public:
 			} else {
 				//If we have obtained correct reconstruction				
 
-				//Compute smoothness (oscilation)
+				//Compute smoothness (oscilation)			
 				for (int cellIndex : stencil.cells) {
 					if (cellIndex == rootIndex) continue; //Skip center
 					Cell& cell = _gridPtr->Cells[cellIndex]; 
 					for (int i = 0; i < nv; i++) {
 						double du = (*values[cellIndex])[i] - data.meanValues[i];
-						data.oscilation[i] += (du * du);
+						data.oscilation[i] += (du * du);						
 					};
-				};				
+				};						
 
 				//Compute weight
 				const double epsilon = std::numeric_limits<double>::min();
@@ -297,6 +302,8 @@ public:
 					data.weight[i] = 1.0 / (epsilon + data.oscilation[i]);
 				};
 			};
+
+			
 		};
 		values.clear();
 
@@ -308,7 +315,7 @@ public:
 		//Now obtain all availible stencils
 		int nv = _settings.nVars;
 		int size = _settings.stencilCells;
-		std::vector<Stencil> subStencils = ObtainSubstencils(size);
+		std::vector<Stencil> subStencils = ObtainSubstencils(size);		
 
 		//Make map from cell index to values
 		std::map<int, std::shared_ptr<std::vector<double>> > valuesMap;
@@ -325,6 +332,8 @@ public:
 		};*/
 
 		//Now compute smoothness of every stencil and make reconstruction
+		int ENOstencilIndex = -1;
+		mino = std::numeric_limits<double>::max();
 		std::map<int, std::shared_ptr<std::vector<double>> > vs;
 		for (Stencil& s : subStencils) {
 			//Gather values
@@ -336,6 +345,15 @@ public:
 			ReconstructionData data = ReconstructStencilSolution(s, vs);
 			_reconstructions.push_back(data);
 			_weights.push_back(data.weight);
+
+			//Find ENO stencil
+			double totalo = 0;
+			for (int i = 0; i < nv; i++) totalo += data.oscilation[i];
+			if (totalo < mino) {
+				mino = totalo;
+				_ENOstencil = s;
+				_ENOreconstruction = data;
+			};
 		};
 
 		//Normilize weights		
@@ -349,10 +367,19 @@ public:
 				_weights[j][i] /= wSum;
 			};
 		};
+	
 	};
 
 	//Interpolate face values
-	virtual std::vector<double> GetSolutionAtFace(Face& face) {
+	virtual std::vector<double> GetSolutionAtFace(Face& face) {		
+		if ((_settings.type == SpatialDiscretisationType::ENO)) {
+			//ENO
+			//Obtain interpolated values at face center
+			std::vector<double> U = _ENOreconstruction.InterpolateValues(_settings.type, face.FaceCenter);
+			return U;
+		};
+
+		//WENO general reconstruction
 		int nStencils = _weights.size();
 		std::vector<double> result(_settings.nVars, 0.0);
 		std::vector<double> wSum(_settings.nVars); //Sum of distance corrected weights at face

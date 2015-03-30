@@ -1213,8 +1213,8 @@ public:
 		//In every cell proper cell reconstruct solution
 		for (int localCellIndex = 0; localCellIndex < _grid.nCellsLocal; localCellIndex++) {
 			Cell* cell = _grid.localCells[localCellIndex];			  			
-			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
-			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
+			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
+			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
 
 			//Compute stencil
 			int rootMaterial = GetCellGasModelIndex(cell->GlobalIndex);
