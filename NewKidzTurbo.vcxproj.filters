@@ -363,6 +363,9 @@
     <ClInclude Include="src\gridgeneration\GenGrid1DUniform.h">
       <Filter>Header Files\GridGeneration</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">

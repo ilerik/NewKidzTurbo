@@ -13,7 +13,6 @@
                                if (ierr)                                       \
                                {                                               \
                                  const char * error_msg = cg_get_error();      \
-								 _logger->WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::FATAL_ERROR, error_msg); \
-                                 cg_error_exit();	\
+                                 cg_error_exit();                              \
                                }                                               \
                              };

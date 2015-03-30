@@ -1,24 +1,28 @@
 #include "stdafx.h"
 
-#include <stdio.h>
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include "kernel.h"
-#include "gridgeneration.h"
 #include <cmath>
 #include <random>
-#include "MeshMovement.h"
 
-#include "cuda.h"
-#include <cuda_runtime.h>
+//#include "kernel.h"
+#include "GenGrid1DUniform.h"
+#include "CGNSWriter.h"
+#include "grid.h"
+
+//#include "cuda.h"
+//#include <cuda_runtime.h>
 
 //Test cases
-#include "test_list.h"
+//#include "test_list.h"
 
 //Main program
 int main(int argc, char *argv[]) {	
-	TestCases1D::TestCase1D_SodShockTube test1D;
+	std::shared_ptr<ParallelManager> MPImanager(new ParallelManager(argc, argv));
+	//std::shared_ptr<PostProcessing::CGNSWriter> writer(new PostProcessing::CGNSWriter(MPImanager));
+
+	/*TestCases1D::TestCase1D_SodShockTube test1D;
 	int nOld = 100;
 	test1D.Init(argc, argv);
 	test1D.Run(nOld);
@@ -33,8 +37,8 @@ int main(int argc, char *argv[]) {
 		L2 = L2new;
 		nOld = n;
 	};
+	return 0;*/
 
-	return 0;
 	//RTInstabilityTests::TestSettings settings;
 
 	////Pertrubation

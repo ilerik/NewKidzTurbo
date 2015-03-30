@@ -49,6 +49,17 @@ public:
 		if (_MPIinitialized) MPI_Finalize(); 
 	};
 
+	//=============================== Parallel topology routines =====================================
+
+	//Is master node
+	inline bool IsMaster() { return _rank == 0;	};
+	
+	//Is first node
+	inline bool IsFirstNode() {	return _rank == 0; };
+
+	//Is last node
+	inline bool IsLastNode() { return _rank == _np - 1; };
+
 	//=============================== Synchronisation primitives =====================================
 
 	//Barrier synchronisation
@@ -62,7 +73,7 @@ public:
 	//Send synchronisation signal to target process
 	void SendSignal(int rankDestination) {
 		auto before = std::chrono::high_resolution_clock::now();
-		MPI_Barrier(_comm);
+		MPI_Recv(nullptr, 0, MPI_INT, rankDestination, 0, _comm, &_status);
 		auto after = std::chrono::high_resolution_clock::now();
 		_syncDuration += after - before; // update synchronisation time duration
 	};
@@ -70,12 +81,25 @@ public:
 	//Blocking wait for synchronisation signal from source process
 	void WaitSignal(int rankSource) {
 		auto before = std::chrono::high_resolution_clock::now();
-		MPI_Barrier(_comm);
+		MPI_Send(nullptr, 0, MPI_INT, rankSource, 0, _comm);
 		auto after = std::chrono::high_resolution_clock::now();
 		_syncDuration += after - before; // update synchronisation time duration
 	};
 
-	//Data communication primitives
+	//============================== Data communication primitives =====================================
+
+	//Gather one value from each process on root
+	template<class DataTypeClass, MPI_Datatype MPIDataTypeClass>
+	void Gather(int N, std::vector<int>& result) {		
+		if (IsMaster()) {			
+			result.resize(_nProcessors);
+			MPI_Gather(&N, 1, MPI_INT, &result[0], 1, MPI_INT, 0, _comm);
+		} else {
+			MPI_Gather(&N, 1, MPI_INT, NULL, 1, MPI_INT, 0, _comm);
+		};		
+	};
+
+	//Templated Allgatherv wrapper
 	template<class DataTypeClass, MPI_Datatype MPIDataTypeClass>
 	void Allgatherv(std::vector<DataTypeClass>& local, std::vector<DataTypeClass>& counts, std::vector<DataTypeClass>& result) {
 		//Make displacement array
