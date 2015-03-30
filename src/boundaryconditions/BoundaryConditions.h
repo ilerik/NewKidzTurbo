@@ -6,9 +6,8 @@
 //#include "BCSupersonicInlet.h"
 //#include "BCWallViscousIsothermal.h"
 #include "BCSymmetryPlane.h"
-#include "BCOutflowSupersonic.h"
-#include "BCInflowSupersonic.h"
 #include "BCGeneral.h"
+#include "BCNatural.h"
 
 
 #endif

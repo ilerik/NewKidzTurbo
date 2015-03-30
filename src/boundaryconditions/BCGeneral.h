@@ -57,19 +57,13 @@ public:
 	std::map<BoundaryVariableType, CompositeBoundaryConditionInfo> boundaryConditions;
 
 	//Get dummy cell values
-	std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) {
+	virtual std::vector<double> getDummyValues(int nmat, std::vector<double> inV, const Cell& dummyCell) {
 		//Obtain face
+		int nVariables = 5;
 		if (dummyCell.Faces.size() != 1) throw new Exception("Dummy cell has more than one face");
 		Face& face = _grid->localFaces[dummyCell.Faces[0]];
-
-		//Obtain neighbour cell
-		int nCellIndex = _grid->cellsGlobalToLocal[face.FaceCell_1];
-		int nVariables = _gasModels[nmat]->nConservativeVariables;
-		Vector center = _grid->localCells[nCellIndex]->CellCenter;
-
-		//Obtain interrior values
-		std::vector<double> inV(&values[nCellIndex * nVariables], &values[nVariables * nCellIndex] + nVariables);
-
+		Vector& center = face.FaceCenter;
+					
 		//Compute dummy values
 		double ro = inV[0];
 		double u = inV[1]/inV[0];
@@ -98,7 +92,7 @@ public:
 		return res;
 	};
 
-	void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
+	virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
 		//Read configuration
 		//std::pair<double, bool> propertyValue;
 		//propertyValue = bcConfig.GetPropertyValue("Density");

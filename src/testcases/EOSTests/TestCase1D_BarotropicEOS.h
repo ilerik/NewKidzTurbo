@@ -1,11 +1,11 @@
-#ifndef TURBO_TestCases_RiemannProblemTests_TestCase1D_SodShockTube
-#define TURBO_TestCases_RiemannProblemTests_TestCase1D_SodShockTube
+#ifndef NewKidzTurbo_TestCases_EOSTests_TestCase1D_BarotropicEOS
+#define NewKidzTurbo_TestCases_EOSTests_TestCase1D_BarotropicEOS
 
 #include "TestCase.h"
 #include "Gengrid1DUniform.h"
 #include <memory>
 
-namespace TestCases1D {
+namespace TestCasesEOS {
 
 enum class BoundaryConditionType {
 	FreeSurface,
@@ -14,7 +14,7 @@ enum class BoundaryConditionType {
 	Wall
 };
 
-class TestCase1D_SodShockTube : public InitialConditions::InitialConditions {
+class TestCase1D_BarotropicEOS : public InitialConditions::InitialConditions {
 private:
 	//Data
 	Godunov3DSolverPerfectGas _exactSolver;
@@ -67,14 +67,16 @@ private:
 		double pressure = 0.0;		
 		if (nmat == 0) {
 			//Light
-			ro = 1.0;
-			pressure = 1.0;
-			e = pressure / (0.4 * ro);
+			ro = 7900;
+			u = 250;
+			pressure = 2e14;
+			e = 0;
 		} else {
 			//Heavy
-			ro = 0.125;
-			pressure = 0.1;
-			e = pressure / (0.4 * ro);
+			ro = 11400;
+			u = -250;
+			pressure = 2e14;
+			e = 0;
 		};
 			
 		//Convert to conservative variables
@@ -90,14 +92,13 @@ private:
 	};
 
 	//Generate configuration
-	GasModelConfiguration GetGasModelConfiguration() {
+	GasModelConfiguration GetGasModelConfiguration(double E, double ro0, double p0) {
 		GasModelConfiguration conf;
 
-		conf.GasModelName = "PerfectGasModel";
-		conf.SetPropertyValue("IdealGasConstant", 8.3144621);
-		conf.SetPropertyValue("SpecificHeatRatio", 1.4);
-		conf.SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
-		conf.SetPropertyValue("SpecificHeatPressure", 1006.43);
+		conf.GasModelName = "BarotropicGasModel";
+		conf.SetPropertyValue("YoungModulus", E);
+		conf.SetPropertyValue("ReferencePressure", p0);
+		conf.SetPropertyValue("ReferenceDensity", ro0);		
 		
 		return conf;		
 	};
@@ -142,15 +143,15 @@ private:
 		//Availible gas models		
 		//Left metal
 		_configuration.AddGasModel("Light");
-		_configuration.GasModelsConfiguration["Light"] = GetGasModelConfiguration();
+		_configuration.GasModelsConfiguration["Light"] = GetGasModelConfiguration(2e13, 7900, 2e14);
 
 		//Right metal
 		_configuration.AddGasModel("Heavy");
-		_configuration.GasModelsConfiguration["Heavy"] = GetGasModelConfiguration();
+		_configuration.GasModelsConfiguration["Heavy"] = GetGasModelConfiguration(2e13, 11400, 2e14);
 
 		//Boundary conditions		
-		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("Light", BoundaryConditionType::Symmetry);
-		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("Heavy", BoundaryConditionType::Symmetry);			
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("Light", BoundaryConditionType::Natural);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("Heavy", BoundaryConditionType::Natural);			
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
@@ -159,15 +160,15 @@ private:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
+		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";
-		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
+		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
 
 		//Run settings
 		_configuration.MaxIteration = 100000000;
-		_configuration.MaxTime = 0.2;
-		_configuration.SaveSolutionSnapshotIterations = 1;
-		_configuration.SaveSolutionSnapshotTime = 0;
+		_configuration.MaxTime = 5e-6;
+		_configuration.SaveSolutionSnapshotIterations = 0;
+		_configuration.SaveSolutionSnapshotTime = 1e-6;
 
 		//Gravity
 		_configuration.g = Vector(0,0,0);				
@@ -218,72 +219,40 @@ public:
 		_MPIManager->Barrier();
 	};
 
-	//Get error value
-	double L2error() {
-		_exactSolver.BindGasModels(_gasModels);
-		GasModel::ConservativeVariables UL;
-		GasModel::ConservativeVariables UR;
-		UL.ro = 1.0;
-		UL.rou = 0.0;
-		UL.rov = 0.0;
-		UL.row = 0.0;
-		UL.roE = 1.0 / (0.4);
-
-		UR.ro = 0.125;
-		UR.rou = 0.0;
-		UR.rov = 0.0;
-		UR.row = 0.0;
-		UR.roE = 0.1 / (0.4);
-
-		Face f;
-		f.FaceNormal = Vector(1.0, 0.0, 0.0);
-		f.FaceCenter = Vector(0.0, 0.0, 0.0);
-		f.FaceSquare = 1.0;
-
+	//Save result to tecplot
+	void SaveSolutionTecplot() {		
 		std::ofstream ofs("solution.dat");
-		ofs<<"VARIABLES = \"x\" \"ro\" \"roExact\" \"p\" \"pExact\" \"u\" \"uExact\""<<std::endl;
+		ofs<<"VARIABLES = \"x\" \"ro\"  \"p\"  \"u\" \"c\""<<std::endl;
 
 		double L2error = 0.0;
 		for (int i = 0; i<_grid->nCellsLocal; i++) {
-			Cell& cell = _kernel->GetLocalCell(i);
-			double dx = -0.5;
-			double x = cell.CellCenter.x + dx;
-			double xL = _kernel->GetLocalFace(cell.Faces[0]).FaceCenter.x + dx;
-			double xR = _kernel->GetLocalFace(cell.Faces[1]).FaceCenter.x + dx;
-			double t = 0.2;
-			std::vector<double> U1 = _exactSolver.SampleSolution( UL, UR, f, xL/t);
-			std::vector<double> U2 = _exactSolver.SampleSolution( UL, UR, f, xR/t);
+			Cell& cell = _kernel->GetLocalCell(i);			
+			double x = cell.CellCenter.x;			
 
-			//Exact second order solution
-			std::vector<double> UExact = 0.5 * (U1 + U2);
-			double roExact = UExact[0];
-			double uExact = UExact[1] / UExact[0];
-			double eExact = UExact[4] / roExact - uExact*uExact/2.0;
-			double pExact = eExact * roExact / (0.4); 
-
+			//Local gas model
+			int nmat = _kernel->GetCellGasModelIndex(cell.GlobalIndex);
+			GasModel* gasModelPtr = _gasModels[nmat].get();
+		
 			//Obtained solution
 			std::vector<double> U = _kernel->GetCellValues(cell.GlobalIndex);
 			double ro = U[0];
 			double u = U[1] / U[0];
 			double e = U[4] / ro - u*u/2.0;
-			double p = e * ro / (0.4); 
-			L2error += std::pow(ro - roExact, 2.0) * cell.CellVolume;
+			double p = 0;
+			double c = 0;
+			double Gr = 0;
+			gasModelPtr->GetPressureAndSoundSpeed(U, p, c, Gr);
 
 			//Output to file
 			ofs<<x<<" ";
-			ofs<<ro<<" ";
-			ofs<<roExact<<" ";
-			ofs<<p<<" ";
-			ofs<<pExact<<" ";
+			ofs<<ro<<" ";			
+			ofs<<p<<" ";			
 			ofs<<u<<" ";
-			ofs<<uExact<<" ";
+			ofs<<c<<" ";
 			ofs<<std::endl;
-		};
-		L2error = std::sqrt(L2error);
+		};		
 
-		ofs.close();
-
-		return L2error;
+		ofs.close();		
 	};
 };
 

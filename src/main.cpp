@@ -18,7 +18,14 @@
 
 //Main program
 int main(int argc, char *argv[]) {	
-	TestCases1D::TestCase1D_SodShockTube test1D;
+	TestCasesEOS::TestCase1D_BarotropicEOS test1D;
+	test1D.Init(argc, argv);
+	test1D.Run(500);
+	test1D.SaveSolutionTecplot();
+
+	return 0;
+
+	/*TestCases1D::TestCase1D_SodShockTube test1D;
 	int nOld = 100;
 	test1D.Init(argc, argv);
 	test1D.Run(nOld);
@@ -34,7 +41,7 @@ int main(int argc, char *argv[]) {
 		nOld = n;
 	};
 
-	return 0;
+	return 0;*/
 	//RTInstabilityTests::TestSettings settings;
 
 	////Pertrubation

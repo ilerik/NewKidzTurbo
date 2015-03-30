@@ -94,6 +94,9 @@
     <Filter Include="Header Files\TestCases\RTInstabilityTests">
       <UniqueIdentifier>{7bede7df-aaa2-4cd8-9d3a-2a07a8ef2117}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\TestCases\EOSTests">
+      <UniqueIdentifier>{d2c8e2a4-0c18-4031-9464-6504b5cb1241}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\turbulentmodels\biffplatemodel.h">
@@ -362,6 +365,15 @@
     </ClInclude>
     <ClInclude Include="src\gridgeneration\GenGrid1DUniform.h">
       <Filter>Header Files\GridGeneration</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\EOSTests\TestCase1D_BarotropicEOS.h">
+      <Filter>Header Files\TestCases\EOSTests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boundaryconditions\BCNatural.h">
+      <Filter>Header Files\BoundaryConditions</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

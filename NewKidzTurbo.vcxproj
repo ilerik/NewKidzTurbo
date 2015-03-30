@@ -140,6 +140,7 @@
   <ItemGroup>
     <ClInclude Include="src\ALEmethod\ALEMethod.h" />
     <ClInclude Include="src\boundaryconditions\BCGeneral.h" />
+    <ClInclude Include="src\boundaryconditions\BCNatural.h" />
     <ClInclude Include="src\boundaryconditions\BCOutflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCInflowSupersonic.h" />
     <ClInclude Include="src\boundaryconditions\BCSymmetryPlane.h" />
@@ -190,6 +191,7 @@
     <ClInclude Include="src\sources\GravitySource.h" />
     <ClInclude Include="src\sources\ISource.h" />
     <ClInclude Include="src\stdafx.h" />
+    <ClInclude Include="src\testcases\EOSTests\TestCase1D_BarotropicEOS.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpactTestCase.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_SteelVSPb.h" />
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsCollision1D_PbVSPb.h" />

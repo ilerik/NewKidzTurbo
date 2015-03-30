@@ -933,13 +933,13 @@ public:
 				bcTypeCheckPassed = true;
 			};
 			if (bcType == BCType_t::BCOutflowSupersonic) {
-				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCOutflowSupersonic());
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCNatural());
 				bcTypeCheckPassed = true;
 			};
-			if (bcType == BCType_t::BCInflowSupersonic) {
+			/*if (bcType == BCType_t::BCInflowSupersonic) {
 				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCInflowSupersonic());
 				bcTypeCheckPassed = true;
-			};
+			};*/
 			if (bcType == BCType_t::BCGeneral) {
 				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCGeneral());
 				bcTypeCheckPassed = true;
@@ -1213,8 +1213,8 @@ public:
 		//In every cell proper cell reconstruct solution
 		for (int localCellIndex = 0; localCellIndex < _grid.nCellsLocal; localCellIndex++) {
 			Cell* cell = _grid.localCells[localCellIndex];			  			
-			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
-			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
+			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
+			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
 
 			//Compute stencil
 			int rootMaterial = GetCellGasModelIndex(cell->GlobalIndex);
