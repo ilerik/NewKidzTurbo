@@ -151,9 +151,9 @@ public:
 	//Local cells, faces and nodes
 	std::vector<int> localCells;
 	std::vector<int> localNodes;
-	std::unordered_map<int, Cell> cells;
-	std::unordered_map<int, Node> nodes;
-	std::unordered_map<int, Node> faces;
+	//std::unordered_map<int, Cell> cells;
+	//std::unordered_map<int, Node> nodes;
+	//std::unordered_map<int, Node> faces;
 	int nProperCellsLocal;  //Number of local non dummy cells
 	int nCellsLocal;		//Number of local cells (including dummy)
 	int nFacesLocal;		//Number of local faces

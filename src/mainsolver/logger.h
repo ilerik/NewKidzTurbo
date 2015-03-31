@@ -52,7 +52,9 @@ public:
 	};
 
 	//Constructor uses specified stream
-	Logger(std::shared_ptr<ParallelManager>& MPIManager, LoggerMessageLevel level, std::shared_ptr<std::ostream> outputStream) : _MPIManager(MPIManager), _level(level), _outputStream(outputStream) { 	};
+	Logger(std::shared_ptr<ParallelManager>& MPIManager, LoggerMessageLevel level, std::ostream& outputStream) : _MPIManager(MPIManager), _level(level) {
+		_outputStream = std::shared_ptr<std::ostream>(&outputStream);
+	};
 
 	//Destructor flushes stream
 	~Logger() {

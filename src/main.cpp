@@ -18,9 +18,10 @@
 //#include "test_list.h"
 
 //Main program
-int main(int argc, char *argv[]) {	
+int main(int argc, char *argv[]) {		
 	std::shared_ptr<ParallelManager> MPImanager(new ParallelManager(argc, argv));
-	//std::shared_ptr<PostProcessing::CGNSWriter> writer(new PostProcessing::CGNSWriter(MPImanager));
+	std::shared_ptr<Logger> logger(new Logger(MPImanager, LoggerMessageLevel::Local, new std::ostream(std::cout.rdbuf())) );
+	std::shared_ptr<PostProcessing::CGNSWriter> writer(new PostProcessing::CGNSWriter(MPImanager, logger));
 
 	/*TestCases1D::TestCase1D_SodShockTube test1D;
 	int nOld = 100;
