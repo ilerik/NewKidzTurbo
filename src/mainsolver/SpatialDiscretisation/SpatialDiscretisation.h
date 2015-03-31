@@ -34,6 +34,13 @@ struct Stencil {
 		cells.insert(root);
 	};	
 
+	//Construct of disconnected cells
+	Stencil(int root_, std::set<int> cells_) {
+		root = root_;
+		cells = cells_;
+		neighbours.clear();
+	};
+
 	//Add cell to stencil and make connections
 	bool AddCell(int cell, std::vector<int> nCells) {
 		//Return false if this cell is in stencil
@@ -58,7 +65,7 @@ struct ReconstructionSettings {
 
 class ReconstructionData {
 public:
-	//Stencil used
+	//Stencils used
 	Vector center;
 	Stencil stencil;
 
@@ -83,6 +90,19 @@ public:
 		//Default piecewise constant reconstruction
 		return result;
 	};
+
+	//Get interpolated value at point
+	double InterpolateValue(int nValue, SpatialDiscretisationType type, Vector r) {
+		double result = meanValues[nValue];
+		if ((type == SpatialDiscretisationType::WENO) || (type == SpatialDiscretisationType::ENO)) {
+			Vector dr = r - center;
+			result += gradients[nValue] * dr;
+			return result;
+		};
+
+		//Default piecewise constant reconstruction
+		return result;
+	};
 };
 
 
@@ -95,9 +115,8 @@ class CellSpatialDiscretisation {
 
 	std::vector<ReconstructionData> _reconstructions;	//Reconstruction data for each substencil
 	std::vector<std::vector<double>> _weights;			//Weight of each substencil
-	double mino; //ENO stencilt total oscilation	
-	Stencil _ENOstencil;	//ENO stencil
-	ReconstructionData _ENOreconstruction; //ENO reconstruction data
+	std::vector<double> _mino; //ENO stencilt oscilation for every variable
+	std::vector<int> _ENOStencilIndex;	//ENO stencil index for every variable
 	
 	//Temp
 	std::vector<int> _stencilIndexes;
@@ -200,36 +219,52 @@ public:
 	};
 
 	//Obtain all substencils of given size
-	std::vector<Stencil> ObtainSubstencils(int size) {				
+	std::vector<Stencil> ObtainSubstencils(int size) {	
+		//Store cells taken
+		std::set<int> stencilCells;
+		std::set<std::set<int> > subStencilsCells;
+		std::vector<Stencil> subStencils;
+
 		//Obtain all possible substencils
-		std::function<std::vector<Stencil>(int,int)> DFS = [&](int cell, int size) {		 
-			std::vector<Stencil> subStencils;
-
-			//Cell itself
-			if (size == 1) {						
-				subStencils.push_back(Stencil(cell));
-				return subStencils;
+		std::function<void()> StencilSearch = [&]() {
+			//If we gathered enough
+			if (size == stencilCells.size()) {						
+				subStencilsCells.insert(stencilCells);
+				return;
 			};
 
-			//Depth first search
-			for (int child : _stencil.neighbours[cell]) {
-				std::vector<Stencil> nSubStencils = DFS(child, size - 1);
-
-				//For each subgraph get stencils and combine them
-				for (Stencil& s : nSubStencils) {
-					std::vector<int> nCells(1, s.root);
-					if (s.AddCell(cell, nCells)) {
-						//Add new stencil
-						s.root = cell;
-						subStencils.push_back(s);
-					};
-				};			
+			//Find all cells neighbours
+			std::unordered_set<int> neighbourCells;
+			for (int cell : stencilCells) {
+				auto ncells = _stencil.neighbours[cell];
+				for (int ncell : ncells) neighbourCells.insert(ncell);
 			};
 
-			return subStencils;
+			//Remove cells that already in stencil
+			for (int cell : stencilCells) {
+				if (neighbourCells.find(cell) != std::end(neighbourCells)) neighbourCells.erase(cell);
+			};
+
+			//Make step to all possible next choises
+			for (int ncell : neighbourCells) {
+				stencilCells.insert(ncell);
+				StencilSearch();
+				stencilCells.erase(ncell);
+			};
+
+			return;
 		};
 
-		return DFS(_stencil.root, size);
+		//Launch stencil search	
+		stencilCells.insert(_stencil.root);
+		StencilSearch();
+
+		//Generate stencils
+		for (std::set<int> cells : subStencilsCells) {
+			subStencils.push_back(Stencil(_stencil.root, cells));
+		};
+
+		return subStencils; 
 	};
 
 	//Make reconstruction on given stencil
@@ -263,13 +298,15 @@ public:
 					Cell& cell = _gridPtr->Cells[cellIndex];
 					points.push_back(cell.CellCenter);
 					vs.push_back((*values[cellIndex])[i]);					
-					Vector grad = ComputeGradientByPoints(_settings.nDims, center, data.meanValues[i], points, vs, status);
-					data.gradients[i] = grad;
+				};
 
-					//If reconstruction failed finish
-					if (!status) {
-						isGradientFailed = true;
-					};
+				//Actual LLS call
+				Vector grad = ComputeGradientByPoints(_settings.nDims, center, data.meanValues[i], points, vs, status);
+				data.gradients[i] = grad;
+
+				//If reconstruction failed finish
+				if (!status) {
+					isGradientFailed = true;
 				};
 			};
 
@@ -332,10 +369,12 @@ public:
 		};*/
 
 		//Now compute smoothness of every stencil and make reconstruction
-		int ENOstencilIndex = -1;
-		mino = std::numeric_limits<double>::max();
+		_ENOStencilIndex.resize(nv, -1);
+		_mino.resize(nv, std::numeric_limits<double>::max());
 		std::map<int, std::shared_ptr<std::vector<double>> > vs;
-		for (Stencil& s : subStencils) {
+		for (int sI = 0; sI < subStencils.size(); sI++) {
+			Stencil& s = subStencils[sI];
+
 			//Gather values
 			for (int cell : s.cells) {
 				vs[cell] = valuesMap[cell];
@@ -347,12 +386,11 @@ public:
 			_weights.push_back(data.weight);
 
 			//Find ENO stencil
-			double totalo = 0;
-			for (int i = 0; i < nv; i++) totalo += data.oscilation[i];
-			if (totalo < mino) {
-				mino = totalo;
-				_ENOstencil = s;
-				_ENOreconstruction = data;
+			for (int i = 0; i < nv; i++) {
+				if (data.oscilation[i] < _mino[i]) {
+					_mino[i] = data.oscilation[i];
+					_ENOStencilIndex[i] = sI;
+				};
 			};
 		};
 
@@ -375,7 +413,10 @@ public:
 		if ((_settings.type == SpatialDiscretisationType::ENO)) {
 			//ENO
 			//Obtain interpolated values at face center
-			std::vector<double> U = _ENOreconstruction.InterpolateValues(_settings.type, face.FaceCenter);
+			std::vector<double> U(_settings.nVars);
+			for (int i = 0; i < _settings.nVars; i++) {
+				U[i] = _reconstructions[_ENOStencilIndex[i]].InterpolateValue(i, _settings.type, face.FaceCenter);
+			};
 			return U;
 		};
 

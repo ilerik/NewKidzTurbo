@@ -30,7 +30,7 @@ public:
 		return res;
 	};
 
-	void LinearInterpolationComputeDisplacements(Grid& grid, 
+	void LinearInterpolationComputeDisplacements(std::shared_ptr<Grid>& grid, 
 		const std::unordered_set<int> movingNodes, 
 		std::map<int, Vector>& movingNodesDisplacements, 
 		const std::unordered_set<int> freeNodes, 
@@ -41,7 +41,7 @@ public:
 		std::map<double, Vector> velocitiesByCoordinate;
 
 		for (int nodeIndex : movingNodes) {
-			double coord = grid.localNodes[nodeIndex].P.x;
+			double coord = grid->localNodes[nodeIndex].P.x;
 			coordinates.push_back(coord);
 			velocitiesByCoordinate[coord] = movingNodesDisplacements[nodeIndex];
 		};
@@ -50,7 +50,7 @@ public:
 
 		for (int nodeIndex : freeNodes) {
 			Vector nodeVelocity; //Resulting node velocity
-			double x = grid.localNodes[nodeIndex].P.x;
+			double x = grid->localNodes[nodeIndex].P.x;
 			for (int i = 1; i < coordinates.size(); i++) {
 				double xL = coordinates[i-1];
 				double xR = coordinates[i];
@@ -65,7 +65,7 @@ public:
 	};
 
 
-	void IDWComputeDisplacements(Grid& grid, 
+	void IDWComputeDisplacements(std::shared_ptr<Grid>& grid, 
 		const std::unordered_set<int> movingNodes, 
 		std::map<int, Vector>& movingNodesDisplacements, 
 		const std::unordered_set<int> freeNodes, 
@@ -91,8 +91,8 @@ public:
 		};
 				
 		//For each moving node determine neighbour boundary faces	
-		for (int i = 0; i<grid.localFaces.size(); i++) {
-			Face& f = grid.localFaces[i];
+		for (int i = 0; i<grid->localFaces.size(); i++) {
+			Face& f = grid->localFaces[i];
 			bool isMovingFace = true;
 			for (int& faceNodeIndex : f.FaceNodes) {
 				if (movingNodes.find(faceNodeIndex) == movingNodes.end()) {
@@ -111,7 +111,7 @@ public:
 		int counter = 0;
 		for (int nodeIndex : movingNodes) {
 			counter++;		
-			Node& node = grid.localNodes[nodeIndex];
+			Node& node = grid->localNodes[nodeIndex];
 			Vector Displacement = dR[nodeIndex];
 			Vector newNormal;
 			Vector normal;
@@ -119,10 +119,10 @@ public:
 			//Iterate through all neighbour faces
 			std::set<int> faces = bFaces[nodeIndex];
 			for (int faceIndex : faces) {
-				Face& f = grid.localFaces[faceIndex];
+				Face& f = grid->localFaces[faceIndex];
 				std::vector<Vector> points(0);
 				for (int i = 0; i<f.FaceNodes.size(); i++) {
-					Node& n = grid.localNodes[f.FaceNodes[i]];
+					Node& n = grid->localNodes[f.FaceNodes[i]];
 					Vector D = dR[f.FaceNodes[i]];
 					points.push_back(n.P + D);
 				};
@@ -149,13 +149,13 @@ public:
 		double percent = 0;
 		for (int nodeIndex : freeNodes) {
 			counter++;		
-			Node& ni = grid.localNodes[nodeIndex];
+			Node& ni = grid->localNodes[nodeIndex];
 			std::vector<Vector> displacements;
 			dR[nodeIndex] = Vector(0,0,0);
 			double sum = 0;		
 
 			for (int movingNodeIndex : movingNodes) {			
-				Node& nb = grid.localNodes[movingNodeIndex];
+				Node& nb = grid->localNodes[movingNodeIndex];
 				Vector bb = b[movingNodeIndex];
 				RotationMatrix M = R[movingNodeIndex];			
 				Vector dr = ni.P - nb.P;			
@@ -180,7 +180,7 @@ public:
 		//Sync
 	};
 
-	void IDWNoRotationComputeDisplacements(Grid& grid, 
+	void IDWNoRotationComputeDisplacements(std::shared_ptr<Grid>& grid, 
 		const std::unordered_set<int> movingNodes, 
 		std::map<int, Vector>& movingNodesDisplacements, 
 		const std::unordered_set<int> freeNodes, 
@@ -204,13 +204,13 @@ public:
 		double percent = 0;
 		for (int nodeIndex : freeNodes) {
 			counter++;		
-			Node& ni = grid.localNodes[nodeIndex];
+			Node& ni = grid->localNodes[nodeIndex];
 			std::vector<Vector> displacements;
 			dR[nodeIndex] = Vector(0,0,0);
 			double sum = 0;		
 
 			for (int movingNodeIndex : movingNodes) {			
-				Node& nb = grid.localNodes[movingNodeIndex];				
+				Node& nb = grid->localNodes[movingNodeIndex];				
 				Vector dr = ni.P - nb.P;							
 				Vector displ = dR[movingNodeIndex];				
 				double w = W(dr);	//TO DO		
@@ -228,7 +228,7 @@ public:
 
 
 	//Main function
-	void ComputeDisplacements(Grid& grid, 
+	void ComputeDisplacements(std::shared_ptr<Grid>& grid, 
 		const std::unordered_set<int> movingNodes, 
 		std::map<int, Vector>& movingNodesDisplacements, 
 		const std::unordered_set<int> freeNodes, 
@@ -251,7 +251,7 @@ public:
 	};
 
 	//Main function
-	void MoveNodes(Grid& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
+	void MoveNodes(std::shared_ptr<Grid>& grid, std::vector<int> nodes, std::vector<Vector> displacements) {
 		assert(displacements.size() == nodes.size());
 
 		//Determine set of boundary nodes
@@ -260,7 +260,7 @@ public:
 		//Determine set of inner nodes		
 		std::unordered_set<int> freeNodes;
 		int cb = 0;
-		for (int i = 0; i < grid.localNodes.size(); i++) {			
+		for (int i = 0; i < grid->localNodes.size(); i++) {			
 			freeNodes.insert(i);
 		};		
 		for (int nodeI : movingNodes) {			
@@ -284,14 +284,14 @@ public:
 		//Change grid according to displacements	
 		//Nodes first
 		for (int i : freeNodes) {
-			grid.localNodes[i].P += dRfree[i];
+			grid->localNodes[i].P += dRfree[i];
 		};
 		for (int i : movingNodes) {
-			grid.localNodes[i].P += dRmoving[i];
+			grid->localNodes[i].P += dRmoving[i];
 		};
 
 		//Recalculate Face normals and other grid geometric properties
-		grid.UpdateGeometricProperties();
+		grid->UpdateGeometricProperties();
 
 	}; //MoveMesh
 

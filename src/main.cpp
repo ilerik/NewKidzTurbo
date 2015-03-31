@@ -17,73 +17,54 @@
 #include "test_list.h"
 
 //Main program
-int main(int argc, char *argv[]) {		
-	TestCases1D::TestCase1D_SodShockTube test1D;
-	int nOld = 100;
-	test1D.Init(argc, argv);
-	test1D.Run(nOld);
-	double L2 = test1D.L2error();
-	std::cout<<L2<<std::endl;	
-	int dn = 10;
-	for (int n = nOld + dn; n < 200; n += dn) {
-		test1D.Run(n);
-		double L2new = test1D.L2error();
-		double order = (std::log(L2new) - std::log(L2)) / (std::log(n) - std::log(nOld));
-		std::cout<<"n = "<<n<<", L2 = "<<L2new<<", Order : " <<order<<std::endl;
-		L2 = L2new;
-		nOld = n;
-	};
+int main(int argc, char *argv[]) {			
+	RTInstabilityTests::TestSettings settings;
 
-	return 0;
-	//RTInstabilityTests::TestSettings settings;
+	//Pertrubation
+	settings.geometrySettings.lambda = 0.5;
+	settings.geometrySettings.A = 0.01; //0.1e-2;
+	settings.geometrySettings.IsUserDefinedDisturbance = false;
 
-	////Pertrubation
-	//settings.geometrySettings.lambda = 2.0e-2;
-	//settings.geometrySettings.A = 0.0; //0.1e-2;
-	//settings.geometrySettings.IsUserDefinedDisturbance = false;
+	//Mesh
+	int nWaves = 1;
+	settings.geometrySettings.nCellX = 50;
+	settings.geometrySettings.nCellY = 50;
+	settings.geometrySettings.xMin = -0.5 * (nWaves * settings.geometrySettings.lambda);
+	settings.geometrySettings.xMax = +0.5 * (nWaves * settings.geometrySettings.lambda);
+	settings.geometrySettings.yMin = -0.75;
+	settings.geometrySettings.yMax = +0.75;
+	settings.geometrySettings.yInterface = 0.0;	
 
-	////Mesh
-	//int nWaves = 5;
-	//settings.geometrySettings.nCellX = 50;
-	//settings.geometrySettings.nCellY = 50;
-	//settings.geometrySettings.xMin = -0.5 * (nWaves * settings.geometrySettings.lambda);
-	//settings.geometrySettings.xMax = +0.5 * (nWaves * settings.geometrySettings.lambda);
-	//settings.geometrySettings.yMin =  0.0e-2;
-	//settings.geometrySettings.yMax = 10.0e-2;
-	//settings.geometrySettings.yInterface = 5.0e-2;
+	//Boundaries
+	settings.bcTop = RTInstabilityTests::BoundaryConditionType::Wall;
+	settings.bcBottom = RTInstabilityTests::BoundaryConditionType::Wall;
 
-	//settings.geometrySettings.lambda *= nWaves; // Make one wave only
-
-	////Boundaries
-	//settings.bcTop = RTInstabilityTests::BoundaryConditionType::Wall;
-	//settings.bcBottom = RTInstabilityTests::BoundaryConditionType::Wall;
-
-	////Materials
-	//settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::PerfectGas;
-	//settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::PerfectGas;
-	//settings.materialSettings.roHeavy = 2.0;
-	//settings.materialSettings.roLight = 1.0;
-	//settings.Pinterface = 1e10;
+	//Materials
+	settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::PerfectGas;
+	settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::PerfectGas;
+	settings.materialSettings.roHeavy = 2.0;
+	settings.materialSettings.roLight = 1.0;
+	settings.Pinterface = 2.5;
 	//settings.gravity = Vector(0.0, 0.0, 0.0);
-	////settings.gravity = Vector(0.0, -1.0, 0.0);
+	settings.gravity = Vector(0.0, -0.25, 0.0);
 
-	////Method
+	//Method
 	//settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
-	////_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";			
-	////_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
-	//settings.methodSettings.spatialReconstruction = RTInstabilityTests::MethodSettings::SpatialDiscretisationType::Constant;
+	//settings.methodSettings.meshMotionType = "Lagrangian";			
+	settings.methodSettings.meshMotionType = "Eulerian";		
+	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::ENO;
 
-	////Run parameters
-	//int nSnapshots = 100;
-	//settings.MaxTime = 10e-6; //10 mks
-	//settings.SaveSolutionSnapshotTime = settings.MaxTime / nSnapshots;
-	//settings.MaxIteration = 1000000;
-	//settings.SaveSolutionSnapshotIterations = 0;
+	//Run parameters
+	int nSnapshots = 100;
+	settings.MaxTime = 11.0;
+	settings.SaveSolutionSnapshotTime = settings.MaxTime / nSnapshots;
+	settings.MaxIteration = 1000000;
+	settings.SaveSolutionSnapshotIterations = 0;
 
-	////Create test object
-	//ParallelManager MPIManager(argc, argv);
-	//RTInstabilityTests::RTInstabilityTestCase test(MPIManager, settings);
-	//test.RunTest(&argc, &argv);
+	//Create test object
+	ParallelManager MPIManager(argc, argv);
+	RTInstabilityTests::RTInstabilityTestCase test(MPIManager, settings);
+	test.RunTest(&argc, &argv);
 
 	//ParallelManager MPIManager(argc, argv);
 	//GenGrid2DInterfacePertrubation(MPIManager, 

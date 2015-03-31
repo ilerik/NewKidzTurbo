@@ -224,7 +224,12 @@ public:
 	std::vector<Cell*> localCells; // only local cells (including dummy cells)
 	std::set<int> dummyLocalCells; // dummy cells created for each boundary face element	
 	std::map<int, int> cellsGlobalToLocal; // cells global index map to local index
+
+	//Topological boundary conditions (e.g. periodic) 
 	std::map<int, std::set<int>> periodicNodesIdentityList; // for each node list of nodes identifyed with it via periodic boundary
+	std::map<int, int> FaceToFaceIdentity; //For each face store it's paired face through topological mapping
+	std::map<int, Vector> FaceToFaceTranslation; 
+	std::map<int, Matrix> FaceToFaceTransformation; 
 
 	//Faces
 	int nFaces; //number of local faces

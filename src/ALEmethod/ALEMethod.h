@@ -228,7 +228,7 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
-		_moveHelper.ComputeDisplacements(*_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+		_moveHelper.ComputeDisplacements(_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
 		
 		//TO DO Sync
 		return;

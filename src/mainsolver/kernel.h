@@ -1241,6 +1241,7 @@ public:
 			for (int faceIndex : cell->Faces) {
 				Face& face = _gridPtr->localFaces[faceIndex];
 				std::vector<double> U = cellSpatial.GetSolutionAtFace(face);
+				
 				if (face.FaceCell_1 == localCellIndex) {
 					cellValuesL[face.GlobalIndex] = U;
 				} else {
@@ -1263,7 +1264,55 @@ public:
 			//Obtain dummy cell state
 			cellValuesR[faceLocalIndex] = _boundaryConditions[cell->BCMarker]->getDummyValues(nmat, cellValuesL[faceLocalIndex], *cell);
 		};
-	};
+
+		//Handle periodic connectivity issue
+		assert(_nProcessors == 1);
+		for (Face& face : _gridPtr->localFaces) {
+			//Additional check
+			if (cellValuesL[face.GlobalIndex].size() == 0) throw Exception("Reconstruction incomplete");
+
+			//If right state is empty check for periodic counterpart
+			if (cellValuesR[face.GlobalIndex].size() == 0) {
+				//Find corresponding nodes
+				std::set<int> identicalNodes;
+				for (int faceNode : face.FaceNodes) {
+					identicalNodes.insert(faceNode);
+					identicalNodes.insert(std::begin(_gridPtr->periodicNodesIdentityList[faceNode]), std::end(_gridPtr->periodicNodesIdentityList[faceNode]));
+				};
+
+				//Find corresponding face on right neighbour cell
+				int facePairIndex = -1;
+				bool isFound = false;
+				Cell& pairCell = _gridPtr->Cells[face.FaceCell_2];
+				for (int faceIndex : pairCell.Faces) {
+					Face& pairFace = _gridPtr->localFaces[faceIndex];
+					isFound = true;
+
+					//Check if all face nodes are right
+					for (int nodeIndex : pairFace.FaceNodes) {
+						if (identicalNodes.find(nodeIndex) == identicalNodes.end()) {
+							isFound = false;
+							break;
+						};
+					};
+
+					//Break if we found right face
+					if (isFound) {
+						facePairIndex = faceIndex;
+						break;
+					};
+				};
+
+				if (isFound && (cellValuesL[facePairIndex].size() != 0)) {
+					//Everything went fine
+					cellValuesR[face.GlobalIndex] = cellValuesL[facePairIndex];
+				} else {
+					throw Exception("Reconstruction incomplete");
+				};
+			};
+		};
+
+	}; //Compute solution reconstruction
 
 	//Compute convective flux and max wave propagation speed throught each face
 	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<std::vector<double> >& cellValuesL, std::vector<std::vector<double> >& cellValuesR, std::vector<double>& ALEindicators) {
@@ -1297,7 +1346,7 @@ public:
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
 			GasModel::ConservativeVariables UL = cellValuesL[f.GlobalIndex];
-			GasModel::ConservativeVariables UR = cellValuesR[f.GlobalIndex];						
+			GasModel::ConservativeVariables UR = cellValuesR[f.GlobalIndex];
 
 			//Determine face velocity
 			Vector faceVelocityAverage = Vector(0,0,0);
@@ -1637,10 +1686,6 @@ public:
 		//Synchronize
 		_parallelHelper.Barrier();
 	};	
-
-	//Implicit time step
-	void ImplicitTimeStep() {
-	};
 	
 	////Compute scalar function gradient in each cell	
 	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {

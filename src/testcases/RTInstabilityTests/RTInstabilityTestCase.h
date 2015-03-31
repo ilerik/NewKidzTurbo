@@ -59,13 +59,8 @@ struct MaterialSettigs {
 
 //Solution method settings
 struct MethodSettings {
-	std::string meshMotionType;
-	
-	//Spatial reconstruction type
-	enum class SpatialDiscretisationType {
-		Constant, //RTI wont develop for first order methods
-		WENO
-	} spatialReconstruction;
+	std::string meshMotionType;	
+	SpatialDiscretisationType spatialReconstruction;
 };
 
 //Test parameters
@@ -94,7 +89,7 @@ struct TestSettings {
 //simultaneously a shock wave, a contact discontinuity, and an expansion fan.
 class RTInstabilityTestCase: public TestCase,  public InitialConditions::InitialConditions {
 protected:	
-	Grid _grid;					  //Grid object	
+	std::shared_ptr<Grid> _gridPtr; //Grid object	
 	Configuration _configuration; //Configuration object
 	std::shared_ptr<ParallelManager> _MPIManager;  
 
@@ -259,7 +254,7 @@ public:
 
 	//Prepare computational grid
 	void PrepareGrid() {
-		_grid = GenGrid2DInterfacePertrubation(_MPIManager, 
+		_gridPtr = GenGrid2DInterfacePertrubation(_MPIManager, 
 			_settings.geometrySettings.nCellX, _settings.geometrySettings.nCellY,
 			_settings.geometrySettings.xMin, _settings.geometrySettings.xMax,
 			_settings.geometrySettings.yMin, _settings.geometrySettings.yMax,
@@ -270,7 +265,7 @@ public:
 			_signedDistanceFunction
 			);
 
-		_kernel->BindGrid(_grid);
+		_kernel->BindGrid(_gridPtr);
 	};
 
 	//Initial materials distribution
@@ -369,8 +364,9 @@ public:
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.5;
-		_configuration.RungeKuttaOrder = 4;		
+		_configuration.SpatialDiscretisation = _settings.methodSettings.spatialReconstruction;
+		_configuration.CFL = 0.2;
+		_configuration.RungeKuttaOrder = 1;		
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
@@ -496,8 +492,8 @@ public:
 			std::map<int, GasModel::MediumPhase> phases;
 			std::map<int, int> nmats;
 			std::vector<int> cellsIndexes;
-			for (int cellIndex = 0; cellIndex < _grid->nCellsLocal; cellIndex++) {
-				Cell* cell = _grid->localCells[cellIndex];
+			for (int cellIndex = 0; cellIndex < _gridPtr->nCellsLocal; cellIndex++) {
+				Cell* cell = _gridPtr->localCells[cellIndex];
 				int cellGlobalIndex = cell->GlobalIndex;
 				cellsIndexes.push_back(cellGlobalIndex);
 				double coordinate =  cell->CellCenter.x;
@@ -525,14 +521,14 @@ public:
 			double xInterfaceMax = -1000;
 			double xLeftBorder = 1000;
 			double xRightBorder = -1000;
-			for (Face& face : _grid->localFaces) {
+			for (Face& face : _gridPtr->localFaces) {
 				bool isMeltedL = (phases[face.FaceCell_1] == GasModel::MediumPhase::AboveMeltingPoint);
 				bool isMeltedR = (phases[face.FaceCell_2] == GasModel::MediumPhase::AboveMeltingPoint);
 				bool isReversed = (face.FaceNormal.x < 0);
 				int nmatL = nmats[face.FaceCell_1];
 				int nmatR = nmats[face.FaceCell_2];
 				double faceX = face.FaceCenter.x;
-				if (_grid->IsBoundaryFace(face)) continue;
+				if (_gridPtr->IsBoundaryFace(face)) continue;
 				if (nmatL != nmatR) {
 					if (xInterfaceMax < faceX) xInterfaceMax = faceX;
 					if (xInterfaceMin > faceX) xInterfaceMin = faceX;
@@ -558,8 +554,8 @@ public:
 				double xEnd = -1000;
 				for (int j = 0; j < clusters[i].size(); j++) {
 					int cellGlobalIndex = *clusters[i][j];
-					int cellIndex = _grid->cellsGlobalToLocal[cellGlobalIndex];
-					Cell* cell = _grid->localCells[cellIndex];
+					int cellIndex = _gridPtr->cellsGlobalToLocal[cellGlobalIndex];
+					Cell* cell = _gridPtr->localCells[cellIndex];
 					double x =  cell->CellCenter.x;
 					double S = cell->CellVolume;
 					int nmat = nmats[cellGlobalIndex];
@@ -567,7 +563,7 @@ public:
 
 					//Determine coordinates
 					for (int faceIndex : cell->Faces) {
-						Face& face = _grid->localFaces[faceIndex];
+						Face& face = _gridPtr->localFaces[faceIndex];
 						double faceX = face.FaceCenter.x;
 						if (xBegin > faceX) xBegin = faceX;
 						if (xEnd < faceX) xEnd = faceX;
