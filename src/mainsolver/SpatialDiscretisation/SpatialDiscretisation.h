@@ -278,6 +278,17 @@ public:
 		data.center = center;
 		data.meanValues = *values[rootIndex];
 
+		//Cell characteristic sizes
+		double hx = 0;
+		double hy = 0;
+		double hz = 0;
+		for (int nI = 0; nI < rootCell.Nodes.size(); nI++) {
+			Vector dr = _gridPtr->localNodes[nI].P - center;
+			hx += std::abs(dr.x);
+			hy += std::abs(dr.y);
+			hz += std::abs(dr.z);
+		};
+
 		if (_settings.type == SpatialDiscretisationType::PiecewiseConstant) {
 			//Null gradients
 			data.gradients = std::vector<Vector>(nv, Vector());
@@ -317,7 +328,7 @@ public:
 			if (isGradientFailed) {
 				//If no reconstruction obtained
 				for (int i = 0; i < nv; i++) {
-					data.oscilation[i] = std::numeric_limits<double>::max();					
+					data.oscilation[i] = std::numeric_limits<double>::max();
 					data.weight[i] = 0;
 				};
 			} else {
@@ -326,10 +337,12 @@ public:
 				//Compute smoothness (oscilation)			
 				for (int cellIndex : stencil.cells) {
 					if (cellIndex == rootIndex) continue; //Skip center
-					Cell& cell = _gridPtr->Cells[cellIndex]; 
+					Cell& cell = _gridPtr->Cells[cellIndex]; 					
 					for (int i = 0; i < nv; i++) {
-						double du = (*values[cellIndex])[i] - data.meanValues[i];
-						data.oscilation[i] += (du * du);						
+						double dux = (data.gradients[i].x) * hx;
+						double duy = (data.gradients[i].y) * hy;
+						double duz = (data.gradients[i].z) * hz;
+						data.oscilation[i] += (dux * dux) + (duy * duy) + (duz * duz);						
 					};
 				};						
 

@@ -22,13 +22,13 @@ int main(int argc, char *argv[]) {
 
 	//Pertrubation
 	settings.geometrySettings.lambda = 0.5;
-	settings.geometrySettings.A = 0.01; //0.1e-2;
+	settings.geometrySettings.A = 0.0; //0.01; //0.1e-2;	
 	settings.geometrySettings.IsUserDefinedDisturbance = false;
 
 	//Mesh
 	int nWaves = 1;
-	settings.geometrySettings.nCellX = 50;
-	settings.geometrySettings.nCellY = 50;
+	settings.geometrySettings.nCellX = 20;
+	settings.geometrySettings.nCellY = 60;
 	settings.geometrySettings.xMin = -0.5 * (nWaves * settings.geometrySettings.lambda);
 	settings.geometrySettings.xMax = +0.5 * (nWaves * settings.geometrySettings.lambda);
 	settings.geometrySettings.yMin = -0.75;
@@ -49,14 +49,14 @@ int main(int argc, char *argv[]) {
 	settings.gravity = Vector(0.0, -0.25, 0.0);
 
 	//Method
-	//settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
+	settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
 	//settings.methodSettings.meshMotionType = "Lagrangian";			
-	settings.methodSettings.meshMotionType = "Eulerian";		
+	//settings.methodSettings.meshMotionType = "Eulerian";		
 	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::ENO;
 
 	//Run parameters
 	int nSnapshots = 100;
-	settings.MaxTime = 11.0;
+	settings.MaxTime = 10.0;
 	settings.SaveSolutionSnapshotTime = settings.MaxTime / nSnapshots;
 	settings.MaxIteration = 1000000;
 	settings.SaveSolutionSnapshotIterations = 0;

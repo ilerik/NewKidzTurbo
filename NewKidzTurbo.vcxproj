@@ -173,6 +173,7 @@
     <ClInclude Include="src\mainsolver\Configuration\GoverningEquationsConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\RiemannSolverConfiguration.h" />
     <ClInclude Include="src\mainsolver\Configuration\SimulationConfiguration.h" />
+    <ClInclude Include="src\mainsolver\DistributedMesh\DistributedMesh.h" />
     <ClInclude Include="src\mainsolver\grid.h" />
     <ClInclude Include="src\mainsolver\kernel.h" />
     <ClInclude Include="src\mainsolver\logger.h" />

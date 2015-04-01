@@ -1,4 +1,4 @@
-#ifndef NewKidzTurbo_TestCases_RTInstabilityTests_RTInstabilityTestCase
+﻿#ifndef NewKidzTurbo_TestCases_RTInstabilityTests_RTInstabilityTestCase
 #define NewKidzTurbo_TestCases_RTInstabilityTests_RTInstabilityTestCase
 
 #include "TestCase.h"
@@ -133,6 +133,7 @@ public:
 			double dSurface = _pFunction(x) + d;
 			return dSurface;
 		};
+
 	};
 
 	GasModelConfiguration GetGasModelConfiguration(GasModelType gasModel, MaterialType material) {
@@ -259,7 +260,7 @@ public:
 			_settings.geometrySettings.xMin, _settings.geometrySettings.xMax,
 			_settings.geometrySettings.yMin, _settings.geometrySettings.yMax,
 			1.0, 1.0,
-			true, false,
+			false, false,
 			_interfaceCenter,
 			_interfaceNormal,
 			_signedDistanceFunction
@@ -326,6 +327,10 @@ public:
 			pressure += _settings.gravity * dn * ro;
 			e = pressure / (0.4 * ro);
 		};
+
+		double Lx = _settings.geometrySettings.xMax - _settings.geometrySettings.xMin;
+		double Ly = _settings.geometrySettings.yMax - _settings.geometrySettings.yMin;
+		v = 0.01 * (1 + std::cos(2*PI*x/Lx)) * (1+cos(2*PI*y/Ly))/4.0;
 			
 		//Convert to conservative variables
 		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
@@ -359,13 +364,15 @@ public:
 		_configuration.GasModelsConfiguration["Heavy"] = GetGasModelConfiguration(_settings.materialSettings.gasModelHeavy, MaterialType::Heavy);
 
 		//Boundary conditions		
+		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("Light", RTInstabilityTests::BoundaryConditionType::Wall);
+		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("Light", RTInstabilityTests::BoundaryConditionType::Wall);
 		_configuration.BoundaryConditions["bottom"] = GetBoundaryConditionConfiguration("Light", _settings.bcBottom);
 		_configuration.BoundaryConditions["top"] = GetBoundaryConditionConfiguration("Heavy", _settings.bcTop);			
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
 		_configuration.SpatialDiscretisation = _settings.methodSettings.spatialReconstruction;
-		_configuration.CFL = 0.2;
+		_configuration.CFL = 0.8;
 		_configuration.RungeKuttaOrder = 1;		
 
 		//ALE settings
