@@ -1633,7 +1633,7 @@ public:
 			//ALE step mesh transformation
 			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
 				//Move mesh
-				_ALEmethod.MoveMesh(stageTimeStep);			
+				_ALEmethod.MoveMesh(stageTimeStep);	
 
 				//Regenerate geometric entities
 				_gridPtr->UpdateGeometricProperties();

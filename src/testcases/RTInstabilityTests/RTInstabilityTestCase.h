@@ -260,7 +260,7 @@ public:
 			_settings.geometrySettings.xMin, _settings.geometrySettings.xMax,
 			_settings.geometrySettings.yMin, _settings.geometrySettings.yMax,
 			1.0, 1.0,
-			false, false,
+			true, false,
 			_interfaceCenter,
 			_interfaceNormal,
 			_signedDistanceFunction
@@ -372,11 +372,11 @@ public:
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
 		_configuration.SpatialDiscretisation = _settings.methodSettings.spatialReconstruction;
-		_configuration.CFL = 0.8;
+		_configuration.CFL = 0.4;
 		_configuration.RungeKuttaOrder = 1;		
 
 		//ALE settings
-		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
+		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;
 		_configuration.ALEConfiguration.ALEMotionType = _settings.methodSettings.meshMotionType;		
 
 		//Run settings

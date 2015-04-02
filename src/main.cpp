@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 	settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
 	//settings.methodSettings.meshMotionType = "Lagrangian";			
 	//settings.methodSettings.meshMotionType = "Eulerian";		
-	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::ENO;
+	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::WENO;
 
 	//Run parameters
 	int nSnapshots = 100;

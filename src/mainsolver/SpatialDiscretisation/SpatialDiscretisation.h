@@ -347,9 +347,10 @@ public:
 				};						
 
 				//Compute weight
-				const double epsilon = std::numeric_limits<double>::min();
+				const double r = -4;
+				const double epsilon = std::numeric_limits<double>::epsilon();
 				for (int i = 0; i < nv; i++) {
-					data.weight[i] = 1.0 / (epsilon + data.oscilation[i]);
+					data.weight[i] = std::pow(epsilon + data.oscilation[i], r);
 				};
 			};
 
@@ -437,9 +438,14 @@ public:
 		int nStencils = _weights.size();
 		std::vector<double> result(_settings.nVars, 0.0);
 		std::vector<double> wSum(_settings.nVars); //Sum of distance corrected weights at face
-		for (int si = 0; si < nStencils; si++) {
+		for (int si = 0; si < nStencils; si++) {						
 			//Obtain interpolated values at face center
-			std::vector<double> U = _reconstructions[si].InterpolateValues(_settings.type, face.FaceCenter);
+			for (int i = 0; i < _settings.nVars; i++) {				
+				double u =  _reconstructions[si].InterpolateValue(i, _settings.type, face.FaceCenter);
+				double w = _weights[si][i];				
+				result[i]	+= w * u;
+				wSum[i]		+= w;
+			};
 
 			//Compute distance coefficient for current stencil (as inverse average distance to face center)
 			double d = 0.0;						
@@ -448,14 +454,7 @@ public:
 				Vector dr = cell.CellCenter - face.FaceCenter;
 				d += dr.mod();
 			};
-			d = 1.0 / std::pow(d, 5);
-			
-			//Add up result
-			for (int i = 0; i < _settings.nVars; i++) {				
-				double w = d * _weights[si][i];				
-				result[i]	+= w * U[i];
-				wSum[i]		+= w;
-			};
+			d = 1.0 / std::pow(d, 5);						
 		};
 
 		//Normilize		

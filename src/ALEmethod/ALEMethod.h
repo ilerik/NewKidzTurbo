@@ -228,6 +228,34 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
+		//Compute displacements
+		_moveHelper.ComputeDisplacements(_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+
+		//Correct displacement on periodic boundaries
+		std::map<int, Vector> correctedVelocities;
+		for (auto kv : _gridPtr->periodicNodesIdentityList) {
+			int nodeIndex = kv.first;
+			std::set<int> identicalNodes = kv.second;
+
+			Vector nodeVelocity = nodesVelocity[nodeIndex];
+			nodeVelocity.x = 0;
+			nodeVelocity.z = 0;
+			
+			correctedVelocities[nodeIndex] = nodeVelocity;
+			for (int inodeIndex : identicalNodes) {
+				correctedVelocities[nodeIndex].y += nodesVelocity[inodeIndex].y;
+			};
+			correctedVelocities[nodeIndex].y /= 1 + identicalNodes.size();
+		};
+
+		//Write corrections back and add new moving nodes
+		for (auto kv : correctedVelocities) {
+			nodesVelocity[kv.first] = kv.second;
+			freeNodes.erase(kv.first);
+			movingNodes.insert(kv.first);
+		};
+
+		//Compute displacements again
 		_moveHelper.ComputeDisplacements(_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
 		
 		//TO DO Sync

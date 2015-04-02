@@ -159,8 +159,8 @@ public:
 				Vector bb = b[movingNodeIndex];
 				RotationMatrix M = R[movingNodeIndex];			
 				Vector dr = ni.P - nb.P;			
-				//Vector displ = (M * ni.P + bb - ni.P);
-				Vector displ = dR[movingNodeIndex];
+				Vector displ = (M * ni.P + bb - ni.P);
+				//Vector displ = dR[movingNodeIndex];
 				/*if ((dr.x) > (period / 2.0)) {
 					dr.x = (period / 2.0) - dr.x;
 				};
