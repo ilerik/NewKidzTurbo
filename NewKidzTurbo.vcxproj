@@ -182,6 +182,7 @@
     <ClInclude Include="src\mainsolver\patch.h" />
     <ClInclude Include="src\mainsolver\perfomanceHelper.h" />
     <ClInclude Include="src\mainsolver\SpatialDiscretisation\SpatialDiscretisation.h" />
+    <ClInclude Include="src\meshadaptation\MeshAdaptationManager.h" />
     <ClInclude Include="src\meshmovement\MeshMovement.h" />
     <ClInclude Include="src\postprocessing\CGNSWriter.h" />
     <ClInclude Include="src\riemannsolvers\GeneralEOS_HLLC_3d.h" />
@@ -204,6 +205,7 @@
     <ClInclude Include="src\testcases\MetalsCollisionTests\MetalsImpact2DTestCase.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_1.h" />
     <ClInclude Include="src\testcases\RMInstabilityTests\RMITest_ALE_1.h" />
+    <ClInclude Include="src\testcases\RTInstabilityTests\DoludenkoTestCase.h" />
     <ClInclude Include="src\testcases\RTInstabilityTests\RTInstabilityTestCase.h" />
     <ClInclude Include="src\testcases\TestCase.h" />
     <ClInclude Include="src\testcases\TestCases1D\TestCase1DALE3_RK2.h" />

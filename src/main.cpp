@@ -21,18 +21,18 @@ int main(int argc, char *argv[]) {
 	RTInstabilityTests::TestSettings settings;
 
 	//Pertrubation
-	settings.geometrySettings.lambda = 0.5;
+	settings.geometrySettings.lambda = 8e-3;
 	settings.geometrySettings.A = 0.0; //0.01; //0.1e-2;	
 	settings.geometrySettings.IsUserDefinedDisturbance = false;
 
 	//Mesh
 	int nWaves = 1;
-	settings.geometrySettings.nCellX = 20;
-	settings.geometrySettings.nCellY = 60;
+	settings.geometrySettings.nCellX = 80;
+	settings.geometrySettings.nCellY = 40;
 	settings.geometrySettings.xMin = -0.5 * (nWaves * settings.geometrySettings.lambda);
 	settings.geometrySettings.xMax = +0.5 * (nWaves * settings.geometrySettings.lambda);
-	settings.geometrySettings.yMin = -0.75;
-	settings.geometrySettings.yMax = +0.75;
+	settings.geometrySettings.yMin = -2.0e-3;
+	settings.geometrySettings.yMax = +2.0e-3;
 	settings.geometrySettings.yInterface = 0.0;	
 
 	//Boundaries
@@ -40,13 +40,13 @@ int main(int argc, char *argv[]) {
 	settings.bcBottom = RTInstabilityTests::BoundaryConditionType::Wall;
 
 	//Materials
-	settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::PerfectGas;
-	settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::PerfectGas;
-	settings.materialSettings.roHeavy = 2.0;
-	settings.materialSettings.roLight = 1.0;
-	settings.Pinterface = 2.5;
+	settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::Barotropic;
+	settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::Barotropic;
+	settings.materialSettings.roHeavy = 11400.0;	
+	settings.materialSettings.roLight = 4500.0;
+	settings.Pinterface = 2e14;
 	//settings.gravity = Vector(0.0, 0.0, 0.0);
-	settings.gravity = Vector(0.0, -0.25, 0.0);
+	settings.gravity = Vector(0.0, -1e6, 0.0);
 
 	//Method
 	settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
 	//Run parameters
 	int nSnapshots = 100;
-	settings.MaxTime = 10.0;
+	settings.MaxTime = 5.0e-6;
 	settings.SaveSolutionSnapshotTime = settings.MaxTime / nSnapshots;
 	settings.MaxIteration = 1000000;
 	settings.SaveSolutionSnapshotIterations = 0;
