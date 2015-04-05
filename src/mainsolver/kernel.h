@@ -1,4 +1,4 @@
-#ifndef TURBO_MAINSOLVER_KERNEL
+﻿#ifndef TURBO_MAINSOLVER_KERNEL
 #define TURBO_MAINSOLVER_KERNEL
 
 #include "grid.h"
@@ -380,7 +380,7 @@ public:
 				//Save snapshot
 				std::stringstream snapshotFileName;
 				snapshotFileName.str(std::string());
-				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".cgns";
+				snapshotFileName<<"dataI"<<stepInfo.Iteration<<".dat";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
 			};
@@ -392,7 +392,7 @@ public:
 				snapshotFileName.str(std::string());
 				snapshotFileName<<std::fixed;
 				snapshotFileName.precision(snapshotTimePrecision);								
-				snapshotFileName<<"dataT"<<stepInfo.Time<<".cgns";
+				snapshotFileName<<"dataT"<<stepInfo.Time<<".dat";
 				SaveGrid(snapshotFileName.str());				
 				SaveSolution(snapshotFileName.str(), "Solution");
 
@@ -410,10 +410,10 @@ public:
 			msg.clear();
 			msg.str(std::string());
 			msg<<"Iteration = "<<stepInfo.Iteration<<"; Total time = "<< stepInfo.Time << "; Time step = " <<stepInfo.TimeStep << "; RMSrou = "<<stepInfo.Residual[1]<<"\n";
-			msg<<"ALEtoFluxRation = "<<stepInfo.ALETime / stepInfo.ConvectiveFluxesTime <<"; ConvectiveFluxTime = "<<stepInfo.ConvectiveFluxesTime << "; ALETime = " << stepInfo.ALETime<<"\n";
-			msg<<"Computation time = "<<computationPhase->GetTotalTimeMilliseconds()<<std::endl;
-			msg<<"Snapshot time = "<<snapshotsPhase->GetTotalTimeMilliseconds()<<std::endl;
-			msg<<"Save history time = "<<saveHistoryPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"ALEtoFluxRation = "<<stepInfo.ALETime / stepInfo.ConvectiveFluxesTime <<"; ConvectiveFluxTime = "<<stepInfo.ConvectiveFluxesTime << "; ALETime = " << stepInfo.ALETime<<"\n";
+			//msg<<"Computation time = "<<computationPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"Snapshot time = "<<snapshotsPhase->GetTotalTimeMilliseconds()<<std::endl;
+			//msg<<"Save history time = "<<saveHistoryPhase->GetTotalTimeMilliseconds()<<std::endl;
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());
 			if (_parallelHelper.IsMaster() && _isVerbose) {
 				std::cout<<msg.str();
@@ -1287,7 +1287,74 @@ public:
 		return TURBO_OK;
 	};
 
-	turbo_errt SaveSolution(std::string fname, std::string solutionName) {	
+	turbo_errt SaveSolution(std::string fname, std::string solutionName) {
+		std::ofstream ofs(fname);
+
+		ofs<<"TITLE = \"Impact ALE solution\""<<std::endl;
+		ofs<<"VARIABLES = \"X\", \"Y\", \"mat\", \"Pressure(GPa)\""<<std::endl;
+		ofs<<"ZONE T=\"DataI"<<stepInfo.Iteration<<"\", STRANDID=1, SOLUTIONTIME="<<stepInfo.Time<<", NODES="<<_grid.nCellsLocal*4<<", ELEMENTS="<<_grid.nCellsLocal<<", DATAPACKING=BLOCK, VARLOCATION=([3,4]=CELLCENTERED), ZONETYPE=FEQUADRILATERAL"<<std::endl;
+		
+		//Output data for nodes
+
+		//X
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			for (int n : cell->Nodes) {
+				ofs<<_grid.localNodes[n].P.x<<" ";
+			};
+			for (int n : cell->Nodes) {
+				ofs<<_grid.localNodes[n].P.x<<" ";
+			};
+		};
+		ofs<<std::endl;
+
+		//Y
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			for (int n : cell->Nodes) {
+				ofs<<_grid.localNodes[n].P.y<<" ";
+			};
+			for (int n : cell->Nodes) {
+				double P = GetCellPressure(cellIndex) / 1e9;
+				/*if (P > 1.0) {
+					P = std::log10(P);
+				} else {
+					P = 0.0;
+				};*/
+				ofs<<P<<" ";
+			};
+		};
+		ofs<<std::endl;		
+
+		//Output data for cells
+
+		//Material
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			ofs<<GetCellGasModelIndex(cellIndex)<<" ";
+		};
+		ofs<<std::endl;
+
+		//P
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			ofs<<GetCellPressure(cellIndex) / 1e9<<" ";
+		};
+		ofs<<std::endl;		
+
+		//Connectivity
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];			
+			ofs<<1 + cellIndex * 4<<" "
+				<<1 + cellIndex * 4 + 1<<" "
+				<<1 + cellIndex * 4 + 3<<" "
+				<<1 + cellIndex * 4 + 2<<std::endl;						
+		};
+		ofs<<std::endl;
+
+		ofs.close();
+
+		return TURBO_OK;
 		//Open file
 		_cgnsWriter.OpenFile(fname);
 		int nv = nVariables;
