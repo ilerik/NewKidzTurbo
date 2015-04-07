@@ -1291,8 +1291,8 @@ public:
 		std::ofstream ofs(fname);
 
 		ofs<<"TITLE = \"Impact ALE solution\""<<std::endl;
-		ofs<<"VARIABLES = \"X\", \"Y\", \"mat\", \"Pressure(GPa)\""<<std::endl;
-		ofs<<"ZONE T=\"DataI"<<stepInfo.Iteration<<"\", STRANDID=1, SOLUTIONTIME="<<stepInfo.Time<<", NODES="<<_grid.nCellsLocal*4<<", ELEMENTS="<<_grid.nCellsLocal<<", DATAPACKING=BLOCK, VARLOCATION=([3,4]=CELLCENTERED), ZONETYPE=FEQUADRILATERAL"<<std::endl;
+		ofs<<"VARIABLES = \"X\", \"Y\", \"mat\", \"Pressure(GPa)\", \"Acceleration (m/s^2)\", \"T\""<<std::endl;
+		ofs<<"ZONE T=\"DataI"<<stepInfo.Iteration<<"\", STRANDID=1, SOLUTIONTIME="<<stepInfo.Time<<", NODES="<<_grid.nCellsLocal*4<<", ELEMENTS="<<_grid.nCellsLocal<<", DATAPACKING=BLOCK, VARLOCATION=([3,4,5,6]=CELLCENTERED), ZONETYPE=FEQUADRILATERAL"<<std::endl;
 		
 		//Output data for nodes
 
@@ -1300,10 +1300,10 @@ public:
 		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
 			Cell* cell = _grid.localCells[cellIndex];
 			for (int n : cell->Nodes) {
-				ofs<<_grid.localNodes[n].P.x<<" ";
+				ofs<<_grid.localNodes[n].P.x * 1e3<<" ";
 			};
 			for (int n : cell->Nodes) {
-				ofs<<_grid.localNodes[n].P.x<<" ";
+				ofs<<_grid.localNodes[n].P.x * 1e3<<" ";
 			};
 		};
 		ofs<<std::endl;
@@ -1312,8 +1312,13 @@ public:
 		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
 			Cell* cell = _grid.localCells[cellIndex];
 			for (int n : cell->Nodes) {
-				ofs<<_grid.localNodes[n].P.y<<" ";
+				ofs<<0<<" ";
 			};
+			double d_rou_dt = Residual[cell->GlobalIndex * nVariables + 1];
+			double d_ro_dt = Residual[cell->GlobalIndex * nVariables + 0];
+			double ro = GetCellValues(cell->GlobalIndex)[0];
+			double u = GetCellValues(cell->GlobalIndex)[1] / ro;
+			double a = (d_rou_dt - u * d_ro_dt) / ro;
 			for (int n : cell->Nodes) {
 				double P = GetCellPressure(cellIndex) / 1e9;
 				/*if (P > 1.0) {
@@ -1321,7 +1326,7 @@ public:
 				} else {
 					P = 0.0;
 				};*/
-				ofs<<P<<" ";
+				ofs<<a<<" ";
 			};
 		};
 		ofs<<std::endl;		
@@ -1340,7 +1345,28 @@ public:
 			Cell* cell = _grid.localCells[cellIndex];
 			ofs<<GetCellPressure(cellIndex) / 1e9<<" ";
 		};
-		ofs<<std::endl;		
+		ofs<<std::endl;
+
+		//Acceleration
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			double d_rou_dt = Residual[cell->GlobalIndex * nVariables + 1];
+			double d_ro_dt = Residual[cell->GlobalIndex * nVariables + 0];
+			double ro = GetCellValues(cell->GlobalIndex)[0];
+			double u = GetCellValues(cell->GlobalIndex)[1] / ro;
+			double a = (d_rou_dt - u * d_ro_dt) / ro;
+			ofs<<a<<" ";
+		};
+		ofs<<std::endl;
+
+		//Temperature
+		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+			Cell* cell = _grid.localCells[cellIndex];
+			int nmat = GetCellGasModelIndex(cellIndex);
+			double T = _gasModels[nmat]->GetTemperature(GetCellValues(cell->GlobalIndex));
+			ofs<<T<<" ";
+		};
+		ofs<<std::endl;
 
 		//Connectivity
 		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
