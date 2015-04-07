@@ -27,39 +27,39 @@ int main(int argc, char *argv[]) {
 
 	//Mesh
 	int nWaves = 1;
-	settings.geometrySettings.nCellX = 80;
+	settings.geometrySettings.nCellX = 10;
 	settings.geometrySettings.nCellY = 40;
 	settings.geometrySettings.xMin = -0.5 * (nWaves * settings.geometrySettings.lambda);
 	settings.geometrySettings.xMax = +0.5 * (nWaves * settings.geometrySettings.lambda);
-	settings.geometrySettings.yMin = -2.0e-3;
-	settings.geometrySettings.yMax = +2.0e-3;
+	settings.geometrySettings.yMin = -0.01;
+	settings.geometrySettings.yMax = +0.01;
 	settings.geometrySettings.yInterface = 0.0;	
 
 	//Boundaries
-	settings.bcTop = RTInstabilityTests::BoundaryConditionType::Wall;
+	settings.bcTop = RTInstabilityTests::BoundaryConditionType::Natural;
 	settings.bcBottom = RTInstabilityTests::BoundaryConditionType::Wall;
 
 	//Materials
-	settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::Barotropic;
-	settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::Barotropic;
+	settings.materialSettings.gasModelHeavy = RTInstabilityTests::GasModelType::PerfectGas;
+	settings.materialSettings.gasModelLight = RTInstabilityTests::GasModelType::PerfectGas;
 	settings.materialSettings.roHeavy = 11400.0;	
-	settings.materialSettings.roLight = 4500.0;
-	settings.Pinterface = 2e14;
+	settings.materialSettings.roLight = 7900.0;
+	settings.Pinterface = 5e8;
 	//settings.gravity = Vector(0.0, 0.0, 0.0);
-	settings.gravity = Vector(0.0, -1e6, 0.0);
+	settings.gravity = Vector(0.0, 0.0, 0.0);
 
 	//Method
-	settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
-	//settings.methodSettings.meshMotionType = "Lagrangian";			
-	//settings.methodSettings.meshMotionType = "Eulerian";		
-	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::WENO;
+	//settings.methodSettings.meshMotionType = "ALEMaterialInterfaces";
+	//settings.methodSettings.meshMotionType = "Lagrangian";
+	settings.methodSettings.meshMotionType = "Eulerian";		
+	settings.methodSettings.spatialReconstruction = SpatialDiscretisationType::PiecewiseConstant;
 
 	//Run parameters
 	int nSnapshots = 100;
-	settings.MaxTime = 5.0e-6;
+	settings.MaxTime = 100.0e-6;
 	settings.SaveSolutionSnapshotTime = settings.MaxTime / nSnapshots;
 	settings.MaxIteration = 1000000;
-	settings.SaveSolutionSnapshotIterations = 0;
+	settings.SaveSolutionSnapshotIterations = 1;
 
 	//Create test object
 	ParallelManager MPIManager(argc, argv);

@@ -226,7 +226,7 @@ public:
 		};
 
 		if (type == BoundaryConditionType::Natural) {
-			conf.BoundaryConditionType = BCType_t::BCOutflowSupersonic;
+			conf.BoundaryConditionType = BCType_t::BCGeneral;
 			conf.MovementType = BoundaryConditionMovementType::Fixed;
 			conf.MaterialName = materialName;
 			return conf;			
@@ -319,18 +319,18 @@ public:
 		if (nmat == 0) {
 			//Light
 			ro = _settings.materialSettings.roLight;
-			pressure += _settings.gravity * dn * ro;
-			e = pressure / (0.4 * ro);
+			pressure += _settings.gravity * dn * ro;			
 		} else {
 			//Heavy
 			ro = _settings.materialSettings.roHeavy;
-			pressure += _settings.gravity * dn * ro;
-			e = pressure / (0.4 * ro);
+			pressure += _settings.gravity * dn * ro;						
+			v = -500;
 		};
+		e = pressure / (0.4 * ro);
 
 		double Lx = _settings.geometrySettings.xMax - _settings.geometrySettings.xMin;
 		double Ly = _settings.geometrySettings.yMax - _settings.geometrySettings.yMin;
-		v = 1e-4 * (std::cos(1200*x) * std::exp(-std::abs(y)));
+		//v = 1e-4 * (std::cos(1200*x) * std::exp(-std::abs(y)));
 			
 		//Convert to conservative variables
 		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
@@ -372,8 +372,8 @@ public:
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
 		_configuration.SpatialDiscretisation = _settings.methodSettings.spatialReconstruction;
-		_configuration.CFL = 0.4;
-		_configuration.RungeKuttaOrder = 1;		
+		_configuration.CFL = 0.1;
+		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;
