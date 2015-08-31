@@ -160,9 +160,9 @@ private:
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
-		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
+		_configuration.ALEConfiguration.ALEMotionType = "Eulerian";	
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";
-		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
+		//_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
 
 		//Run settings
 		_configuration.MaxIteration = 100000000;
@@ -204,13 +204,13 @@ public:
 
 		//Initial conditions
 		_kernel->GenerateInitialConditions(this);
-		//_kernel->SaveGrid("init.cgns");
-		//_kernel->SaveSolution("init.cgns", "Solution");
+		_kernel->SaveGrid("init.cgns");
+		_kernel->SaveSolution("init.cgns", "Solution");
 
 		//Run computational cycle
 		_kernel->RunCalculation();
-		//_kernel->SaveGrid("result.cgns");
-		//_kernel->SaveSolution("result.cgns", "Solution");
+		_kernel->SaveGrid("result.cgns");
+		_kernel->SaveSolution("result.cgns", "Solution");
 
 		//Finilize
 		_kernel->FinalizeCalculation();

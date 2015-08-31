@@ -437,30 +437,30 @@ public:
 		//WENO general reconstruction
 		int nStencils = _weights.size();
 		std::vector<double> result(_settings.nVars, 0.0);
-		std::vector<double> wSum(_settings.nVars); //Sum of distance corrected weights at face
+		//std::vector<double> wSum(_settings.nVars); //Sum of distance corrected weights at face
 		for (int si = 0; si < nStencils; si++) {						
 			//Obtain interpolated values at face center
 			for (int i = 0; i < _settings.nVars; i++) {				
 				double u =  _reconstructions[si].InterpolateValue(i, _settings.type, face.FaceCenter);
 				double w = _weights[si][i];				
 				result[i]	+= w * u;
-				wSum[i]		+= w;
+				//wSum[i]		+= w;
 			};
 
-			//Compute distance coefficient for current stencil (as inverse average distance to face center)
-			double d = 0.0;						
-			for (int cellIndex : _reconstructions[si].stencil.cells) {	
-				Cell& cell = _gridPtr->Cells[cellIndex];
-				Vector dr = cell.CellCenter - face.FaceCenter;
-				d += dr.mod();
-			};
-			d = 1.0 / std::pow(d, 5);						
-		};
+//  Compute distance coefficient for current stencil (as inverse average distance to face center)
+//  double d = 0.0;						
+//  for (int cellIndex : _reconstructions[si].stencil.cells) {	
+//		  Cell& cell = _gridPtr->Cells[cellIndex];
+//		  Vector dr = cell.CellCenter - face.FaceCenter;
+//		  d += dr.mod();
+//	  };
+//  	d = 1.0 / std::pow(d, 5);						
+    };
 
-		//Normilize		
-		for (int i = 0; i < _settings.nVars; i++) {								
-			result[i] /=  wSum[i];
-		};		
+		//Normalize	 TO DO FIX !!!double normalisation!!!
+//		for (int i = 0; i < _settings.nVars; i++) {								
+//			result[i] /=  wSum[i];
+//		};		
 
 		return result;
 	};
