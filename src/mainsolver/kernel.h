@@ -205,10 +205,10 @@ public:
 	//Finilize kernel work
 	turbo_errt Finalize() {
 		_cgnsReader.Finalize();
-		_cgnsWriter.Finalize();
-		_parallelHelper.Finalize();			
-		_logger.FinilizeLogging();
-		_perfomanceHelper.Finalize();
+		_cgnsWriter.Finalize();					
+    _logger.FinilizeLogging();
+    _perfomanceHelper.Finalize();
+    _parallelHelper.Finalize();
 		return TURBO_OK;
 	};
 
@@ -1068,49 +1068,56 @@ public:
 	};
 
 	turbo_errt ReadConfiguration(std::string fname) {
-		//Hardcode configuration for now
-		_configuration.InputCGNSFile = "";
-		_configuration.OutputCGNSFile = "result.cgns";
+    //Hardcode configuration for now
+    _configuration.WorkingDirectory = "./results";
+    _configuration.InputCGNSFile = "";
+    _configuration.OutputCGNSFile = "result.cgns";
 
-		//Availible gas models
-		_configuration.AddGasModel("Air");	
-		_configuration.AddGasModel("StainlessSteel");
-		_configuration.AddGasModel("Plumbum");
+    //Rieman solver settings
+    _configuration.RiemannSolverConfiguration.riemannSolverType = RiemannSolverConfiguration::RiemannSolverType::Godunov;
 
-		//Air (ideal gas)
-		_configuration.GasModelsConfiguration["Air"].GasModelName = "PerfectGasModel";
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("IdealGasConstant", 8.3144621);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatRatio", 1.4);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatVolume", 1006.43 / 1.4);
-		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
+    //Solver settings					
+    _configuration.SimulationType = TimeAccurate;
+    _configuration.CFL = 0.5;
+    _configuration.RungeKuttaOrder = 4;
 
-		//Stainless steel
-		_configuration.GasModelsConfiguration["StainlessSteel"].GasModelName = "LomonosovFortovGasModel";
-		_configuration.GasModelsConfiguration["StainlessSteel"].SetPropertyValue("MaterialIndex", 0);		
+    //Run settings
+    _configuration.MaxIteration = 1000000;
+    _configuration.MaxTime = 140e-6;
+    _configuration.SaveSolutionSnapshotIterations = 0;
+    _configuration.SaveSolutionSnapshotTime = _configuration.MaxTime / 28;
 
-		//Plumbum
-		_configuration.GasModelsConfiguration["Plumbum"].GasModelName = "LomonosovFortovGasModel";
-		_configuration.GasModelsConfiguration["Plumbum"].SetPropertyValue("MaterialIndex", 1);				
+    //ALE settings
+    _configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::Linear1D;
+    //_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
+    //_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";
+    _configuration.ALEConfiguration.ALEMotionType = "Eulerian";		
 
-		//Boundary conditions				
-		_configuration.BoundaryConditions["top"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		_configuration.BoundaryConditions["bottom"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		//_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCInflowSupersonic;
-		//_configuration.BoundaryConditions["left"].SetPropertyValue("Density", 1000 * 1.0 / 0.88200003E-01); //Pb
-		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityX", 1000); //
-		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityY", 0); //
-		//_configuration.BoundaryConditions["left"].SetPropertyValue("VelocityZ", 0); //
-		//_configuration.BoundaryConditions["left"].SetPropertyValue("InternalEnergy", 0); //
-		//_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;
-		/*_configuration.BoundaryConditions["rear"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["front"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["INLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["OUTLET_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;
-		_configuration.BoundaryConditions["WALL_2D"].BoundaryConditionType = BCType_t::BCSymmetryPlane;*/
+		//Availible gas models		
+		_configuration.AddGasModel("Xenon"); // 0
+		_configuration.AddGasModel("Argon"); // 1		
+
+		//Xenon
+		_configuration.GasModelsConfiguration["Xenon"].GasModelName = "PerfectGasModel";
+    _configuration.GasModelsConfiguration["Xenon"].SetPropertyValue("IdealGasConstant", 8.3144621);
+    _configuration.GasModelsConfiguration["Xenon"].SetPropertyValue("SpecificHeatRatio", 5.0/3.0);
+    _configuration.GasModelsConfiguration["Xenon"].SetPropertyValue("SpecificHeatVolume", 1006.43 / (5.0 / 3.0));
+    _configuration.GasModelsConfiguration["Xenon"].SetPropertyValue("SpecificHeatPressure", 1006.43);
+
+		//Argon
+		_configuration.GasModelsConfiguration["Argon"].GasModelName = "PerfectGasModel";
+    _configuration.GasModelsConfiguration["Argon"].SetPropertyValue("IdealGasConstant", 8.3144621);
+    _configuration.GasModelsConfiguration["Argon"].SetPropertyValue("SpecificHeatRatio", 5.0/3.0);
+    _configuration.GasModelsConfiguration["Argon"].SetPropertyValue("SpecificHeatVolume", 1006.43 / (5.0 / 3.0));
+    _configuration.GasModelsConfiguration["Argon"].SetPropertyValue("SpecificHeatPressure", 1006.43);
+
+		//Boundary conditions						
+		_configuration.BoundaryConditions["right"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;    
+    _configuration.BoundaryConditions["right"].MovementType = BoundaryConditionMovementType::Fixed;
+    _configuration.BoundaryConditions["right"].MaterialName = "Argon";
+		_configuration.BoundaryConditions["left"].BoundaryConditionType = BCType_t::BCOutflowSupersonic;    
+    _configuration.BoundaryConditions["left"].MovementType = BoundaryConditionMovementType::Fixed;
+    _configuration.BoundaryConditions["left"].MaterialName = "Xenon";
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1133,10 +1140,7 @@ public:
 
 				//Skip missing boundary condition
 				continue;
-			};
-
-			
-			
+			};						
 			
 			//Initialize boundary conditions
 			bool bcTypeCheckPassed = false;
@@ -1291,8 +1295,8 @@ public:
 		std::ofstream ofs(fname);
 
 		ofs<<"TITLE = \"Impact ALE solution\""<<std::endl;
-		ofs<<"VARIABLES = \"X\", \"Y\", \"mat\", \"Pressure(GPa)\", \"Acceleration (m/s^2)\", \"T\""<<std::endl;
-		ofs<<"ZONE T=\"DataI"<<stepInfo.Iteration<<"\", STRANDID=1, SOLUTIONTIME="<<stepInfo.Time<<", NODES="<<_grid.nCellsLocal*4<<", ELEMENTS="<<_grid.nCellsLocal<<", DATAPACKING=BLOCK, VARLOCATION=([3,4,5,6]=CELLCENTERED), ZONETYPE=FEQUADRILATERAL"<<std::endl;
+		ofs<<"VARIABLES = \"X\", \"Y\", \"mat\", \"Pressure(GPa)\", \"u\", \"Acceleration (m/s^2)\", \"T\""<<std::endl;
+		ofs<<"ZONE T=\"DataI"<<stepInfo.Iteration<<"\", STRANDID=1, SOLUTIONTIME="<<stepInfo.Time<<", NODES="<<_grid.nCellsLocal*4<<", ELEMENTS="<<_grid.nCellsLocal<<", DATAPACKING=BLOCK, VARLOCATION=([3,4,5,6,7]=CELLCENTERED), ZONETYPE=FEQUADRILATERAL"<<std::endl;
 		
 		//Output data for nodes
 
@@ -1346,6 +1350,17 @@ public:
 			ofs<<GetCellPressure(cellIndex) / 1e9<<" ";
 		};
 		ofs<<std::endl;
+
+    //Velocity
+    for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {
+      Cell* cell = _grid.localCells[cellIndex];
+      double d_rou_dt = Residual[cell->GlobalIndex * nVariables + 1];
+      double d_ro_dt = Residual[cell->GlobalIndex * nVariables + 0];
+      double ro = GetCellValues(cell->GlobalIndex)[0];
+      double u = GetCellValues(cell->GlobalIndex)[1] / ro;      
+      ofs << u << " ";
+    };
+    ofs << std::endl;
 
 		//Acceleration
 		for (int cellIndex = 0; cellIndex < _grid.nCellsLocal; cellIndex++) {

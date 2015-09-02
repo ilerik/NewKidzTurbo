@@ -76,7 +76,7 @@ public:
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.85;
+		_configuration.CFL = 0.3;
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
