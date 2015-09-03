@@ -5,10 +5,11 @@
 #include "utilityfunctions.h"
 #include "MeshMovement.h"
 #include <unordered_set>
+#include <memory>
 
 //Define ALE integration method
 class ALEMethod {	
-	Grid* _grid;
+	std::shared_ptr<Grid> _gridPtr;
 
 	// map faceIndex to [0,1] indicator value. 1.0 - F
 	double (*_indicatorFunction)(int); 
@@ -17,8 +18,8 @@ public:
 	MeshMovement _moveHelper;
 
 	//Set reference to grid
-	void SetGrid(Grid& grid) {
-		_grid = &grid;
+	void SetGrid(std::shared_ptr<Grid>& grid) {
+		_gridPtr = grid;
 	};
 
 	//Define availible types of ALE motion
@@ -61,10 +62,10 @@ public:
 	//ALE residual correction procedure
 	void Remap(int nVariables, std::vector<double>& residual, std::vector<double>& cellValues, double dt) {
 		//Compute grid motion fluxes through each face
-		for (int cellInd = 0; cellInd < _grid->nCellsLocal; cellInd++) {
-			Cell* c = _grid->localCells[cellInd];
+		for (int cellInd = 0; cellInd < _gridPtr->nCellsLocal; cellInd++) {
+			Cell* c = _gridPtr->localCells[cellInd];
 			for (int faceInd : c->Faces) {
-				Face& f = _grid->localFaces[faceInd];					
+				Face& f = _gridPtr->localFaces[faceInd];					
 
 				//Compute volume swept by face TO DO generalize
 				double sweptVolume = 0;
@@ -169,7 +170,7 @@ public:
 
 		//For each node refresh list of adjacent faces with computed velocities
 		adjacentFaces.clear();		
-		for (Face& f : _grid->localFaces) {			
+		for (Face& f : _gridPtr->localFaces) {			
 			//If one of the faces is moving then it's moving node
 			bool isMovingNode = false;
 			if (facesVelocity.find(f.GlobalIndex) != facesVelocity.end()) {
@@ -177,7 +178,7 @@ public:
 			};
 
 			//If face is boundary then it's nodes also considered moving
-			if (_grid->IsBoundaryFace(f)) {
+			if (_gridPtr->IsBoundaryFace(f)) {
 				isMovingNode = true;
 			};
 			
@@ -191,13 +192,13 @@ public:
 		//Determine free nodes
 		//TO DO make optimal
 		freeNodes.clear();
-		for (Node& n : _grid->localNodes) {
+		for (Node& n : _gridPtr->localNodes) {
 			if (movingNodes.find(n.GlobalIndex) == std::end(movingNodes)) freeNodes.insert(n.GlobalIndex);
 		};
 
 		//For each moving node compute velocity (node is moving if any adjacent face is moving)
 		for (int nodeIndex : movingNodes) {	
-			Node& n = _grid->localNodes[nodeIndex];
+			Node& n = _gridPtr->localNodes[nodeIndex];
 			Vector nodeVelocity; //Resulting node velocity
 			double sumFacesSquare = 0;
 
@@ -212,13 +213,13 @@ public:
 			
 			//LLS approximation
 			for (int faceIndex : adjacentFaces[n.GlobalIndex]) {
-				Face& face = _grid->localFaces[faceIndex];
+				Face& face = _gridPtr->localFaces[faceIndex];
 				Vector faceVelocity = facesVelocity[faceIndex];
 				velocities.push_back(faceVelocity * face.FaceNormal);
 				normals.push_back(face.FaceNormal);
 				weights.push_back(face.FaceSquare);				
 			};
-			nodeVelocity = ComputeVelocityByPoints(_grid->gridInfo.CellDimensions, velocities, normals, weights);
+			nodeVelocity = ComputeVelocityByPoints(_gridPtr->gridInfo.CellDimensions, velocities, normals, weights);
 
 			//Store node velocity
 			nodesVelocity[n.GlobalIndex] = nodeVelocity;
@@ -227,7 +228,35 @@ public:
 
 	//Compute free nodes velocities
 	void ComputeFreeNodesVelocities() {
-		_moveHelper.ComputeDisplacements(*_grid, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+		//Compute displacements
+		_moveHelper.ComputeDisplacements(_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
+
+		//Correct displacement on periodic boundaries
+		std::map<int, Vector> correctedVelocities;
+		for (auto kv : _gridPtr->periodicNodesIdentityList) {
+			int nodeIndex = kv.first;
+			std::set<int> identicalNodes = kv.second;
+
+			Vector nodeVelocity = nodesVelocity[nodeIndex];
+			nodeVelocity.x = 0;
+			nodeVelocity.z = 0;
+			
+			correctedVelocities[nodeIndex] = nodeVelocity;
+			for (int inodeIndex : identicalNodes) {
+				correctedVelocities[nodeIndex].y += nodesVelocity[inodeIndex].y;
+			};
+			correctedVelocities[nodeIndex].y /= 1 + identicalNodes.size();
+		};
+
+		//Write corrections back and add new moving nodes
+		for (auto kv : correctedVelocities) {
+			nodesVelocity[kv.first] = kv.second;
+			freeNodes.erase(kv.first);
+			movingNodes.insert(kv.first);
+		};
+
+		//Compute displacements again
+		_moveHelper.ComputeDisplacements(_gridPtr, movingNodes, nodesVelocity, freeNodes, nodesVelocity);
 		
 		//TO DO Sync
 		return;
@@ -238,7 +267,7 @@ public:
 		for (std::pair<int, Vector> pair : nodesVelocity) {
 			int nodeInd = pair.first;
 			Vector v = pair.second;
-			_grid->localNodes[nodeInd].P += v * timestep;
+			_gridPtr->localNodes[nodeInd].P += v * timestep;
 		};
 	};
 

@@ -88,11 +88,13 @@ private:
 	StepHistoryLogger* _stepHistoryLogger;
 
 	//Grid data
-	Grid _grid;
 	std::shared_ptr<Grid> _gridPtr;
 
 	//Configuration
-	Configuration _configuration;	
+	Configuration _configuration;
+
+	//Spatial scheme
+	SpatialDiscretisationType _spatialDiscretisation;
 
 	//Gas model (equations of state)
 	std::vector<std::shared_ptr<GasModel> > _gasModels;	
@@ -261,16 +263,16 @@ public:
 		};
 
 		//Allocate memory for data structures
-		Values.resize(nVariables * _grid.nCellsLocal);
-		Residual.resize(nVariables * _grid.nCellsLocal);
-		CellGasModel.resize(_grid.nCellsLocal);
-		FaceFluxes.resize(_grid.nFaces);
+		Values.resize(nVariables * _gridPtr->nCellsLocal);
+		Residual.resize(nVariables * _gridPtr->nCellsLocal);
+		CellGasModel.resize(_gridPtr->nCellsLocal);
+		FaceFluxes.resize(_gridPtr->nFaces);
 		for (std::vector<double>& flux : FaceFluxes) {
 			flux.resize(nVariables);
 			for (double& v : flux) v = 0;
 		};	
-		MaxWaveSpeed.resize(_grid.nFaces);		
-		FacePressure.resize(_grid.nFaces);
+		MaxWaveSpeed.resize(_gridPtr->nFaces);		
+		FacePressure.resize(_gridPtr->nFaces);
 
 		//Solver settings
 		bool isSolverSpecified = false;
@@ -313,7 +315,7 @@ public:
 		};
 
 		//Spatial discretisation
-		//_spatialDiscretisation = std::unique_ptr<SpatialDiscretisation>(new SpatialDiscretisation(_gridPtr));			
+		_spatialDiscretisation = _configuration.SpatialDiscretisation;
 
 		//Simulation settings
 		_simulationType = _configuration.SimulationType;
@@ -335,7 +337,7 @@ public:
 			_ALEmethod.ALEMotionType = ALEMethod::ALEMotionType::PureLagrangian;	
 			isALEMovementSet = true;
 		};
-		_ALEmethod.SetGrid(_grid);		
+		_ALEmethod.SetGrid(_gridPtr);		
 
 		//Run settings
 		MaxIteration = _configuration.MaxIteration;
@@ -482,9 +484,9 @@ public:
 
 	//Load grid from CGNS file
 	turbo_errt LoadGrid(std::string filename) {
-		_grid = _cgnsReader.LoadGrid(filename);
-		PartitionGrid(_grid);
-		GenerateGridGeometry(_grid);
+		//_gridPtr = _cgnsReader.LoadGrid(filename);
+		//PartitionGrid(_gridPtr);
+		//GenerateGridGeometry(_gridPtr);
 		return TURBO_OK;
 	};	
 
@@ -492,14 +494,13 @@ public:
 	turbo_errt SaveGrid(std::string filename)
 	{
 		_cgnsWriter.CreateFile(filename);
-		_cgnsWriter.WriteGridToFile(_grid);		
+		_cgnsWriter.WriteGridToFile(_gridPtr);		
 		_cgnsWriter.CloseFile();
 		return TURBO_OK;
 	}
 
 	//Bind existing grid to kernel
 	turbo_errt BindGrid(std::shared_ptr<Grid>& grid) {
-		_grid = *grid.get();
 		_gridPtr = grid;
 		return TURBO_OK;
 	};
@@ -652,9 +653,9 @@ public:
 		//Determine values required (TO DO Generalize) closest neighbours for now
 		std::set<int> requiredValuesCells;
 		std::set<int> requiredGradientsCells;
-		for (Cell* cell : _grid.localCells) {
+		for (Cell* cell : _gridPtr->localCells) {
 			for (int c : cell->NeigbourCells) {
-				if (_parallelHelper.getRank() != _grid.cellsPartitioning[c]) {
+				if (_parallelHelper.getRank() != _gridPtr->cellsPartitioning[c]) {
 					requiredValuesCells.insert(c);
 					requiredGradientsCells.insert(c);				
 				};
@@ -662,7 +663,7 @@ public:
 		};
 
 		//Set partitioning info
-		_parallelHelper.SetCellsPartitioning(_grid.cellsPartitioning);
+		_parallelHelper.SetCellsPartitioning(_gridPtr->cellsPartitioning);
 		
 		//Make requests	
 		_parallelHelper.ClearRequests();
@@ -723,7 +724,7 @@ public:
 				//Cell index
 				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
 				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
-				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
+				int cellLocalIndex = _gridPtr->cellsGlobalToLocal[cellGlobalIndex];
 				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
 				//Write values from cell to send buffer
 				for (int k = 0; k < nVariables; k++) {
@@ -814,7 +815,7 @@ public:
 				//Cell index
 				int cellGlobalIndex = _parallelHelper.toSendValuesByProc[i][j];
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellGlobalIndex = ", cellGlobalIndex);	
-				int cellLocalIndex = _grid.cellsGlobalToLocal[cellGlobalIndex];
+				int cellLocalIndex = _gridPtr->cellsGlobalToLocal[cellGlobalIndex];
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "cellLocalIndex = ", cellLocalIndex);	
 				//Write values from cell to send buffer
 				for (int k = 0; k < nVariables; k++) {
@@ -899,7 +900,7 @@ public:
 
 		//Create Boundary conditions from configuration
 		bool isUnspecifiedBC = false;
-		for (const auto& bc : _grid.patchesNames) {
+		for (const auto& bc : _gridPtr->patchesNames) {
 			const std::string& bcName = bc.first;			
 			int bcMarker = bc.second;			
 			if ( _configuration.BoundaryConditions.find(bcName) == _configuration.BoundaryConditions.end()) {
@@ -933,13 +934,13 @@ public:
 				bcTypeCheckPassed = true;
 			};
 			if (bcType == BCType_t::BCOutflowSupersonic) {
-				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCOutflowSupersonic());
+				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCNatural());
 				bcTypeCheckPassed = true;
 			};
-			if (bcType == BCType_t::BCInflowSupersonic) {
+			/*if (bcType == BCType_t::BCInflowSupersonic) {
 				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCInflowSupersonic());
 				bcTypeCheckPassed = true;
-			};
+			};*/
 			if (bcType == BCType_t::BCGeneral) {
 				_boundaryConditions[bcMarker] = std::unique_ptr<BoundaryConditions::BoundaryCondition>(new BoundaryConditions::BCGeneral());
 				bcTypeCheckPassed = true;
@@ -981,33 +982,33 @@ public:
 
 	turbo_errt ReadInitialConditions(std::string solutionName) {		
 		//Read physical data
-		std::vector<double> density(_grid.nCellsLocal);
-		std::vector<double> velocityX(_grid.nCellsLocal);
-		std::vector<double> velocityY(_grid.nCellsLocal);
-		std::vector<double> velocityZ(_grid.nCellsLocal);		
-		_cgnsReader.ReadField(_grid, solutionName, "Density", density);
-		_cgnsReader.ReadField(_grid, solutionName, "VelocityX", velocityX);
-		_cgnsReader.ReadField(_grid, solutionName, "VelocityY", velocityY);
-		_cgnsReader.ReadField(_grid, solutionName, "VelocityZ", velocityZ);
-		_cgnsReader.ReadField(_grid, solutionName, "VelocityZ", velocityZ);
+		//std::vector<double> density(_gridPtr->nCellsLocal);
+		//std::vector<double> velocityX(_gridPtr->nCellsLocal);
+		//std::vector<double> velocityY(_gridPtr->nCellsLocal);
+		//std::vector<double> velocityZ(_gridPtr->nCellsLocal);		
+		//_cgnsReader.ReadField(_gridPtr, solutionName, "Density", density);
+		//_cgnsReader.ReadField(_gridPtr, solutionName, "VelocityX", velocityX);
+		//_cgnsReader.ReadField(_gridPtr, solutionName, "VelocityY", velocityY);
+		//_cgnsReader.ReadField(_gridPtr, solutionName, "VelocityZ", velocityZ);
+		//_cgnsReader.ReadField(_gridPtr, solutionName, "VelocityZ", velocityZ);
 
-		//Fill data structures
-		nVariables = 5;
-		Values.resize(nVariables * _grid.nCellsLocal);
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			double ro = density[i];
-			double rou = velocityX[i] * ro;
-			double rov = velocityY[i] * ro;
-			double row = velocityZ[i] * ro;
-			Values[i + 0] = ro;
-			Values[i + 1] = rou;
-			Values[i + 2] = rov;
-			Values[i + 3] = row;
-		};
+		////Fill data structures
+		//nVariables = 5;
+		//Values.resize(nVariables * _gridPtr->nCellsLocal);
+		//for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
+		//	double ro = density[i];
+		//	double rou = velocityX[i] * ro;
+		//	double rov = velocityY[i] * ro;
+		//	double row = velocityZ[i] * ro;
+		//	Values[i + 0] = ro;
+		//	Values[i + 1] = rou;
+		//	Values[i + 2] = rov;
+		//	Values[i + 3] = row;
+		//};
 
-		//Synchronize		
-		_parallelHelper.Barrier();
-		_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished reading initial conditions");	
+		////Synchronize		
+		//_parallelHelper.Barrier();
+		//_logger.WriteMessage(LoggerMessageLevel::GLOBAL, LoggerMessageType::INFORMATION, "Finished reading initial conditions");	
 		return TURBO_OK;
 	};
 
@@ -1017,8 +1018,8 @@ public:
 		initConditions->setGasModel(_gasModels);
 				
 		//For each local cell write initial conditions
-		for (int i = 0; i<_grid.nCellsLocal; i++) {			
-			Cell* c = _grid.localCells[i];
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {			
+			Cell* c = _gridPtr->localCells[i];
 
 			//Get initial values
 			std::vector<double> values = initConditions->getInitialValues(*c);						
@@ -1038,8 +1039,8 @@ public:
 
 	turbo_errt FillInitialConditions(std::function<std::vector<double>(Vector)> FVariables, std::function<int(Vector)> FMaterial) {
 		//For each local cell write initial conditions
-		for (int i = 0; i < _grid.nCellsLocal; i++) {
-			Cell* cell = _grid.localCells[i];
+		for (int i = 0; i < _gridPtr->nCellsLocal; i++) {
+			Cell* cell = _gridPtr->localCells[i];
 
 			//Get initial values
 			std::vector<double> values = FVariables(cell->CellCenter);						
@@ -1074,13 +1075,13 @@ public:
 
 		//Write solution node		
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "1");	
-		_cgnsWriter.WriteSolution(_grid, solutionName);
+		_cgnsWriter.WriteSolution(_gridPtr, solutionName);
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
 
 		//Write physical quantities
-		std::vector<double> buffer(_grid.nCellsLocal);
-		std::vector<double> buffer2(_grid.nCellsLocal);
-		std::vector<double> buffer3(_grid.nCellsLocal);
+		std::vector<double> buffer(_gridPtr->nCellsLocal);
+		std::vector<double> buffer2(_gridPtr->nCellsLocal);
+		std::vector<double> buffer3(_gridPtr->nCellsLocal);
 		//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 
 		//Stored fields
@@ -1089,48 +1090,48 @@ public:
 			std::string fieldName = storedFields[fieldIndex];			
 			//Write to buffer
 			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "Field name " + fieldName);	
-			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _grid.nCellsLocal);				
-			for (int i = 0; i<_grid.nCellsLocal; i++) {
-				int nmat = GetCellGasModelIndex(_grid.localCells[i]->GlobalIndex);
+			_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "nCellsLocal = ", _gridPtr->nCellsLocal);				
+			for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
+				int nmat = GetCellGasModelIndex(_gridPtr->localCells[i]->GlobalIndex);
 				GasModel::ConservativeVariables U(&Values[i * nv]);
 				std::vector<double> storedValues = _gasModels[nmat]->GetStoredValuesFromConservative(U);				
 				buffer[i] = storedValues[fieldIndex];
 			};
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "2");	
-			_cgnsWriter.WriteField(_grid, solutionName, fieldName, buffer);		
+			_cgnsWriter.WriteField(_gridPtr, solutionName, fieldName, buffer);		
 			//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "3");	
 		};
 
 		//Additional fields (TO DO) generalize
 		//VelocityX
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			double ro = Values[i * nv + 0];
 			double rou = Values[i * nv + 1];
 			double u = rou / ro;
 			buffer[i] = u;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "VelocityX", buffer); 
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "VelocityX", buffer); 
 
 		//VelocityY
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			double ro = Values[i * nv + 0];
 			double rov = Values[i * nv + 2];
 			double v = rov / ro;
 			buffer[i] = v;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "VelocityY", buffer); 
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "VelocityY", buffer); 
 
 		//VelocityZ
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			double ro = Values[i * nv + 0];
 			double row = Values[i * nv + 3];
 			double w = row / ro;
 			buffer[i] = w;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "VelocityZ", buffer); 
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "VelocityZ", buffer); 
 
 		//Pressure and sound speed and Gruneisen coef
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			int nmat = CellGasModel[i];
 			double P = 0;
 			double C = 0;
@@ -1140,12 +1141,12 @@ public:
 			buffer2[i] = C;
 			buffer3[i] = Gr;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Pressure", buffer);
-		_cgnsWriter.WriteField(_grid, solutionName, "SoundSpeed", buffer2);
-		_cgnsWriter.WriteField(_grid, solutionName, "Gruneisen", buffer3);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Pressure", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "SoundSpeed", buffer2);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Gruneisen", buffer3);
 
 		//Internal energy
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			double ro = Values[i * nv + 0];
 			double u = Values[i * nv + 1] / ro;
 			double v = Values[i * nv + 2] / ro;
@@ -1154,48 +1155,48 @@ public:
 			double e = E - (u*u + v*v + w*w) / 2.0;	
 			buffer[i] = e;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "EnergyInternal", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "EnergyInternal", buffer);
 
 		//Temperature
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			int nmat = CellGasModel[i];
 			double T = _gasModels[nmat]->GetTemperature(&Values[i * nv + 0]);
 			buffer[i] = T;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Temperature", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Temperature", buffer);
 
 		//Phase information
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			int nmat = CellGasModel[i];
 			GasModel::MediumPhase phase = _gasModels[nmat]->GetPhase(&Values[i * nv + 0]);
 			int indicator = phase == GasModel::MediumPhase::AboveMeltingPoint;
 			buffer[i] = indicator;
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Phase", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Phase", buffer);
 
 		//Material index
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
 			buffer[i] = GetCellGasModelIndex(i);
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Material", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Material", buffer);
 
 		//Quality
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			buffer[i] = MeshQuality::Anisotropy(_grid, *_grid.localCells[i]);
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
+			buffer[i] = MeshQuality::Anisotropy(_gridPtr, *_gridPtr->localCells[i]);
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "Anisotropy", buffer);
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			buffer[i] = MeshQuality::LinearSize(_grid, *_grid.localCells[i]);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Anisotropy", buffer);
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSize(_gridPtr, *_gridPtr->localCells[i]);
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "LinearSize", buffer);
-		for (int i = 0; i<_grid.nCellsLocal; i++) {
-			buffer[i] = MeshQuality::LinearSizeRatio(_grid, *_grid.localCells[i]);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "LinearSize", buffer);
+		for (int i = 0; i<_gridPtr->nCellsLocal; i++) {
+			buffer[i] = MeshQuality::LinearSizeRatio(_gridPtr, *_gridPtr->localCells[i]);
 		};
-		_cgnsWriter.WriteField(_grid, solutionName, "LinearSizeRatio", buffer);
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "LinearSizeRatio", buffer);
 
 		//Write partitioning to solution
-		std::vector<double> part(_grid.nCellsLocal, _parallelHelper.getRank());		
-		_cgnsWriter.WriteField(_grid, solutionName, "Processor", part); 
+		std::vector<double> part(_gridPtr->nCellsLocal, _parallelHelper.getRank());		
+		_cgnsWriter.WriteField(_gridPtr, solutionName, "Processor", part); 
 
 		//Close file
 		_cgnsWriter.CloseFile();
@@ -1206,15 +1207,14 @@ public:
 	//Reconstruct solution for each face, left state and right state
 	void ComputeSolutionReconstruction(const std::vector<double>& cellValues, std::vector<std::vector<double> >& cellValuesL, std::vector<std::vector<double> >& cellValuesR) {
 		int nv = nVariables;
-		int nFaces = _grid.localFaces.size();
+		int nFaces = _gridPtr->localFaces.size();
 		if (cellValuesL.size() != nFaces) cellValuesL.resize(nFaces);
 		if (cellValuesR.size() != nFaces) cellValuesR.resize(nFaces);
 
 		//In every cell proper cell reconstruct solution
-		for (int localCellIndex = 0; localCellIndex < _grid.nCellsLocal; localCellIndex++) {
-			Cell* cell = _grid.localCells[localCellIndex];			  			
-			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::WENO);
-			//CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, SpatialDiscretisationType::PiecewiseConstant);
+		for (int localCellIndex = 0; localCellIndex < _gridPtr->nCellsLocal; localCellIndex++) {
+			Cell* cell = _gridPtr->localCells[localCellIndex];			  			
+			CellSpatialDiscretisation cellSpatial(cell->GlobalIndex, _gridPtr, _spatialDiscretisation);			
 
 			//Compute stencil
 			int rootMaterial = GetCellGasModelIndex(cell->GlobalIndex);
@@ -1239,8 +1239,9 @@ public:
 
 			//Interpolate to every face
 			for (int faceIndex : cell->Faces) {
-				Face& face = _grid.localFaces[faceIndex];
+				Face& face = _gridPtr->localFaces[faceIndex];
 				std::vector<double> U = cellSpatial.GetSolutionAtFace(face);
+				
 				if (face.FaceCell_1 == localCellIndex) {
 					cellValuesL[face.GlobalIndex] = U;
 				} else {
@@ -1250,10 +1251,10 @@ public:
 		};
 
 		//Apply boundary conditions for dummy cells
-		for (int localCellIndex = _grid.nCellsLocal; localCellIndex < _grid.nCells; localCellIndex++) {
+		for (int localCellIndex = _gridPtr->nCellsLocal; localCellIndex < _gridPtr->nCells; localCellIndex++) {
 			//Get cell and face info
-			Cell* cell = _grid.localCells[localCellIndex];			  			
-			Face& face = _grid.localFaces[cell->Faces[0]];
+			Cell* cell = _gridPtr->localCells[localCellIndex];			  			
+			Face& face = _gridPtr->localFaces[cell->Faces[0]];
 			int nmat = GetCellGasModelIndex(cell->GlobalIndex);
 			int faceLocalIndex = face.GlobalIndex;			
 
@@ -1263,7 +1264,55 @@ public:
 			//Obtain dummy cell state
 			cellValuesR[faceLocalIndex] = _boundaryConditions[cell->BCMarker]->getDummyValues(nmat, cellValuesL[faceLocalIndex], *cell);
 		};
-	};
+
+		//Handle periodic connectivity issue
+		assert(_nProcessors == 1);
+		for (Face& face : _gridPtr->localFaces) {
+			//Additional check
+			if (cellValuesL[face.GlobalIndex].size() == 0) throw Exception("Reconstruction incomplete");
+
+			//If right state is empty check for periodic counterpart
+			if (cellValuesR[face.GlobalIndex].size() == 0) {
+				//Find corresponding nodes
+				std::set<int> identicalNodes;
+				for (int faceNode : face.FaceNodes) {
+					identicalNodes.insert(faceNode);
+					identicalNodes.insert(std::begin(_gridPtr->periodicNodesIdentityList[faceNode]), std::end(_gridPtr->periodicNodesIdentityList[faceNode]));
+				};
+
+				//Find corresponding face on right neighbour cell
+				int facePairIndex = -1;
+				bool isFound = false;
+				Cell& pairCell = _gridPtr->Cells[face.FaceCell_2];
+				for (int faceIndex : pairCell.Faces) {
+					Face& pairFace = _gridPtr->localFaces[faceIndex];
+					isFound = true;
+
+					//Check if all face nodes are right
+					for (int nodeIndex : pairFace.FaceNodes) {
+						if (identicalNodes.find(nodeIndex) == identicalNodes.end()) {
+							isFound = false;
+							break;
+						};
+					};
+
+					//Break if we found right face
+					if (isFound) {
+						facePairIndex = faceIndex;
+						break;
+					};
+				};
+
+				if (isFound && (cellValuesL[facePairIndex].size() != 0)) {
+					//Everything went fine
+					cellValuesR[face.GlobalIndex] = cellValuesL[facePairIndex];
+				} else {
+					throw Exception("Reconstruction incomplete");
+				};
+			};
+		};
+
+	}; //Compute solution reconstruction
 
 	//Compute convective flux and max wave propagation speed throught each face
 	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<std::vector<double> >& cellValuesL, std::vector<std::vector<double> >& cellValuesR, std::vector<double>& ALEindicators) {
@@ -1288,8 +1337,8 @@ public:
 
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
-		for (int i = 0; i<_grid.localFaces.size(); i++) {
-			Face& f = _grid.localFaces[i];											
+		for (int i = 0; i<_gridPtr->localFaces.size(); i++) {
+			Face& f = _gridPtr->localFaces[i];											
 			std::vector<double> flux;
 			int ALEIndicator = ALEindicators[i];
 
@@ -1297,7 +1346,7 @@ public:
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
 			GasModel::ConservativeVariables UL = cellValuesL[f.GlobalIndex];
-			GasModel::ConservativeVariables UR = cellValuesR[f.GlobalIndex];						
+			GasModel::ConservativeVariables UR = cellValuesR[f.GlobalIndex];
 
 			//Determine face velocity
 			Vector faceVelocityAverage = Vector(0,0,0);
@@ -1343,8 +1392,8 @@ public:
 
 		//Compute ALE indicator values
 		timerALE.Resume();
-		std::vector<double> ALEindicators(_grid.nFaces, 0);
-		for (Face& f : _grid.localFaces) {
+		std::vector<double> ALEindicators(_gridPtr->nFaces, 0);
+		for (Face& f : _gridPtr->localFaces) {
 			int nmatL = GetCellGasModelIndex(f.FaceCell_1);
 			int nmatR = GetCellGasModelIndex(f.FaceCell_2);
 			if (!IsDummyCell(f.FaceCell_2)) {
@@ -1377,7 +1426,7 @@ public:
 		if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {
 			//Compute face velocities
 			_ALEmethod.facesVelocity.clear();
-			for (Face& f : _grid.localFaces) {
+			for (Face& f : _gridPtr->localFaces) {
 				int ALEindicator = ALEindicators[f.GlobalIndex];
 				if (ALEindicator == 0) continue; //Skip face that don't participate in obligatory motion
 				int nmatL = GetCellGasModelIndex(f.FaceCell_1);
@@ -1395,8 +1444,8 @@ public:
 			_ALEmethod.ComputeMovingNodesVelocities();
 
 			//Impose boundary movement
-			for (Face& f : _grid.localFaces) {
-				if (!_grid.IsBoundaryFace(f)) continue;
+			for (Face& f : _gridPtr->localFaces) {
+				if (!_gridPtr->IsBoundaryFace(f)) continue;
 				BoundaryConditionMovementType movementType = GetFaceBoundaryCondition(f)->movementType;
 				if (movementType == BoundaryConditionMovementType::Fixed) {
 					//Each node must stick to its place
@@ -1408,7 +1457,7 @@ public:
 			_ALEmethod.ComputeFreeNodesVelocities();
 
 			//Compute new face velocities
-			for (Face& f : _grid.localFaces) {
+			for (Face& f : _gridPtr->localFaces) {
 				_ALEmethod.facesVelocity[f.GlobalIndex] = _ALEmethod.ComputeFaceVelocityByNodes(f);
 			};
 		};
@@ -1425,7 +1474,7 @@ public:
 		//ComputeViscousFluxes();	
 		
 		//Distribute residual to each cell		
-		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
+		for ( int cellIndex = 0; cellIndex<_gridPtr->nCellsLocal; cellIndex++ )
 		{
 			//Get cell reference
 			Cell& cell = GetLocalCell(cellIndex);
@@ -1472,9 +1521,9 @@ public:
 		
 
 		//Compute source term
-		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
+		for ( int cellIndex = 0; cellIndex<_gridPtr->nCellsLocal; cellIndex++ )
 		{
-			Cell* cell = _grid.localCells[cellIndex];						
+			Cell* cell = _gridPtr->localCells[cellIndex];						
 			std::vector<double> val(&cellValues[cellIndex * nVariables], &cellValues[cellIndex * nVariables] + nVariables);
 			std::vector<double> RSource = _sources->GetResidual(val);
 			for (int i = 0; i < nVariables; i++) residual[cellIndex*nVariables + i] -= cell->CellVolume * RSource[i];
@@ -1486,15 +1535,15 @@ public:
 	//Compute spectral radii estimate for each cell
 	void ComputeSpectralRadius(std::map<int, double>& spectralRadius, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues) {
 		spectralRadius.clear();		
-		for (int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++)
+		for (int cellIndex = 0; cellIndex<_gridPtr->nCellsLocal; cellIndex++)
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			Cell* cell = _gridPtr->localCells[cellIndex];			
 			spectralRadius[cellIndex] = 0;
 			std::vector<int>& nFaces = cell->Faces;
 			for (int nFaceIndex : nFaces)
 			{
 				//Blazek f. 6.21
-				Face& face = _grid.localFaces[nFaceIndex];			
+				Face& face = _gridPtr->localFaces[nFaceIndex];			
 				spectralRadius[cellIndex] +=  maxWaveSpeed[nFaceIndex] * face.FaceSquare;
 			};
 		};
@@ -1503,9 +1552,9 @@ public:
 	//Compute local time step for each cell utilizing spectral radius estimates
 	void ComputeLocalTimeStep(std::map<int, double>& localTimeStep, std::map<int, double>& spectralRadius) {
 		localTimeStep.clear();
-		for (int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++)
+		for (int cellIndex = 0; cellIndex<_gridPtr->nCellsLocal; cellIndex++)
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			Cell* cell = _gridPtr->localCells[cellIndex];			
 			double sR = spectralRadius[cellIndex];
 			localTimeStep[cellIndex] = CFL * cell->CellVolume / sR; //Blazek f. 6.20
 		}
@@ -1584,16 +1633,16 @@ public:
 			//ALE step mesh transformation
 			if (_ALEmethod.ALEMotionType != ALEMethod::ALEMotionType::PureEulerian) {						
 				//Move mesh
-				_ALEmethod.MoveMesh(stageTimeStep);			
+				_ALEmethod.MoveMesh(stageTimeStep);	
 
 				//Regenerate geometric entities
-				GenerateGridGeometry(_grid);
+				_gridPtr->UpdateGeometricProperties();
 			};
 			timerALE.Pause();
 
-			for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
+			for ( int cellIndex = 0; cellIndex<_gridPtr->nCellsLocal; cellIndex++ )
 			{
-				Cell* cell = _grid.localCells[cellIndex];			
+				Cell* cell = _gridPtr->localCells[cellIndex];			
 				//Update values
 				for (int i = 0; i < nVariables; i++) {
 					Values[cellIndex*nVariables + i] += Residual[cellIndex*nVariables + i] * (- stageTimeStep / cell->CellVolume);
@@ -1637,21 +1686,17 @@ public:
 		//Synchronize
 		_parallelHelper.Barrier();
 	};	
-
-	//Implicit time step
-	void ImplicitTimeStep() {
-	};
 	
 	////Compute scalar function gradient in each cell	
 	//void ComputeFunctionGradient( std::vector<Vector>& grads, std::vector<double>& values, double (*func)(const std::vector<double>&) ) {
 	//	//Allocate memory for gradients
-	//	grads.resize(_grid.nCellsLocal);		
+	//	grads.resize(_gridPtr->nCellsLocal);		
 
 	//	//For each cell compute gradient of given function
 	//	std::vector<Vector> nPoints;
 	//	std::vector<double> nValues;
-	//	for (int i = 0; i<_grid.nCellsLocal; i++) {			
-	//		Cell& cell = *_grid.localCells[i];			
+	//	for (int i = 0; i<_gridPtr->nCellsLocal; i++) {			
+	//		Cell& cell = *_gridPtr->localCells[i];			
 
 	//		//Determine required set of point and values
 	//		nPoints.clear();			
@@ -1659,7 +1704,7 @@ public:
 
 	//		//Add all neighbours
 	//		for (int j = 0; j<cell.NeigbourCells.size(); j++) {				
-	//			Cell& nCell = _grid.Cells[cell.NeigbourCells[j]];
+	//			Cell& nCell = _gridPtr->Cells[cell.NeigbourCells[j]];
 	//			std::vector<double> nU;				
 	//			if (nCell.IsDummy) {
 	//			};
@@ -1677,9 +1722,9 @@ public:
 	//				nPoint = 2 * (face.FaceCenter - cell.CellCenter) + cell.CellCenter;
 	//			} else {
 	//				if (face.FaceCell_1 == cell.GlobalIndex) {
-	//					nPoint = _grid.cells[face.FaceCell_2].CellCenter;
+	//					nPoint = _gridPtr->cells[face.FaceCell_2].CellCenter;
 	//				} else {
-	//					nPoint = _grid.cells[face.FaceCell_1].CellCenter;
+	//					nPoint = _gridPtr->cells[face.FaceCell_1].CellCenter;
 	//				};
 	//			};
 	//			double nValue = (this->*func)(nU);
@@ -1696,19 +1741,19 @@ public:
 
 	//Return number of local cells (stored on this process)
 	inline int GetLocalCellsNumber() {
-		return _grid.nCellsLocal;
+		return _gridPtr->nCellsLocal;
 	};
 
 	inline bool IsLocalCell(int globalIndex) {
-		return _grid.GetCellPart(globalIndex) == _parallelHelper.getRank();
+		return _gridPtr->GetCellPart(globalIndex) == _parallelHelper.getRank();
 	};
 
 	inline bool IsDummyCell(int globalIndex) {
-		return _grid.IsDummyCell(globalIndex);
+		return _gridPtr->IsDummyCell(globalIndex);
 	};
 
 	inline bool IsBoundaryFace(Face& face) {
-		return _grid.IsBoundaryFace(face);
+		return _gridPtr->IsBoundaryFace(face);
 	};	
 
 	//Get face boundary condition reference
@@ -1720,7 +1765,7 @@ public:
 	//Get cell boundary condition reference
 	inline BoundaryConditions::BoundaryCondition* GetCellBoundaryCondition(int globalIndex) {
 		if (!IsDummyCell(globalIndex)) throw 1; //TO DO check
-		Cell& cell = _grid.Cells[globalIndex];						
+		Cell& cell = _gridPtr->Cells[globalIndex];						
 		return _boundaryConditions[cell.BCMarker].get();
 	};	
 
@@ -1729,8 +1774,8 @@ public:
 		if (IsLocalCell(globalIndex)) {
 			if (IsDummyCell(globalIndex)) {
 				//If dummy cell compute on the go				
-				Cell& cell = _grid.Cells[globalIndex];
-				int nCellIndex = _grid.cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
+				Cell& cell = _gridPtr->Cells[globalIndex];
+				int nCellIndex = _gridPtr->cellsGlobalToLocal[cell.NeigbourCells[0]]; //Obtain neighbour
 
 				//IF dummy get from boundary condition
 				int nmat = _boundaryConditions[cell.BCMarker]->_nmat;
@@ -1742,7 +1787,7 @@ public:
 				if (localIndex == -1) {
 					//If local index is unknown determine it
 					//Lower perfomance WARNING
-					localIndex = _grid.cellsGlobalToLocal[globalIndex];										
+					localIndex = _gridPtr->cellsGlobalToLocal[globalIndex];										
 				};
 				int nmat = CellGasModel[localIndex];
 				return nmat;
@@ -1765,7 +1810,7 @@ public:
 				/*msg.str("");
 				msg<<"Cells = "<<globalIndex;
 				_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );*/
-				Cell& cell = _grid.Cells[globalIndex];				
+				Cell& cell = _gridPtr->Cells[globalIndex];				
 				//Obtain neighbour
 				int nmat = GetCellGasModelIndex(cell.NeigbourCells[0]);
 				//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, "!" );				
@@ -1775,7 +1820,7 @@ public:
 				if (localIndex == -1) {
 					//If local index is unknown determine it
 					//Lower perfomance WARNING
-					localIndex = _grid.cellsGlobalToLocal[globalIndex];					
+					localIndex = _gridPtr->cellsGlobalToLocal[globalIndex];					
 					//msg.str("");					
 					//msg<<"Local Index = "<<localIndex;
 					//_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str() );
@@ -1795,11 +1840,11 @@ public:
 
 	//Grid elements accessors
 	inline Cell& GetLocalCell(int localIndex) {
-		return *_grid.localCells[localIndex];
+		return *_gridPtr->localCells[localIndex];
 	};
 
 	inline Face& GetLocalFace(int localIndex) {
-		return _grid.localFaces[localIndex];
+		return _gridPtr->localFaces[localIndex];
 	};
 
 	//Medium properties accessors

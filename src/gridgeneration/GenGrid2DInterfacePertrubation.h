@@ -8,7 +8,7 @@
 #include <cassert>
 #include <functional>
 
-Grid GenGrid2DInterfacePertrubation(std::shared_ptr<ParallelManager> MPIManager, int N, int M, 
+std::shared_ptr<Grid> GenGrid2DInterfacePertrubation(std::shared_ptr<ParallelManager> MPIManager, int N, int M, 
 									double xMin, double xMax, 
 									double yMin, double yMax , 
 									double q_x, double q_y, 
@@ -16,13 +16,13 @@ Grid GenGrid2DInterfacePertrubation(std::shared_ptr<ParallelManager> MPIManager,
 									Vector interfaceCenter, Vector interfaceNormal,
 									std::function<double(Vector r)> disturbanceDistance) 
 {
-	Grid grid = GenGrid2DUniform(MPIManager, N, M, xMin, xMax, yMin, yMax, 1.0, 1.0, periodicX, periodicY);		
+	std::shared_ptr<Grid> grid(GenGrid2DUniform(MPIManager, N, M, xMin, xMax, yMin, yMax, 1.0, 1.0, periodicX, periodicY));		
 
 	//Determine nodes that a closest to interface
 	std::map<double, int> interfaceNodesIndexes;	
 	std::map<double, double> interfaceNodesY;
 	double interfaceY = interfaceCenter.y;
-	for (Node& node : grid.localNodes) {
+	for (Node& node : grid->localNodes) {
 		double x = node.P.x;
 		double y = node.P.y;
 		if (interfaceNodesY.find(x) == std::end(interfaceNodesY)) {
@@ -54,7 +54,7 @@ Grid GenGrid2DInterfacePertrubation(std::shared_ptr<ParallelManager> MPIManager,
 	};
 	
 	//Add unmovable nodes
-	for (Node& node : grid.localNodes) {
+	for (Node& node : grid->localNodes) {
 		double x = node.P.x;
 		double y = node.P.y;
 
@@ -66,21 +66,20 @@ Grid GenGrid2DInterfacePertrubation(std::shared_ptr<ParallelManager> MPIManager,
 		};		
 	};
 
-	grid.PartitionGrid(MPIManager);
-	grid.GenerateLocalCells(MPIManager->rank(), grid.cellsPartitioning);
-	grid.GenerateLocalFaces(MPIManager->rank());
-	grid.UpdateGeometricProperties();
-	//grid.GenerateLocalGrid();
+	grid->PartitionGrid(MPIManager);
+	grid->GenerateLocalCells(MPIManager->rank(), grid->cellsPartitioning);
+	grid->GenerateLocalFaces(MPIManager->rank());
+	grid->UpdateGeometricProperties();	
 
 	//Move mesh
 	MeshMovement moveHelper;
 	moveHelper.meshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
 	moveHelper.MoveNodes(grid, nodes, displacements);
 
-	grid.PartitionGrid(MPIManager);
-	grid.GenerateLocalCells(MPIManager->rank(), grid.cellsPartitioning);
-	grid.GenerateLocalFaces(MPIManager->rank());
-	grid.UpdateGeometricProperties();
+	grid->PartitionGrid(MPIManager);
+	grid->GenerateLocalCells(MPIManager->rank(), grid->cellsPartitioning);
+	grid->GenerateLocalFaces(MPIManager->rank());
+	grid->UpdateGeometricProperties();
 
 	return grid;
 };

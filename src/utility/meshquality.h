@@ -6,9 +6,9 @@
 namespace MeshQuality {
 
 //Normilized anisotropy
-inline double Anisotropy(const Grid& grid, const Cell& cell) {
+	inline double Anisotropy(const std::shared_ptr<Grid>& gridPtr, const Cell& cell) {
 	//Meaningless for 1D
-	if (grid.gridInfo.CellDimensions == 1) {
+	if (gridPtr->gridInfo.CellDimensions == 1) {
 		return 1.0;
 	};
 
@@ -37,17 +37,17 @@ inline double Anisotropy(const Grid& grid, const Cell& cell) {
 
 	//Compute sum of face normals	
 	for (int faceInd : cell.Faces) {
-		double faceS = grid.localFaces[faceInd].FaceSquare;
+		double faceS = gridPtr->localFaces[faceInd].FaceSquare;
 		sumFaceSquare += faceS;
 	};
 
 	//Compute normalized quality
-	if (grid.gridInfo.CellDimensions == 2) {
+	if (gridPtr->gridInfo.CellDimensions == 2) {
 		double q = std::pow(sumFaceSquare, 2.0) / cell.CellVolume;
 		q /= normRatio;
 		return q;
 	};
-	if (grid.gridInfo.CellDimensions == 3) {
+	if (gridPtr->gridInfo.CellDimensions == 3) {
 		double q = std::pow(sumFaceSquare, 3.0 / 2.0) / cell.CellVolume;
 		q /= normRatio;
 		return q;
@@ -59,9 +59,9 @@ inline double Anisotropy(const Grid& grid, const Cell& cell) {
 
 
 //Cell linear size
-inline double LinearSize(const Grid& grid, const Cell& cell) {
-	if (grid.gridInfo.CellDimensions>0) {
-		double linearSize = std::pow(cell.CellVolume, 1.0/grid.gridInfo.CellDimensions);
+inline double LinearSize(const std::shared_ptr<Grid>& gridPtr, const Cell& cell) {
+	if (gridPtr->gridInfo.CellDimensions>0) {
+		double linearSize = std::pow(cell.CellVolume, 1.0/gridPtr->gridInfo.CellDimensions);
 		return linearSize;
 	};
 
@@ -70,18 +70,18 @@ inline double LinearSize(const Grid& grid, const Cell& cell) {
 };
 
 //Cell linear size ratio
-inline double LinearSizeRatio(const Grid& grid, const Cell& cell) {
-	if (grid.gridInfo.CellDimensions<=0) throw new Exception("Unsupported number of dimensions");
+inline double LinearSizeRatio(const std::shared_ptr<Grid>& gridPtr, const Cell& cell) {
+	if (gridPtr->gridInfo.CellDimensions<=0) throw new Exception("Unsupported number of dimensions");
 	
 	//Compute ratio of linear sizes of given cell with every neighbour
 	double maxRatio = 1.0;
 	std::vector<double> ratios(0);
-	double linearSize = std::pow(cell.CellVolume, 1.0/grid.gridInfo.CellDimensions);
+	double linearSize = std::pow(cell.CellVolume, 1.0/gridPtr->gridInfo.CellDimensions);
 	
 	for (int nGlobalIndex : cell.NeigbourCells) {
-		int nLocalIndex = grid.cellsGlobalToLocal.find(nGlobalIndex)->second;
-		double nVolume = grid.localCells[nLocalIndex]->CellVolume;
-		double nLinearSize = std::pow(nVolume, 1.0/grid.gridInfo.CellDimensions);
+		int nLocalIndex = gridPtr->cellsGlobalToLocal.find(nGlobalIndex)->second;
+		double nVolume = gridPtr->localCells[nLocalIndex]->CellVolume;
+		double nLinearSize = std::pow(nVolume, 1.0/gridPtr->gridInfo.CellDimensions);
 		double ratio = nLinearSize / linearSize;
 		if (ratio < 1.0) ratio = 1.0 / ratio; //If less then one take inverse
 		if (maxRatio < ratio) maxRatio = ratio;

@@ -57,19 +57,13 @@ public:
 	std::map<BoundaryVariableType, CompositeBoundaryConditionInfo> boundaryConditions;
 
 	//Get dummy cell values
-	std::vector<double> getDummyValues(int nmat, std::vector<double> values, const Cell& dummyCell) {
+	virtual std::vector<double> getDummyValues(int nmat, std::vector<double> inV, const Cell& dummyCell) {
 		//Obtain face
+		int nVariables = 5;
 		if (dummyCell.Faces.size() != 1) throw new Exception("Dummy cell has more than one face");
 		Face& face = _grid->localFaces[dummyCell.Faces[0]];
-
-		//Obtain neighbour cell
-		int nCellIndex = _grid->cellsGlobalToLocal[face.FaceCell_1];
-		int nVariables = _gasModels[nmat]->nConservativeVariables;
-		Vector center = _grid->localCells[nCellIndex]->CellCenter;
-
-		//Obtain interrior values
-		std::vector<double> inV(&values[nCellIndex * nVariables], &values[nVariables * nCellIndex] + nVariables);
-
+		Vector& center = face.FaceCenter;
+					
 		//Compute dummy values
 		double ro = inV[0];
 		double u = inV[1]/inV[0];
@@ -87,7 +81,7 @@ public:
 		double uDummy = boundaryConditions[BoundaryVariableType::VelocityX].GetDummyValue(u, face, center);
 		double vDummy = boundaryConditions[BoundaryVariableType::VelocityY].GetDummyValue(v, face, center);
 		double wDummy = boundaryConditions[BoundaryVariableType::VelocityZ].GetDummyValue(w, face, center);
-		double eDummy = 0; //_gasModels[nmat]->FindInternalEnergy(roDummy, PDummy);
+		double eDummy = _gasModels[nmat]->FindInternalEnergy(roDummy, PDummy);
 
 		std::vector<double> res(nVariables);	
 		res[0] = roDummy;
@@ -98,7 +92,7 @@ public:
 		return res;
 	};
 
-	void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
+	virtual void loadConfiguration(BoundaryConditionConfiguration& bcConfig) {			
 		//Read configuration
 		//std::pair<double, bool> propertyValue;
 		//propertyValue = bcConfig.GetPropertyValue("Density");
@@ -115,7 +109,7 @@ public:
 		boundaryConditions[BoundaryVariableType::VelocityX].SetNeumanBoundary(0);
 		boundaryConditions[BoundaryVariableType::VelocityY].SetNeumanBoundary(0);
 		boundaryConditions[BoundaryVariableType::VelocityZ].SetNeumanBoundary(0);
-		boundaryConditions[BoundaryVariableType::Pressure].SetDirichletBoundary(1e5);
+		boundaryConditions[BoundaryVariableType::Pressure].SetNeumanBoundary(0);
 	}; 
 
 };

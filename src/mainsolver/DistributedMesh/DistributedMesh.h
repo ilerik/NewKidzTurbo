@@ -1,5 +1,5 @@
-#ifndef TURBO_GRID
-#define TURBO_GRID
+#ifndef NewKidzTurbo_MainSolver_DistributedMesh_DistributedMeshMesh
+#define NewKidzTurbo_MainSolver_DistributedMesh_DistributedMeshMesh
 
 #include "basetypes.h"
 #include "alglibmisc.h"
@@ -11,29 +11,21 @@
 #include <algorithm>
 #include <cassert>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "ParallelManager.h"
 
-#define DEBUG_GRID true
-
-//Specify supported element types
-
-//Node structure
+//Grid types
 struct Node {	
 	int GlobalIndex; //Global index of node
 	Vector P;		 //Position	
 };
 
-//Face types
-enum class FaceType {
-	Local,
-	Boundary,
-	Interprocessor
+enum FaceType {
+	LOCAL,
+	BOUNDARY,
+	INTERPROCESSOR
 };
 
-//Face related data
 struct Face {
 	int GlobalIndex;
 	ElementType_t CGNSType;
@@ -44,7 +36,9 @@ struct Face {
 	Vector FaceNormal;	//Surface normal * square
 	double FaceSquare;	//Face square
 	std::vector<int> FaceNodes;	//Indexes of all face nodes
+	int isExternal;		//If its an external face (FaceCell_2 == dummy cell global index)	
 	int BCMarker;		//Marker of boundary condition type	
+	std::map<std::string,  void*> Data; //Arbitrary data	
 
 	//Constructors
 	Face() {
@@ -78,32 +72,43 @@ struct Face {
 		msg << "Nodes : ";
 		for (int ind : FaceNodes) msg << ind << " ";
 		msg << "\n";
+		msg << "IsExternal = " << isExternal << "\n";
 		msg << "FaceNormal = (" << FaceNormal.x << "," << FaceNormal.y << "," << FaceNormal.z << ")\n";
 		return msg.str();
 	};
 };
 
-//Cell location types
-enum class CellLocation {
-	Local = 0,
-	Dummy = 1,
-	Ghost = 2
+struct FaceComparer
+{
+	//Is first less than second
+    bool operator()( const Face& first , const Face& second) const
+    {
+		//Compare length
+		if (first.FaceNodes.size() < second.FaceNodes.size()) return true;
+		if (first.FaceNodes.size() > second.FaceNodes.size()) return false;
+		//In case length are equal		
+		for (int i = 0; i<first.FaceNodes.size(); i++)
+			if (first.FaceNodes[i] != second.FaceNodes[i]) return first.FaceNodes[i] < second.FaceNodes[i];
+		//Last case they are equal
+		return false;
+    }
 };
 
-//Cell related data
 struct Cell {
 public:
 	//Common properties
 	int GlobalIndex;		//Global cell index
-	CellLocation Location;	//Cell location
+	bool IsDummy;			//Is dummy cell
+	int BCMarker;			//Boundary condition marker
 	ElementType_t CGNSType; //CGNS cell type	
 	std::vector<int> Nodes; //Cell  node indexes
 	std::vector<int> NeigbourCells; //Indexes of neighbour cells
-
 	//Local properties
+	int CGNSElementIndex;	//CGNS element index	
 	std::vector<int> Faces; //Indexes of all cell faces	
 	double CellVolume;		// Volume of cell
 	Vector CellCenter;		// Center of cell
+	double CellHSize;		// Size of cell		
 	std::map<std::string,  void*> Data; //Arbitrary data	
 
 	//Utility function outputs cell info
@@ -124,7 +129,37 @@ public:
 };
 
 
-//Grid level data
+
+//general info
+class GridInfo {
+public:
+	//Basic grid properties and cgns file info
+	std::string fileLocation;
+	int nCoords;
+	int CellDimensions;
+	int GridDimensions;	
+	int nNodes;
+	int nCells;
+
+	//CGNS info
+	int MainBaseIndex; //base index (one base assumed)
+	std::string MainBaseName; 
+	int MainZoneIndex; //zone index (one zone assumed)
+	std::string MainZoneName; 
+	std::vector<int> CellsSections; // volume elements sections (possible many)
+	std::vector<int> BoundarySections; // boundary elements sections (possible many)	
+
+	//raw cgns connectivity info
+	std::map<int, std::set<int> > cgnsIndexToElementNodes;	
+	std::map<int, ElementType_t > cgnsIndexToElementType;
+	std::vector<int> boundaryElements;  //Boundary faces
+	std::vector<int> volumeElements;	//Cells
+
+	//Indexes mapping and numeration
+	std::map<idx_t, idx_t> GlobalIndexToNumber;	// cell global index to number from [0, nCells-1]
+	std::map<idx_t, idx_t> NumberToGlobalIndex;	// number from [0, nCells-1] to cell global index	
+};
+
 class GridStructure {
 public:
 	//Flag set to true if grid was properly created
@@ -149,11 +184,6 @@ public:
 	std::vector<idx_t> adjncy;	//concateneted adjacency lists for each local cell	
 
 	//Local cells, faces and nodes
-	std::vector<int> localCells;
-	std::vector<int> localNodes;
-	//std::unordered_map<int, Cell> cells;
-	//std::unordered_map<int, Node> nodes;
-	//std::unordered_map<int, Node> faces;
 	int nProperCellsLocal;  //Number of local non dummy cells
 	int nCellsLocal;		//Number of local cells (including dummy)
 	int nFacesLocal;		//Number of local faces
@@ -162,7 +192,7 @@ public:
 	//std::vector<std::shared_ptr<Cell> > localCells;
 };
 
-class Grid
+class DistributedMesh
 {		
 	//Underlying MPI implementation
 	std::shared_ptr<ParallelManager> _MPIManager;
@@ -201,7 +231,18 @@ public:
 	int nFaces; //number of local faces
 	std::vector<Face> localFaces; // only local faces
 
-	
+	//Utility functions
+	inline bool IsDummyCell(int globalIndex) {
+		return Cells[globalIndex].IsDummy;
+	};
+
+	inline bool IsBoundaryFace(Face& face) {
+		return IsDummyCell(face.FaceCell_2);
+	};
+
+	inline int GetCellPart(int globalIndex) {
+		return cellsPartitioning[globalIndex];
+	};
 
 	//partitioning info
 	std::vector<int> cellsPartitioning; //map from cell number index to processor rank
@@ -228,6 +269,11 @@ public:
 			};			
 		};					
 	};
+
+	//Geometric properties computation
+	std::vector<Face> ObtainFaces(Cell* cell);
+	void ComputeGeometricProperties(Cell* cell);
+	void ComputeGeometricProperties(Face* face);
 	
 	//Patch operation section
 	void addPatch(std::string name, int bcMarker) {		
@@ -264,24 +310,11 @@ public:
 		gridStructure.Initialized = false;
 	};
 
-	//Geometric properties computation
-	std::vector<Face> ObtainFaces(Cell* cell);
-	void ComputeGeometricProperties(Cell* cell);
-	void ComputeGeometricProperties(Face* face);
-
 	void GenerateLocalCells();	//Generate local cells given partitioning
 	void GenerateLocalFaces();	//Generate local faces given partitioning
 	void GenerateLocalGrid();	//Generate local part of grid
-
-	//Grid partitioning routines
-	void PartitionGrid();		//Partition grid
+	//void PartitionGrid();		//Partition grid
 	
-	//Grid redistribution routines
-	void RequestGhostCell(int cellIndex);
-	void ExchangeGhostCells();
-
-	
-	void RequestNode(int nodeIndex);
 };
 
 /// Implementation part
