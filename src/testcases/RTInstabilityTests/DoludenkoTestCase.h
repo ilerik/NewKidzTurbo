@@ -1,5 +1,5 @@
-﻿#ifndef NewKidzTurbo_TestCases_RTInstabilityTests_RTInstabilityTestCase
-#define NewKidzTurbo_TestCases_RTInstabilityTests_RTInstabilityTestCase
+#ifndef NewKidzTurbo_TestCases_RTInstabilityTests_DoludenkoTestCase
+#define NewKidzTurbo_TestCases_RTInstabilityTests_DoludenkoTestCase
 
 #include "TestCase.h"
 #include "DSUClusteredSet.h"
@@ -87,7 +87,7 @@ struct TestSettings {
 //Numerical test for ALE method applie
 //The well-known Sod shocktube problem is considered in this test case, whose solution contains 
 //simultaneously a shock wave, a contact discontinuity, and an expansion fan.
-class RTInstabilityTestCase: public TestCase,  public InitialConditions::InitialConditions {
+class DoludenkoTestCase: public TestCase,  public InitialConditions::InitialConditions {
 protected:	
 	std::shared_ptr<Grid> _gridPtr; //Grid object	
 	Configuration _configuration; //Configuration object
@@ -102,11 +102,11 @@ protected:
 	Vector _interfaceNormal;
 public:
 	//Default constructor
-	RTInstabilityTestCase() {
+	DoludenkoTestCase() {
 	};
 
 	//Parametrized constructor
-	RTInstabilityTestCase( ParallelManager& MPIManager, TestSettings settings )
+	DoludenkoTestCase( ParallelManager& MPIManager, TestSettings settings )
 	{
 		_MPIManager = std::shared_ptr<ParallelManager>(&MPIManager);
 		_settings = settings;
@@ -159,18 +159,18 @@ public:
 
 		if (gasModel == GasModelType::Barotropic) {
 			double Pref = 2e14;	//P0 = 2*10^14 Pa	
-			if (material == MaterialType::Light) {
+			if (material == MaterialType::StainlessSteel) {
 				double roMetal = 4500; //steel reference density (ro2);
 				conf.GasModelName = "BarotropicGasModel";
-				conf.SetPropertyValue("YoungModulus", 2e13); // as for steel in http://en.wikipedia.org/wiki/Young%27s_modulus
+				conf.SetPropertyValue("YoungModulus", 200e6); // as for steel in http://en.wikipedia.org/wiki/Young%27s_modulus
 				conf.SetPropertyValue("ReferencePressure", Pref); 
 				conf.SetPropertyValue("ReferenceDensity", roMetal); 
 				return conf;
 			};
-			if (material == MaterialType::Heavy) {
+			if (material == MaterialType::Plumbum) {
 				double roMetal = 11400; //SI lead (Pb) ro1
 				conf.GasModelName = "BarotropicGasModel";
-				conf.SetPropertyValue("YoungModulus", 2e13); // as in http://en.wikipedia.org/wiki/Lead
+				conf.SetPropertyValue("YoungModulus", 16e6); // as in http://en.wikipedia.org/wiki/Lead
 				conf.SetPropertyValue("ReferencePressure", Pref); //
 				conf.SetPropertyValue("ReferenceDensity", roMetal); //				
 				return conf;
@@ -226,7 +226,7 @@ public:
 		};
 
 		if (type == BoundaryConditionType::Natural) {
-			conf.BoundaryConditionType = BCType_t::BCGeneral;
+			conf.BoundaryConditionType = BCType_t::BCOutflowSupersonic;
 			conf.MovementType = BoundaryConditionMovementType::Fixed;
 			conf.MaterialName = materialName;
 			return conf;			
@@ -319,18 +319,18 @@ public:
 		if (nmat == 0) {
 			//Light
 			ro = _settings.materialSettings.roLight;
-			pressure += _settings.gravity * dn * ro;			
+			pressure += _settings.gravity * dn * ro;
+			e = pressure / (0.4 * ro);
 		} else {
 			//Heavy
 			ro = _settings.materialSettings.roHeavy;
-			pressure += _settings.gravity * dn * ro;						
-			v = -500;
+			pressure += _settings.gravity * dn * ro;
+			e = pressure / (0.4 * ro);
 		};
-		e = pressure / (0.4 * ro);
 
 		double Lx = _settings.geometrySettings.xMax - _settings.geometrySettings.xMin;
 		double Ly = _settings.geometrySettings.yMax - _settings.geometrySettings.yMin;
-		//v = 1e-4 * (std::cos(1200*x) * std::exp(-std::abs(y)));
+		v = 0.01 * (1 + std::cos(2*PI*x/Lx)) * (1+cos(2*PI*y/Ly))/4.0;
 			
 		//Convert to conservative variables
 		roE = ro*(e + (u*u + v*v + w*w) / 2.0);
@@ -372,8 +372,8 @@ public:
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
 		_configuration.SpatialDiscretisation = _settings.methodSettings.spatialReconstruction;
-		_configuration.CFL = 0.1;
-		_configuration.RungeKuttaOrder = 4;		
+		_configuration.CFL = 0.4;
+		_configuration.RungeKuttaOrder = 1;		
 
 		//ALE settings
 		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;

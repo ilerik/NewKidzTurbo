@@ -387,6 +387,12 @@
     <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\meshadaptation\MeshAdaptationManager.h">
+      <Filter>Header Files\MeshAdaptation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\testcases\RTInstabilityTests\DoludenkoTestCase.h">
+      <Filter>Header Files\TestCases\RTInstabilityTests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
