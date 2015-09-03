@@ -1,4 +1,4 @@
-#ifndef TURBO_MAINSOLVER_KERNEL
+﻿#ifndef TURBO_MAINSOLVER_KERNEL
 #define TURBO_MAINSOLVER_KERNEL
 
 #include "grid.h"

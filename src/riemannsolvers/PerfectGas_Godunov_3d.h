@@ -36,6 +36,7 @@ public:
 		};
 
 		//Check if all gammas are the same
+    isCorrect = true;
 		for (int i = 0; i<gammas.size() - 1; i++) {
 			if (gammas[i] != gammas[i+1]) {
 				isCorrect = false;
@@ -294,7 +295,7 @@ public:
 
 			result.MaxSpeed = max(result.MaxSpeed, std::abs(result.SR));
 		} else {
-			//Left rarefaction
+			//Right rarefaction
 			result.rightWave = Rarefaction;
 
 			//Determine density in star region
