@@ -28,7 +28,7 @@ protected:
 	//Pertrubation position
 	double _pFunction(Vector r) {	
 		if (std::abs(r.y) > _D / 2.0) return r.x;
-    double x = _A * (1.0 + std::cos(1 * PI + 2.0 * PI * r.y * _n / (_D)));
+    double x = _A * (1.0 + std::cos(0 * PI + 2.0 * PI * r.y * _n / (_D)));
 		return r.x - x;
 	};
 
@@ -44,7 +44,7 @@ public:
 		//Pertrubation parameters
     _D = _widthY / 2.0;// 10.0e-3;
     _A = 0.2e-3;
-		_n = 2;
+		_n = 3;
 	};
 
 	//Prepare computational grid
