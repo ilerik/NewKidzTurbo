@@ -28,7 +28,7 @@ protected:
 	//Pertrubation position
 	double _pFunction(Vector r) {	
 		if (std::abs(r.y) > _D / 2.0) return r.x;
-		double x = _A * (1.0 + std::cos(2.0 * PI * r.y / (_n * _D)));
+    double x = _A * (1.0 + std::cos(2.0 * PI * r.y * _n / (_D)));
 		return r.x - x;
 	};
 
@@ -42,8 +42,8 @@ public:
 		_nCellsY = nCellsY;
 
 		//Pertrubation parameters
-		_D = 1.0e-3;
-		_A = 0.1e-3;
+    _D = _widthY / 2.0;// 10.0e-3;
+    _A = 0.2e-3;
 		_n = 1;
 	};
 
@@ -144,7 +144,7 @@ public:
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings
-		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDWnoRotation;
+		_configuration.ALEConfiguration.MeshMovementAlgorithm = MeshMovement::MeshMovementAlgorithm::IDW;
 		//_configuration.ALEConfiguration.ALEMotionType = "Lagrangian";		
 		_configuration.ALEConfiguration.ALEMotionType = "ALEMaterialInterfaces";		
 		//_configuration.ALEConfiguration.ALEMotionType = "Eulerian";		

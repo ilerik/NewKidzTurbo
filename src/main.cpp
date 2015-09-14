@@ -281,8 +281,8 @@ int main(int argc, char *argv[]) {
 	//	);
 
 	//Test 1
-	double widthSteel = 3e-3; //3 mm
-	double widthPb = 2e-3; //2 mm
+	double widthSteel = 1.5e-2; //3 mm
+	double widthPb = 1.5e-2; //2 mm
 	//TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1000,
 	//	1000, //snapshots
 	//	widthSteel, //
@@ -326,9 +326,9 @@ int main(int argc, char *argv[]) {
 	//TestCases1D::TestCase1DALE4 test;
 
 	//Test 1 2D
-	double width = 10e-3;
-	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 200, 200,
-		1000, //snapshots
+	double width = 3e-2;
+	TestCasesMetalsImpact::MetalsImpact2DTestCase test( 66, 66,
+		50, //snapshots
 		width, //
 		widthSteel, //
 		widthPb, 

@@ -413,6 +413,13 @@ public:
 				ro = _roRight;
 			};
 
+      /*const double dx = 3e-2 / 100;
+      const double dy = 3e-2 / 100;
+      if ((std::abs(cell.CellCenter.x - 0.0) <= dx) && (std::abs(cell.CellCenter.y - 0.0) <= dy)) {
+        u = 500;
+        v = 500;
+      };*/
+
 			//Outside is air
 			/*double atm = 1.1e5;
 			double gamma = 1.4;

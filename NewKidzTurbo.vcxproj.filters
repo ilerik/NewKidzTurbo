@@ -306,6 +306,9 @@
     <ClInclude Include="src\boundaryconditions\BCGeneral.h">
       <Filter>Header Files\BoundaryConditions</Filter>
     </ClInclude>
+    <ClInclude Include="src\testcases\TestCases2D\TestCase2D_ALE_SaltzmansProblem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
