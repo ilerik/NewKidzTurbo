@@ -549,6 +549,53 @@ private:
 		CR.push_back(0.16488581E+01);
 		C1R.push_back(0.81879050E+00);
 
+    //2 - Cu
+    V0.push_back(0.11200000E+00);
+    DX.push_back(0.98512793E+00);
+    CMN.push_back(0.32090862E+02);
+    GM.push_back(0.20000000E+01);
+    GN.push_back(0.15083531E+01);
+    ES.push_back(0.52300000E+01);
+    E0.push_back(0.11601043E+00);
+    A1.push_back(-0.65371002E+03);
+    A2.push_back(0.28425300E+04);
+    A3.push_back(-0.44766201E+04);
+    A4.push_back(0.26115000E+04);
+    A5.push_back(-0.32370001E+03);
+    TA.push_back(0.88399196E+00);
+    GC.push_back(0.20048616E+02);
+    GF.push_back(0.10064120E+01);
+    GI.push_back(0.50000000E+00);
+    QS.push_back(0.20000000E+01);
+    RS.push_back(0.50000000E+00);
+    SM.push_back(0.84974420E+00);
+    EA.push_back(0.18000000E+02);
+    CR.push_back(0.31175354E+01);
+    C1R.push_back(0.25285969E+01);
+
+    //3 - Ti
+    V0.push_back(0.22200000E+00);
+    DX.push_back(0.99185765E+00);
+    CMN.push_back(0.10463772E+02);
+    GM.push_back(0.30000000E+01);
+    GN.push_back(0.79043901E+00);
+    ES.push_back(0.97500000E+01);
+    E0.push_back(0.15371029E+00);
+    A1.push_back(-0.29326501E+03);
+    A2.push_back(0.34880301E+03);
+    A3.push_back(-0.13732100E+03);
+    A4.push_back(0.86291000E+02);
+    A5.push_back(-0.45079999E+01);
+    TA.push_back(0.44122058E+00);
+    GC.push_back(0.76616817E+01);
+    GF.push_back(0.10076891E+01);
+    GI.push_back(0.34999999E+00);
+    QS.push_back(0.20000000E+01);
+    RS.push_back(0.50000000E+00);
+    SM.push_back(0.87047338E+00);
+    EA.push_back(0.20000000E+02);
+    CR.push_back(0.31558700E+01);
+    C1R.push_back(0.30427899E+01);
 
 		/*V0.push_back(0.54200000E+00);V0.push_back(0.57700002E+00);V0.push_back(0.36899999E+00);V0.push_back(0.12000000E+00);
 		V0.push_back(0.13900000E+00);V0.push_back(0.11300000E+00);V0.push_back(0.11200000E+00);V0.push_back(0.11200000E+00);

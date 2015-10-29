@@ -313,17 +313,17 @@ int main(int argc, char *argv[]) {
 	//	);
 
 	//Test 1
-	double widthSteel = 3e-3; //3 mm
-	double widthPb = 2e-3; //2 mm
-	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 500,
-		200, //snapshots
-		widthSteel, //
-		widthPb, 
-		2.0e-6, // time = 2 mks
-		TestCasesMetalsImpact::MetalType::StainlessSteel,
-		0.0,
-		TestCasesMetalsImpact::MetalType::Plumbum,
-		-470.0
+	double widthCu = 3e-3; //3 mm
+	double widthPb = 2e-3;  //2 mm
+	TestCasesMetalsImpact::MetalsImpact1DTestCase test( 1200,
+		400, //snapshots
+    widthPb, //
+    widthCu, //
+		4.0e-6, // time = 2 mks	
+    TestCasesMetalsImpact::MetalType::Plumbum,
+		470.0,
+    TestCasesMetalsImpact::MetalType::Cuprum,
+    0.0
 		);
 
 	//Test 2

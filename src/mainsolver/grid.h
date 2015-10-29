@@ -31,18 +31,18 @@ enum FaceType {
 };
 
 struct Face {
-	ElementType_t CGNSType;
-	int GlobalIndex;
+  ElementType_t CGNSType;
+  int GlobalIndex;
 	
-	FaceType Type;		//Type of face (boundary, local, interprocessor)
-	int FaceCell_1;		//Index of cell 1
-	int FaceCell_2;		//Index of cell 2
-	Vector FaceCenter;	//Center of face
-	Vector FaceNormal;	//Surface normal * square
-	double FaceSquare;	//Face square
-	std::vector<int> FaceNodes;	//Indexes of all face nodes
-	int isExternal;		//If its an external face (FaceCell_2 == dummy cell global index)	
-	int BCMarker;		//Marker of boundary condition type	
+  FaceType Type;		//Type of face (boundary, local, interprocessor)
+  int FaceCell_1;		//Index of cell 1
+  int FaceCell_2;		//Index of cell 2
+  Vector FaceCenter;	//Center of face
+  Vector FaceNormal;	//Surface normal * square
+  double FaceSquare;	//Face square
+  std::vector<int> FaceNodes;	//Indexes of all face nodes
+  int isExternal;		//If its an external face (FaceCell_2 == dummy cell global index)	
+  int BCMarker;		//Marker of boundary condition type	
 	std::map<std::string,  void*> Data; //Arbitrary data	
 
 	//Constructors

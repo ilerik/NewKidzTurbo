@@ -89,12 +89,14 @@ public:
 		_configuration.GasModelsConfiguration["Air"].SetPropertyValue("SpecificHeatPressure", 1006.43);
 
 		//Boundary conditions
-		_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::Wall);
-		_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::FreeSurface);		
+    _configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("Air", BoundaryConditionType::FreeSurface);
+    _configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("Air", BoundaryConditionType::FreeSurface);		
+    //_configuration.BoundaryConditions["left"] = GetBoundaryConditionConfiguration("MetalLeft", BoundaryConditionType::FreeSurface);
+		//_configuration.BoundaryConditions["right"] = GetBoundaryConditionConfiguration("MetalRight", BoundaryConditionType::FreeSurface);		
 		
 		//Solver settings					
 		_configuration.SimulationType = TimeAccurate;
-		_configuration.CFL = 0.5;
+		_configuration.CFL = 0.25;
 		_configuration.RungeKuttaOrder = 4;		
 
 		//ALE settings

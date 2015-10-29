@@ -365,7 +365,7 @@ public:
 		//Create phases for time step calculations
 		std::shared_ptr<PerfomancePhase> computationPhase = runCalculationPhase->CreateSubPhase("Computation").lock();
 		std::shared_ptr<PerfomancePhase> snapshotsPhase = runCalculationPhase->CreateSubPhase("Snapshots").lock();
-		std::shared_ptr<PerfomancePhase> saveHistoryPhase = runCalculationPhase->CreateSubPhase("SaveHistory").lock();
+		std::shared_ptr<PerfomancePhase> saveHistoryPhase = runCalculationPhase->CreateSubPhase("  History").lock();
 		for (stepInfo.Iteration = 0; stepInfo.Iteration <= MaxIteration; stepInfo.Iteration++) {
 			//Perform timestep
 			computationPhase->Start();
@@ -1326,10 +1326,10 @@ public:
 				} else {
 					P = 0.0;
 				};*/
-				ofs<<a<<" ";
+				ofs<<1.0<<" ";
 			};
 		};
-		ofs<<std::endl;		
+		ofs<<std::endl;
 
 		//Output data for cells
 
@@ -1526,6 +1526,178 @@ public:
 		return TURBO_OK;
 	};	
 
+  //Check physical admissibility and separation conditions at faces (1D only)
+  void ComputeMeshSeparation() {    
+    //Detect separation and duplicate nodes
+    bool separation_flag{ false };
+    for (int i = 0; i < _grid.localFaces.size(); i++) {
+      Face& f = _grid.localFaces[i];
+
+      //Solution reconstruction
+      int nmatL = GetCellGasModelIndex(f.FaceCell_1);
+      int nmatR = GetCellGasModelIndex(f.FaceCell_2);
+      GasModel::ConservativeVariables UL;
+      GasModel::ConservativeVariables UR;
+      UL = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_1));      
+      UR = GasModel::ConservativeVariables(GetCellValues(f.FaceCell_2));
+      double PL = _gasModels[nmatL]->GetPressure(UL);
+      double PR = _gasModels[nmatR]->GetPressure(UR);      
+      
+      //Different materials
+      //is_separation &= (nmatL != nmatR);            
+
+      //Set constant separation pressure
+      const double PsPb = -1.0e9;
+      const double PsCu = -6.0e9;
+      const double Ps = 1.0e4;
+      const double uDeltaSurface = 0.0;
+      const double uDeltaCu = 10.0;
+      const double uDeltaPb = 10.0;
+
+      
+      double uL = (UL.rou / UL.ro);
+      double uR = (UR.rou / UR.ro);
+      double uDelta = (uR - uL) * f.FaceNormal.x;
+
+      //Kinematic and pressure condition      
+      bool is_separation{ false };
+      if ((nmatL == 0) && (nmatR == 0)) { // Plumbum
+        is_separation = ((PL < PsPb) || (PR < PsPb)); 
+        is_separation = is_separation && (uDelta > uDeltaPb);
+      };
+      if ((nmatL == 1) && (nmatR == 1)) { // Cuprum
+        is_separation = ((PL < PsCu) || (PR < PsCu)); 
+        is_separation = is_separation && (uDelta > uDeltaCu);
+      };
+      if ((nmatL != nmatR)) { //Surface
+        is_separation = ((PL < Ps) || (PR < Ps));
+        is_separation = is_separation && (uDelta > uDeltaSurface);
+      };
+
+      
+
+      //Total separation condition
+      is_separation = is_separation && !IsBoundaryFace(f);
+
+      if (is_separation) {
+        separation_flag = true;
+        std::cout << "Separation DETECTED! Face = " << f.GlobalIndex << std::endl;
+
+        //Duplicate node
+        int old_node_idx = f.FaceNodes.front();
+        int new_node_idx = _grid.localNodes.size();
+        const Node& old_node = _grid.localNodes[old_node_idx];
+        Node&& new_node = Node();
+        new_node.P = old_node.P;
+        new_node.GlobalIndex = new_node_idx;
+        _grid.localNodes.push_back(new_node);
+
+        //Adjust left cell and create dummy
+        int cIndexL{ f.FaceCell_1 };
+        Cell dummyCellL;
+        dummyCellL.GlobalIndex = _grid.nCells++;
+        dummyCellL.NeigbourCells.push_back(cIndexL);
+        dummyCellL.IsDummy = true;
+        dummyCellL.CGNSType = NODE;
+        dummyCellL.Nodes.clear();
+        dummyCellL.Nodes.push_back(old_node_idx);
+        dummyCellL.BCMarker = 2;
+        _grid.Cells.push_back(dummyCellL);        
+        for (auto& nc : _grid.Cells[cIndexL].NeigbourCells) if (nc == f.FaceCell_2) nc = dummyCellL.GlobalIndex;                
+
+        //Adjust left cell and create dummy
+        int cIndexR{ f.FaceCell_2 };
+        Cell dummyCellR;
+        dummyCellR.GlobalIndex = _grid.nCells++;
+        dummyCellR.NeigbourCells.push_back(cIndexR);
+        dummyCellR.IsDummy = true;
+        dummyCellR.CGNSType = NODE;
+        dummyCellR.Nodes.clear();
+        dummyCellR.Nodes.push_back(new_node_idx);
+        dummyCellR.BCMarker = 2;
+        _grid.Cells.push_back(dummyCellR);
+        for (auto& nc : _grid.Cells[cIndexR].NeigbourCells) if (nc == f.FaceCell_1) nc = dummyCellR.GlobalIndex;
+        for (auto& node_idx : _grid.Cells[cIndexR].Nodes) if (node_idx == old_node_idx) node_idx = new_node_idx;
+      };
+
+    };
+
+    if (!separation_flag) return; // Exit if no separation happened
+
+    //Ajust mesh
+    _grid.nDummyCells = _grid.Cells.size() - _grid.nProperCells;
+
+    //Fill in connectivity info
+    _grid.vdist.clear();
+    _grid.xadj.clear();
+    _grid.adjncy.clear();
+    //Allocate memory for data structures
+    Values.resize(nVariables * _grid.nCellsLocal);
+    Residual.resize(nVariables * _grid.nCellsLocal);
+    CellGasModel.resize(_grid.nCellsLocal);
+    FaceFluxes.resize(_grid.nFaces);
+    for (std::vector<double>& flux : FaceFluxes) {
+      flux.resize(nVariables);
+      for (double& v : flux) v = 0;
+    };
+    MaxWaveSpeed.resize(_grid.nFaces);
+    FacePressure.resize(_grid.nFaces);
+    //TO DO generalize
+    int rank = _parallelHelper.getRank();
+    int nProcessors = _parallelHelper.getProcessorNumber();
+    int vProc = _grid.nProperCells / nProcessors;
+    int vLeft = _grid.nProperCells % nProcessors;
+    _grid.vdist.resize(nProcessors + 1);
+    _grid.vdist[0] = 0;
+    for (int i = 0; i<nProcessors; i++) {
+      _grid.vdist[i + 1] = _grid.vdist[i] + vProc;
+      if (vLeft > 0) {
+        _grid.vdist[i + 1]++;
+        vLeft--;
+      };
+    };
+    _grid.vdist[nProcessors] = _grid.nProperCells;
+
+    /*assert(nProc == 1);
+    _grid.vdist.push_back(0);
+    _grid.vdist.push_back(_grid.nProperCells);*/
+
+    int currentInd = 0;
+    _grid.xadj.push_back(currentInd);
+    for (int i = _grid.vdist[rank]; i < _grid.vdist[rank + 1]; i++)
+    {
+      Cell& cell = _grid.Cells[i];
+      for (int j = 0; j<cell.NeigbourCells.size(); j++) {
+        int nIndex = cell.NeigbourCells[j];
+        if (nIndex >= _grid.nProperCells) continue; //Skip dummy
+        _grid.adjncy.push_back(nIndex);
+        currentInd++;
+      };
+      _grid.xadj.push_back(currentInd);
+    };
+
+    //Eliminate non local cells		
+    _grid.nCellsLocal = -_grid.vdist[rank] + _grid.vdist[rank + 1];
+    //_grid.ConstructAndCheckPatches();
+    _parallelHelper.Barrier();
+
+    //Update geometry and faces  
+    PartitionGrid(_grid);
+    GenerateGridGeometry(_grid);
+
+    //Allocate memory for data structures
+    Values.resize(nVariables * _grid.nCellsLocal);
+    Residual.resize(nVariables * _grid.nCellsLocal);
+    CellGasModel.resize(_grid.nCellsLocal);
+    FaceFluxes.resize(_grid.nFaces);
+    for (std::vector<double>& flux : FaceFluxes) {
+      flux.resize(nVariables);
+      for (double& v : flux) v = 0;
+    };
+    MaxWaveSpeed.resize(_grid.nFaces);
+    FacePressure.resize(_grid.nFaces);    
+  };
+
 	//Compute convective flux and max wave propagation speed throught each face
 	void ComputeConvectiveFluxes(std::vector<std::vector<double>>& fluxes, std::vector<double>& maxWaveSpeed, std::vector<double>& cellValues, std::vector<double>& ALEindicators) {
 		timerConvective.Resume();
@@ -1533,7 +1705,7 @@ public:
 		//Nullify all fluxes
 		for (std::vector<double>& flux : fluxes) {
 			for (double& v : flux) v = 0;
-		};
+		};    
 
 		//Compute gradients for second order reconstruction
 		/*if (IsSecondOrder) {
@@ -1557,9 +1729,8 @@ public:
 			msg<<"cell="<<p.first<<"values=("<<p.second[0]<<","<<p.second[1]<<","
 				<<p.second[2]<<","<<p.second[3]<<","<<p.second[4]<<")";
 		};
-		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/	
-
-
+		_logger.WriteMessage(LoggerMessageLevel::LOCAL, LoggerMessageType::INFORMATION, msg.str());*/	    
+  
 		//Compute convective flux for each cell face and apply boundary conditions								
 		#pragma omp for
 		for (int i = 0; i<_grid.localFaces.size(); i++) {
@@ -1607,7 +1778,7 @@ public:
 			RiemannProblemSolutionResult result = rSolver->Solve(nmatL, UL, nmatR, UR, f, faceVelocityAverage);			
 
 			//Store interface velocity and pressure for ALE
-			_ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;			
+      _ALEmethod.facesPressure[f.GlobalIndex] = FacePressure[f.GlobalIndex] = result.Pressure;			
 
 			//Store wave speeds			
 			maxWaveSpeed[f.GlobalIndex] = result.MaxEigenvalue;
@@ -1767,13 +1938,13 @@ public:
 		//Compute residual for each cell		
 		for ( int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++ )
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			Cell& cell = _grid.Cells[cellIndex];			
 			for (int i = 0; i < nVariables; i++) residual[cellIndex*nVariables + i] = 0;
-			std::vector<int>& nFaces = cell->Faces;
+			std::vector<int>& nFaces = cell.Faces;
 			for (int nFaceIndex : nFaces)
 			{
 				Face& face = _grid.localFaces[nFaceIndex];
-				int fluxDirection = (face.FaceCell_1 == cell->GlobalIndex) ? 1 : -1;		
+				int fluxDirection = (face.FaceCell_1 == cell.GlobalIndex) ? 1 : -1;		
 				std::vector<double> fluxc = FaceFluxes[nFaceIndex];
 				//std::vector<double> fluxv = vfluxes[nFaceIndex];
 				for (int j = 0; j<nVariables; j++) {
@@ -1798,9 +1969,9 @@ public:
 		spectralRadius.clear();		
 		for (int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++)
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			Cell& cell = _grid.Cells[cellIndex];			
 			spectralRadius[cellIndex] = 0;
-			std::vector<int>& nFaces = cell->Faces;
+			std::vector<int>& nFaces = cell.Faces;
 			for (int nFaceIndex : nFaces)
 			{
 				//Blazek f. 6.21
@@ -1815,9 +1986,9 @@ public:
 		localTimeStep.clear();
 		for (int cellIndex = 0; cellIndex<_grid.nCellsLocal; cellIndex++)
 		{
-			Cell* cell = _grid.localCells[cellIndex];			
+			Cell& cell = _grid.Cells[cellIndex];			
 			double sR = spectralRadius[cellIndex];
-			localTimeStep[cellIndex] = CFL * cell->CellVolume / sR; //Blazek f. 6.20
+			localTimeStep[cellIndex] = CFL * cell.CellVolume / sR; //Blazek f. 6.20
 		}
 	};	
 
@@ -1825,8 +1996,11 @@ public:
 	void ExplicitTimeStep() {
 		std::stringstream msg;
 
+    //Compute possible mesh separation
+    ComputeMeshSeparation();
+
 		//Compute residual	
-		timerResidual.Resume();
+		timerResidual.Resume();    
 		ComputeResidual(Residual, Values);
 		timerResidual.Pause();
 
@@ -1836,7 +2010,6 @@ public:
 		//Determine time step as global minimum over local time steps		
 		std::map<int, double> spectralRadius;
 		ComputeSpectralRadius(spectralRadius, MaxWaveSpeed, Values);
-
 
 		//Synchronize
 		_parallelHelper.Barrier();
@@ -1916,6 +2089,9 @@ public:
 			_parallelHelper.Barrier();
 
 			if (stage == nStages - 1) break;
+
+      //Compute possible mesh separation
+      ComputeMeshSeparation();
 
 			//Compute new residual
 			timerResidual.Resume();

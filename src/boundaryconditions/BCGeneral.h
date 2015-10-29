@@ -83,7 +83,8 @@ public:
 		double PDummy = boundaryConditions[BoundaryVariableType::Pressure].GetDummyValue(P, face, center); 
 
 
-		double roDummy = boundaryConditions[BoundaryVariableType::Density].GetDummyValue(ro, face, center);
+
+    double roDummy = boundaryConditions[BoundaryVariableType::Density].GetDummyValue(ro, face, center);
 		double uDummy = boundaryConditions[BoundaryVariableType::VelocityX].GetDummyValue(u, face, center);
 		double vDummy = boundaryConditions[BoundaryVariableType::VelocityY].GetDummyValue(v, face, center);
 		double wDummy = boundaryConditions[BoundaryVariableType::VelocityZ].GetDummyValue(w, face, center);
