@@ -67,7 +67,7 @@ public:
 		double Gr;
 		bool NF;
 		e /= 1e6; //J/kg -> kJ/g
-		ro /= 1000; //kg/cc -> g/cc
+		ro /= 1000; //kg/m^3 -> g/sm^3
 		EOSE5(ro, e, P, c, Gr, NF);
 		P *= 1e9;  //GPa -> Pa
 		c *= 1000; //km\s -> m\s
